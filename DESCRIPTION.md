@@ -1,0 +1,1 @@
+A CounterStrikeSharp plugin for CS2 community servers that adds matchmaking-style ranks that only go up, a level and a tiered challenge ladder for every weapon, and XP for around 50 detectable skill shots such as jumpshots, wallbangs, no-scopes, flicks, and efficient reloads, shown in an in-game side panel and stored in MariaDB or MySQL.

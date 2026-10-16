@@ -1,0 +1,73 @@
+// Copyright (c) 2023-2026 ktsu-dev contributors
+
+namespace ktsu.CounterStrikeProgression;
+
+using System.Globalization;
+using CounterStrikeSharp.API;
+using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Utils;
+using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.SkillShots;
+
+/// <summary>
+/// Turns what a player earned into chat lines. Rank-ups, finished tiers, and milestone weapon levels go to
+/// everyone, other level-ups and rare skill shots go to the player, and common skill shots stay quiet unless
+/// the config turns them on.
+/// </summary>
+/// <param name="config">The chat prefix and announcement settings.</param>
+internal sealed class Announcer(PluginConfig config)
+{
+	// Skill shots can land several times a second in a firefight, so the player hears about them at most this often.
+	private const double SkillShotMessageSeconds = 1.5;
+
+	/// <summary>
+	/// Announces a result.
+	/// </summary>
+	/// <param name="player">The player who earned it.</param>
+	/// <param name="session">The player's session.</param>
+	/// <param name="result">What they earned.</param>
+	public void Announce(CCSPlayerController player, PlayerSession session, ProgressionResult result)
+	{
+		Ensure.NotNull(player);
+		Ensure.NotNull(session);
+		Ensure.NotNull(result);
+
+		List<string> skillShots = [];
+		long skillShotXp = 0;
+		foreach (ProgressionNotice notice in result.Notices)
+		{
+			switch (notice.Kind)
+			{
+				case NoticeKind.SkillShot when (notice.SkillShot is not null) && ((notice.SkillShot.Rarity != Rarity.Common) || config.AnnounceCommonSkillShots):
+					skillShots.Add(notice.SkillShot.Name);
+					skillShotXp += notice.Xp;
+					break;
+
+				case NoticeKind.TierCompleted:
+					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} finished {ChatColors.Yellow}{notice.Weapon?.DisplayName} {notice.ChallengeName} {Core.Panel.PanelBuilder.Numeral(notice.Value)}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
+					break;
+
+				case NoticeKind.WeaponLevelUp when notice.Broadcast:
+					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default}'s {notice.Weapon?.DisplayName} reached level {ChatColors.Yellow}{notice.Value}{ChatColors.Default}");
+					break;
+
+				case NoticeKind.WeaponLevelUp:
+					player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {notice.Weapon?.DisplayName} reached level {ChatColors.Yellow}{notice.Value}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
+					break;
+
+				case NoticeKind.RankUp:
+					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} ranked up to {ChatColors.Gold}{RankLadder.Names[notice.Value]}{ChatColors.Default}!");
+					break;
+			}
+		}
+
+		double now = Server.CurrentTime;
+		if ((skillShots.Count > 0) && ((now - session.LastSkillShotMessage) >= SkillShotMessageSeconds))
+		{
+			session.LastSkillShotMessage = now;
+			player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.LightPurple}{string.Join(", ", skillShots)}{ChatColors.Default} +{Xp(skillShotXp)} XP");
+		}
+	}
+
+	private static string Xp(long xp) => xp.ToString("N0", CultureInfo.InvariantCulture);
+}

@@ -1,0 +1,14 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="CounterStrikeSharp.API" Version="1.0.376" />
+    <PackageVersion Include="Dapper" Version="2.1.89" />
+    <PackageVersion Include="ktsu.Extensions" Version="1.9.3" />
+    <PackageVersion Include="ktsu.Semantics.Strings" Version="5.12.1" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+    <PackageVersion Include="MySqlConnector" Version="2.6.2" />
+    <PackageVersion Include="Polyfill" Version="11.4.5" />
+  </ItemGroup>
+</Project>

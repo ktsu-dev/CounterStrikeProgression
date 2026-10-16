@@ -1,0 +1,193 @@
+// Copyright (c) 2023-2026 ktsu-dev contributors
+
+namespace ktsu.CounterStrikeProgression.Core.Storage;
+
+using System.Runtime.CompilerServices;
+using Dapper;
+using ktsu.CounterStrikeProgression.Core.Progression;
+using MySqlConnector;
+
+/// <summary>
+/// Keeps progress in MariaDB or MySQL, in tables prefixed <c>csp_</c>.
+/// </summary>
+internal sealed class MySqlProgressionStore : IProgressionStore
+{
+	/// <summary>The schema version these statements create and expect.</summary>
+	public const int SchemaVersion = 1;
+
+	private const string CreateTables = """
+		CREATE TABLE IF NOT EXISTS csp_schema (
+			id TINYINT NOT NULL PRIMARY KEY,
+			version INT NOT NULL
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+		CREATE TABLE IF NOT EXISTS csp_players (
+			steam_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+			name VARCHAR(128) NOT NULL DEFAULT '',
+			rank_xp BIGINT NOT NULL DEFAULT 0,
+			rank_index INT NOT NULL DEFAULT 0,
+			first_seen DATETIME NOT NULL,
+			last_seen DATETIME NOT NULL,
+			KEY idx_csp_players_rank_xp (rank_xp)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+		CREATE TABLE IF NOT EXISTS csp_weapons (
+			steam_id BIGINT UNSIGNED NOT NULL,
+			weapon VARCHAR(32) NOT NULL,
+			xp BIGINT NOT NULL DEFAULT 0,
+			level INT NOT NULL DEFAULT 1,
+			kills BIGINT NOT NULL DEFAULT 0,
+			headshots BIGINT NOT NULL DEFAULT 0,
+			hits BIGINT NOT NULL DEFAULT 0,
+			shots BIGINT NOT NULL DEFAULT 0,
+			PRIMARY KEY (steam_id, weapon)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+		CREATE TABLE IF NOT EXISTS csp_challenges (
+			steam_id BIGINT UNSIGNED NOT NULL,
+			weapon VARCHAR(32) NOT NULL,
+			challenge VARCHAR(48) NOT NULL,
+			count BIGINT NOT NULL DEFAULT 0,
+			tier INT NOT NULL DEFAULT 0,
+			PRIMARY KEY (steam_id, weapon, challenge)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+		INSERT IGNORE INTO csp_schema (id, version) VALUES (1, @version);
+		""";
+
+	private const string UpsertPlayer = """
+		INSERT INTO csp_players (steam_id, name, rank_xp, rank_index, first_seen, last_seen)
+		VALUES (@SteamId, @Name, @RankXp, @Rank, @FirstSeen, @LastSeen)
+		ON DUPLICATE KEY UPDATE name = VALUES(name), rank_xp = VALUES(rank_xp), rank_index = VALUES(rank_index), last_seen = VALUES(last_seen);
+		""";
+
+	private const string UpsertWeapon = """
+		INSERT INTO csp_weapons (steam_id, weapon, xp, level, kills, headshots, hits, shots)
+		VALUES (@SteamId, @Weapon, @Xp, @Level, @Kills, @Headshots, @Hits, @Shots)
+		ON DUPLICATE KEY UPDATE xp = VALUES(xp), level = VALUES(level), kills = VALUES(kills), headshots = VALUES(headshots), hits = VALUES(hits), shots = VALUES(shots);
+		""";
+
+	private const string UpsertChallenge = """
+		INSERT INTO csp_challenges (steam_id, weapon, challenge, count, tier)
+		VALUES (@SteamId, @Weapon, @Challenge, @Count, @Tier)
+		ON DUPLICATE KEY UPDATE count = VALUES(count), tier = VALUES(tier);
+		""";
+
+	private readonly string connectionString;
+
+	/// <summary>
+	/// Initializes a new instance of the <see cref="MySqlProgressionStore"/> class.
+	/// </summary>
+	/// <param name="settings">Where the database is.</param>
+	public MySqlProgressionStore(DatabaseSettings settings)
+	{
+		Ensure.NotNull(settings);
+		connectionString = new MySqlConnectionStringBuilder
+		{
+			Server = settings.Host,
+			Port = (uint)settings.Port,
+			Database = settings.Database,
+			UserID = settings.User,
+			Password = settings.Password,
+			SslMode = settings.RequireTls ? MySqlSslMode.Required : MySqlSslMode.Preferred,
+			AllowUserVariables = false,
+			ConnectionTimeout = 15,
+		}.ConnectionString;
+	}
+
+	/// <inheritdoc/>
+	public async Task InitializeAsync(CancellationToken cancellationToken)
+	{
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		await connection.ExecuteAsync(new CommandDefinition(CreateTables, new { version = SchemaVersion }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+	}
+
+	/// <inheritdoc/>
+	public async Task<PlayerProgress?> LoadAsync(ulong steamId, CancellationToken cancellationToken)
+	{
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		object parameters = new { steamId };
+
+		PlayerRow? player = await connection.QuerySingleOrDefaultAsync<PlayerRow>(new CommandDefinition(
+			"SELECT steam_id AS SteamId, name AS Name, rank_xp AS RankXp, rank_index AS `Rank`, first_seen AS FirstSeen, last_seen AS LastSeen FROM csp_players WHERE steam_id = @steamId",
+			parameters,
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+		if (player is null)
+		{
+			return null;
+		}
+
+		IEnumerable<WeaponRow> weapons = await connection.QueryAsync<WeaponRow>(new CommandDefinition(
+			"SELECT steam_id AS SteamId, weapon AS Weapon, xp AS Xp, level AS Level, kills AS Kills, headshots AS Headshots, hits AS Hits, shots AS Shots FROM csp_weapons WHERE steam_id = @steamId",
+			parameters,
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+		IEnumerable<ChallengeRow> challenges = await connection.QueryAsync<ChallengeRow>(new CommandDefinition(
+			"SELECT steam_id AS SteamId, weapon AS Weapon, challenge AS Challenge, count AS `Count`, tier AS Tier FROM csp_challenges WHERE steam_id = @steamId",
+			parameters,
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+		return ProgressSnapshot.Rebuild(player, weapons, challenges);
+	}
+
+	/// <inheritdoc/>
+	public async Task SaveAsync(ProgressSnapshot snapshot, CancellationToken cancellationToken)
+	{
+		Ensure.NotNull(snapshot);
+		if (snapshot.IsEmpty)
+		{
+			return;
+		}
+
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		MySqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable transactionScope = transaction.ConfigureAwait(false);
+
+		if (snapshot.Player is not null)
+		{
+			await connection.ExecuteAsync(new CommandDefinition(UpsertPlayer, snapshot.Player, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+		}
+
+		if (snapshot.Weapons.Count > 0)
+		{
+			await connection.ExecuteAsync(new CommandDefinition(UpsertWeapon, snapshot.Weapons, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+		}
+
+		if (snapshot.Challenges.Count > 0)
+		{
+			await connection.ExecuteAsync(new CommandDefinition(UpsertChallenge, snapshot.Challenges, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+		}
+
+		await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+	}
+
+	/// <inheritdoc/>
+	public async Task<IReadOnlyList<LeaderboardEntry>> TopAsync(int count, CancellationToken cancellationToken)
+	{
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		IEnumerable<LeaderboardEntry> top = await connection.QueryAsync<LeaderboardEntry>(new CommandDefinition(
+			"SELECT name AS Name, rank_xp AS RankXp, rank_index AS `Rank` FROM csp_players ORDER BY rank_xp DESC LIMIT @count",
+			new { count },
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+		return [.. top];
+	}
+
+	private async Task<MySqlConnection> OpenAsync(CancellationToken cancellationToken)
+	{
+		MySqlConnection connection = new(connectionString);
+		try
+		{
+			await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+			return connection;
+		}
+		catch
+		{
+			await connection.DisposeAsync().ConfigureAwait(false);
+			throw;
+		}
+	}
+}

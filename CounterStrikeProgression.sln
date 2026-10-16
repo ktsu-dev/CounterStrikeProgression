@@ -1,0 +1,62 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CounterStrikeProgression.Core", "CounterStrikeProgression.Core\CounterStrikeProgression.Core.csproj", "{8241B55B-5104-4BEB-B890-5E94A6144E1E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CounterStrikeProgression", "CounterStrikeProgression\CounterStrikeProgression.csproj", "{AA8DDBB7-3381-49E0-8331-871BC04AA3AA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CounterStrikeProgression.Test", "CounterStrikeProgression.Test\CounterStrikeProgression.Test.csproj", "{EA19D0A2-DF32-4B2C-8FEA-5687703B1AA2}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8241B55B-5104-4BEB-B890-5E94A6144E1E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8241B55B-5104-4BEB-B890-5E94A6144E1E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8241B55B-5104-4BEB-B890-5E94A6144E1E}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8241B55B-5104-4BEB-B890-5E94A6144E1E}.Debug|x64.Build.0 = Debug|Any CPU
+		{8241B55B-5104-4BEB-B890-5E94A6144E1E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{8241B55B-5104-4BEB-B890-5E94A6144E1E}.Debug|x86.Build.0 = Debug|Any CPU
+		{8241B55B-5104-4BEB-B890-5E94A6144E1E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8241B55B-5104-4BEB-B890-5E94A6144E1E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8241B55B-5104-4BEB-B890-5E94A6144E1E}.Release|x64.ActiveCfg = Release|Any CPU
+		{8241B55B-5104-4BEB-B890-5E94A6144E1E}.Release|x64.Build.0 = Release|Any CPU
+		{8241B55B-5104-4BEB-B890-5E94A6144E1E}.Release|x86.ActiveCfg = Release|Any CPU
+		{8241B55B-5104-4BEB-B890-5E94A6144E1E}.Release|x86.Build.0 = Release|Any CPU
+		{AA8DDBB7-3381-49E0-8331-871BC04AA3AA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AA8DDBB7-3381-49E0-8331-871BC04AA3AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AA8DDBB7-3381-49E0-8331-871BC04AA3AA}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{AA8DDBB7-3381-49E0-8331-871BC04AA3AA}.Debug|x64.Build.0 = Debug|Any CPU
+		{AA8DDBB7-3381-49E0-8331-871BC04AA3AA}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{AA8DDBB7-3381-49E0-8331-871BC04AA3AA}.Debug|x86.Build.0 = Debug|Any CPU
+		{AA8DDBB7-3381-49E0-8331-871BC04AA3AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AA8DDBB7-3381-49E0-8331-871BC04AA3AA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AA8DDBB7-3381-49E0-8331-871BC04AA3AA}.Release|x64.ActiveCfg = Release|Any CPU
+		{AA8DDBB7-3381-49E0-8331-871BC04AA3AA}.Release|x64.Build.0 = Release|Any CPU
+		{AA8DDBB7-3381-49E0-8331-871BC04AA3AA}.Release|x86.ActiveCfg = Release|Any CPU
+		{AA8DDBB7-3381-49E0-8331-871BC04AA3AA}.Release|x86.Build.0 = Release|Any CPU
+		{EA19D0A2-DF32-4B2C-8FEA-5687703B1AA2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EA19D0A2-DF32-4B2C-8FEA-5687703B1AA2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EA19D0A2-DF32-4B2C-8FEA-5687703B1AA2}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{EA19D0A2-DF32-4B2C-8FEA-5687703B1AA2}.Debug|x64.Build.0 = Debug|Any CPU
+		{EA19D0A2-DF32-4B2C-8FEA-5687703B1AA2}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{EA19D0A2-DF32-4B2C-8FEA-5687703B1AA2}.Debug|x86.Build.0 = Debug|Any CPU
+		{EA19D0A2-DF32-4B2C-8FEA-5687703B1AA2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EA19D0A2-DF32-4B2C-8FEA-5687703B1AA2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EA19D0A2-DF32-4B2C-8FEA-5687703B1AA2}.Release|x64.ActiveCfg = Release|Any CPU
+		{EA19D0A2-DF32-4B2C-8FEA-5687703B1AA2}.Release|x64.Build.0 = Release|Any CPU
+		{EA19D0A2-DF32-4B2C-8FEA-5687703B1AA2}.Release|x86.ActiveCfg = Release|Any CPU
+		{EA19D0A2-DF32-4B2C-8FEA-5687703B1AA2}.Release|x86.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
