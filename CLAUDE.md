@@ -45,6 +45,7 @@ Nothing goes to NuGet. ktsu.Sdk marks every library packable from its targets, a
 - **`CounterStrikeProgression/CombatHandlers.cs`:** the combat events that become `CombatEvent` snapshots.
 - **`CounterStrikeProgression/LifecycleHandlers.cs`:** connects, spawns, rounds, the per-tick tracking, and the transmit filter.
 - **`CounterStrikeProgression/Panel/WorldTextPanel.cs`:** the side panel, a `point_worldtext` moved in front of the eyes every tick.
+- **`CounterStrikeProgression/Panel/XpFloaties.cs`:** the floating "+XP" text, one billboarded `point_worldtext` per floatie, risen and faded each tick. `Core/Floaties/FloatieMerger.cs` decides when gains on one target merge and what the text says. Panels and floaties are both hidden from everyone but their owner by the transmit filter in `LifecycleHandlers`.
 
 ### Dependencies
 

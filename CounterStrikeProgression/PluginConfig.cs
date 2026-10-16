@@ -63,6 +63,48 @@ public sealed class PanelSettings
 }
 
 /// <summary>
+/// The "+XP" text that floats in the world when a player earns XP.
+/// </summary>
+public sealed class FloatieSettings
+{
+	/// <summary>Gets or sets a value indicating whether floaties are shown.</summary>
+	public bool Enabled { get; set; } = true;
+
+	/// <summary>Gets or sets how long a floatie lasts, in seconds.</summary>
+	public double LifetimeSeconds { get; set; } = 1.4;
+
+	/// <summary>Gets or sets how far a floatie rises over its life, in units.</summary>
+	public double RiseUnits { get; set; } = 28;
+
+	/// <summary>Gets or sets how soon after one gain the next on the same target adds to the same floatie, in seconds.</summary>
+	public double MergeSeconds { get; set; } = 0.75;
+
+	/// <summary>Gets or sets the most floaties one player can have showing at once. The oldest goes first.</summary>
+	public int MaxPerPlayer { get; set; } = 6;
+
+	/// <summary>Gets or sets the font size.</summary>
+	public float FontSize { get; set; } = 48;
+
+	/// <summary>Gets or sets how much bigger a floatie is drawn per unit of distance, so far ones stay readable.</summary>
+	public double SizePerUnitOfDistance { get; set; } = 0.00022;
+
+	/// <summary>Gets or sets the smallest world units per pixel, for floaties close by.</summary>
+	public double MinWorldUnitsPerPixel { get; set; } = 0.025;
+
+	/// <summary>Gets or sets the largest world units per pixel, for floaties far away.</summary>
+	public double MaxWorldUnitsPerPixel { get; set; } = 0.6;
+
+	/// <summary>Gets or sets how far in front of the player a floatie with no target appears, in units.</summary>
+	public double SelfDistance { get; set; } = 90;
+
+	/// <summary>Gets or sets the color of plain XP, as #RRGGBB.</summary>
+	public string Color { get; set; } = "#FFFFFF";
+
+	/// <summary>Gets or sets the color when a floatie names a skill shot, tier, level, or rank-up, as #RRGGBB.</summary>
+	public string HighlightColor { get; set; } = "#F2C94C";
+}
+
+/// <summary>
 /// The plugin's config file, <c>configs/plugins/CounterStrikeProgression/CounterStrikeProgression.json</c>.
 /// </summary>
 public sealed class PluginConfig : BasePluginConfig
@@ -75,6 +117,9 @@ public sealed class PluginConfig : BasePluginConfig
 
 	/// <summary>Gets or sets the progress panel.</summary>
 	public PanelSettings Panel { get; set; } = new();
+
+	/// <summary>Gets or sets the floating "+XP" text.</summary>
+	public FloatieSettings Floaties { get; set; } = new();
 
 	/// <summary>Gets or sets how often, in seconds, changed progress is saved.</summary>
 	public float SaveIntervalSeconds { get; set; } = 60;

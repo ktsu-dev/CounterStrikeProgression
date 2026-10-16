@@ -53,6 +53,7 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 			services.Panel.Close(null, session);
 		}
 
+		services.Floaties.RemoveOwner(playerSlot);
 		Sessions.DisconnectSlot(playerSlot);
 	}
 
@@ -134,6 +135,8 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 
 			services.Panel.Tick(player, session);
 		}
+
+		services.Floaties.Tick();
 	}
 
 	private static void TrackPawn(PlayerSession session, CCSPlayerPawn pawn, double now)
@@ -162,6 +165,7 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 	{
 		GameState.ForgetMap();
 		services.Panel.WorldText.HideAll();
+		services.Floaties.RemoveAll();
 		foreach (PlayerSession session in Sessions.All)
 		{
 			session.Panel.IsOpen = false;
@@ -172,12 +176,13 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 
 	private void OnCheckTransmit(CCheckTransmitInfoList infoList)
 	{
-		if (!services.Panel.WorldText.Any)
+		IReadOnlyList<(int Slot, uint Index)> panels = services.Panel.WorldText.Shown;
+		IReadOnlyList<(int Slot, uint Index)> floaties = services.Floaties.Shown;
+		if ((panels.Count == 0) && (floaties.Count == 0))
 		{
 			return;
 		}
 
-		IReadOnlyList<(int Slot, uint Index)> panels = services.Panel.WorldText.Shown;
 		foreach ((CCheckTransmitInfo info, CCSPlayerController? viewer) in infoList)
 		{
 			if (viewer is null)
@@ -185,13 +190,19 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 				continue;
 			}
 
-			// Every panel except the viewer's own is withheld from them.
-			for (int i = 0; i < panels.Count; i++)
+			// Every panel and floatie except the viewer's own is withheld from them.
+			HideOthers(info, panels, viewer.Slot);
+			HideOthers(info, floaties, viewer.Slot);
+		}
+	}
+
+	private static void HideOthers(CCheckTransmitInfo info, IReadOnlyList<(int Slot, uint Index)> owned, int viewerSlot)
+	{
+		for (int i = 0; i < owned.Count; i++)
+		{
+			if (owned[i].Slot != viewerSlot)
 			{
-				if (panels[i].Slot != viewer.Slot)
-				{
-					info.TransmitEntities.Remove(panels[i].Index);
-				}
+				info.TransmitEntities.Remove(owned[i].Index);
 			}
 		}
 	}

@@ -4,6 +4,7 @@ namespace ktsu.CounterStrikeProgression;
 
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Utils;
 using ktsu.CounterStrikeProgression.Core.Events;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Tracking;
@@ -145,19 +146,20 @@ internal sealed class CombatHandlers(ProgressionServices services)
 		// bullet_damage carries the wallbang count. If it hasn't arrived for this bullet yet, the hit waits one
 		// frame for it rather than guessing the order CS2 sends the two in.
 		int victimSlot = victim.Slot;
+		Vector? victimAt = Copy(victimPawn?.AbsOrigin);
 		if (BulletPenetrations(session, tick, victimSlot) is int known)
 		{
-			services.Apply(attacker, session, Engine.ApplyCombat(progress, hit with { Penetrations = known }));
+			services.Apply(attacker, session, Engine.ApplyCombat(progress, hit with { Penetrations = known }), victimSlot, victimAt);
 		}
 		else
 		{
-			Server.NextFrame(() => ApplyLateHit(session, progress, hit, tick, victimSlot));
+			Server.NextFrame(() => ApplyLateHit(session, progress, hit, tick, victimSlot, victimAt));
 		}
 
 		return HookResult.Continue;
 	}
 
-	private void ApplyLateHit(PlayerSession session, PlayerProgress progress, CombatEvent hit, int tick, int victimSlot)
+	private void ApplyLateHit(PlayerSession session, PlayerProgress progress, CombatEvent hit, int tick, int victimSlot, Vector? victimAt)
 	{
 		CCSPlayerController? attacker = Utilities.GetPlayerFromSlot(session.Slot);
 		if ((Sessions.Get(attacker) != session) || !ReferenceEquals(session.Progress, progress))
@@ -166,8 +168,11 @@ internal sealed class CombatHandlers(ProgressionServices services)
 		}
 
 		int penetrations = BulletPenetrations(session, tick, victimSlot) ?? 0;
-		services.Apply(attacker!, session, Engine.ApplyCombat(progress, hit with { Penetrations = penetrations }));
+		services.Apply(attacker!, session, Engine.ApplyCombat(progress, hit with { Penetrations = penetrations }), victimSlot, victimAt);
 	}
+
+	// Positions are read from live entity memory, so a value kept for later is copied first.
+	private static Vector? Copy(Vector? position) => position is null ? null : new Vector(position.X, position.Y, position.Z);
 
 	private static int? BulletPenetrations(PlayerSession session, int tick, int victimSlot)
 	{
@@ -218,7 +223,7 @@ internal sealed class CombatHandlers(ProgressionServices services)
 		CombatEvent kill = BuildKill(@event, victim, attackerPawn, weapon, session.Combat.Read(Server.CurrentTime), context, session.LastHitVictim);
 		session.Combat.KillMade();
 		session.LastKillWeapon = weapon;
-		services.Apply(attacker, session, Engine.ApplyCombat(progress, kill));
+		services.Apply(attacker, session, Engine.ApplyCombat(progress, kill), victim.Slot, Copy(GameState.PawnOf(victim)?.AbsOrigin));
 		return HookResult.Continue;
 	}
 
@@ -234,7 +239,7 @@ internal sealed class CombatHandlers(ProgressionServices services)
 			return HookResult.Continue;
 		}
 
-		services.Apply(attacker, session, Engine.ApplyFlash(progress, new FlashEvent(flashbang, @event.BlindDuration, victim.IsBot)));
+		services.Apply(attacker, session, Engine.ApplyFlash(progress, new FlashEvent(flashbang, @event.BlindDuration, victim.IsBot)), victim.Slot, Copy(GameState.PawnOf(victim)?.AbsOrigin));
 		return HookResult.Continue;
 	}
 
@@ -321,7 +326,7 @@ internal sealed class CombatHandlers(ProgressionServices services)
 			: GameState.ResolveWeapon(GameState.ActiveWeapon(pawn)?.DesignerName, pawn);
 		if (weapon is not null)
 		{
-			services.Apply(assister, session, Engine.ApplyAssist(progress, new AssistEvent(weapon, @event.Assistedflash, victim.IsBot)));
+			services.Apply(assister, session, Engine.ApplyAssist(progress, new AssistEvent(weapon, @event.Assistedflash, victim.IsBot)), victim.Slot, Copy(GameState.PawnOf(victim)?.AbsOrigin));
 		}
 	}
 

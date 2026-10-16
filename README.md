@@ -22,6 +22,7 @@ Players climb an up-only rank ladder from Silver I to Global Elite. Every weapon
 - **Skill shots**: about 50, covering movement, distance, wallbangs and smokes, scopes, utility and melee, timing and aim, multi-kills, and round situations.
 - **Bots count, at a reduced rate**: rank XP against bots is scaled down, while weapon levels and ladders still move, so practice against bots isn't wasted.
 - **In-game panel**: `!rank` opens a side panel to the right of the view. It falls back to a center-screen card and then to chat if a way of drawing fails.
+- **XP floaties**: every XP gain floats up in the world as "+XP" text, above the target for hits and kills and in front of you otherwise. Only you see your own. Quick hits on one target add up in one floatie, and skill shots, tiers, and level-ups are named under the number in gold.
 - **Announcements**: rank-ups, finished tiers, and every fifth weapon level go to the whole server.
 - **Durable storage**: progress is kept in MariaDB or MySQL in `csp_` tables, saved off the game thread, and retried after a failed save without double counting.
 - **Configurable**: every XP value, multiplier, and detection threshold is a setting.
@@ -87,6 +88,8 @@ Settings left out keep their defaults.
 - **Detection thresholds:** such as `MovingTargetSpeed`, `QuickscopeSeconds`, `FlickDegrees`, and `EfficientReloadFraction`.
 
 ### Panel placement
+
+`Floaties` turns the floating XP text on or off and sets how long it lasts, how far it rises, how quickly gains merge, how many one player can have at once, and its colors.
 
 `Panel` sets the draw mode (`Auto`, `WorldText`, `CenterHtml`, or `Chat`), how many lines each mode shows, and the side panel's font size, scale, color, and offsets. The default placement suits a 16:9 display. CS2 has no client-predicted anchor for world text, so the side panel trails slightly behind fast turns.
 

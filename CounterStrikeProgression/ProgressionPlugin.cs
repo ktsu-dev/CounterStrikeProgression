@@ -69,6 +69,7 @@ public sealed class ProgressionPlugin : BasePlugin, IPluginConfig<PluginConfig>
 	public override void Unload(bool hotReload)
 	{
 		services?.Panel.WorldText.HideAll();
+		services?.Floaties.RemoveAll();
 		services?.Sessions.Shutdown(TimeSpan.FromSeconds(5));
 	}
 

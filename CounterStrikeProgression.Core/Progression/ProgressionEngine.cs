@@ -327,6 +327,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings)
 
 	private void CreditRankXp(PlayerProgress player, double xp, ProgressionResult result)
 	{
+		result.XpEarned += Math.Max(0, xp);
 		double total = player.PendingXp + xp;
 		long whole = (long)Math.Floor(total);
 		player.PendingXp = total - whole;

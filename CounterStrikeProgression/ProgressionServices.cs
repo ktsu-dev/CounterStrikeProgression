@@ -3,6 +3,8 @@
 namespace ktsu.CounterStrikeProgression;
 
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Utils;
+using ktsu.CounterStrikeProgression.Core.Floaties;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Tracking;
 using ktsu.CounterStrikeProgression.Panel;
@@ -31,6 +33,9 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	/// <summary>Gets the progress panels.</summary>
 	public PanelPresenter Panel { get; } = panel;
 
+	/// <summary>Gets the floating "+XP" text.</summary>
+	public XpFloaties Floaties { get; } = new(config.Floaties);
+
 	/// <summary>Gets the round's kills.</summary>
 	public RoundTracker Round { get; } = new(config.Progression);
 
@@ -38,20 +43,23 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	public ILogger Logger { get; } = logger;
 
 	/// <summary>
-	/// Refreshes a player's panel and announces what they earned.
+	/// Refreshes a player's panel, shows a floatie, and announces what they earned.
 	/// </summary>
 	/// <param name="player">The player.</param>
 	/// <param name="session">The player's session.</param>
 	/// <param name="result">What they earned.</param>
-	public void Apply(CCSPlayerController player, PlayerSession session, ProgressionResult result)
+	/// <param name="floatieKey">The target's slot, so gains on one target share a floatie, or <see cref="FloatieMerger.SelfKey"/>.</param>
+	/// <param name="at">Where the target stands, or <see langword="null"/> to float the XP in front of the player.</param>
+	public void Apply(CCSPlayerController player, PlayerSession session, ProgressionResult result, int floatieKey = FloatieMerger.SelfKey, Vector? at = null)
 	{
 		Ensure.NotNull(result);
-		if ((result.XpGained == 0) && (result.Notices.Count == 0))
+		if ((result.XpEarned <= 0) && (result.Notices.Count == 0))
 		{
 			return;
 		}
 
 		PanelPresenter.Invalidate(session);
+		Floaties.Show(player, result, floatieKey, at);
 		announcer.Announce(player, session, result);
 	}
 

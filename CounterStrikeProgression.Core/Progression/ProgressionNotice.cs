@@ -51,6 +51,12 @@ internal sealed class ProgressionResult
 	/// <summary>Gets the whole rank XP points credited.</summary>
 	public long XpGained { get; internal set; }
 
+	/// <summary>
+	/// Gets the rank XP earned, including fractions too small to credit yet, such as a quarter point for
+	/// hitting a bot. It's what the XP floaties show.
+	/// </summary>
+	public double XpEarned { get; internal set; }
+
 	/// <summary>Gets the moments worth telling the player about, in the order they happened.</summary>
 	public IList<ProgressionNotice> Notices { get; } = [];
 }
