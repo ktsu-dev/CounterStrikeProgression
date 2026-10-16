@@ -32,7 +32,7 @@ The solution uses:
 | `CounterStrikeProgression` | The plugin. It reads CS2 events and pawn state into Core's plain snapshots, draws the panel, and handles commands and saves. `AssemblyName` is `CounterStrikeProgression`, because CounterStrikeSharp loads `plugins/<Name>/<Name>.dll`. |
 | `CounterStrikeProgression.Test` | MSTest tests for Core. |
 
-Neither project is packable. The release is a zip of the plugin folder, built by the `Package Plugin` step in `.github/workflows/dotnet.yml`.
+Nothing goes to NuGet. ktsu.Sdk marks every library packable from its targets, after the project file is read, so `IsPackable=false` in a csproj has no effect. `Directory.Build.targets` turns packing off in a target that runs just before Pack. The release is a zip of the plugin folder, built by the `Package Plugin` step in `.github/workflows/dotnet.yml`.
 
 ### Key Files
 

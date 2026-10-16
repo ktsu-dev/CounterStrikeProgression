@@ -8,8 +8,6 @@
     <TargetFrameworks></TargetFrameworks>
     <!-- CounterStrikeSharp loads plugins/<Name>/<Name>.dll, so the file name must match the folder. -->
     <AssemblyName>CounterStrikeProgression</AssemblyName>
-    <!-- Released as a zip of the plugin folder, never as a NuGet package. -->
-    <IsPackable>false</IsPackable>
     <!-- Every package DLL has to sit next to the plugin, because the host resolves nothing else. -->
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>

@@ -6,8 +6,6 @@
     <!-- Loaded only by the plugin, which runs on the .NET 10 runtime CounterStrikeSharp ships. -->
     <TargetFramework>net10.0</TargetFramework>
     <TargetFrameworks></TargetFrameworks>
-    <!-- Ships inside the plugin's release zip, never as a NuGet package. -->
-    <IsPackable>false</IsPackable>
     <!-- The plugin sees Core's internals, so Core's polyfills are marked embedded to keep them from
          clashing with the plugin's own copies. -->
     <PolyUseEmbeddedAttribute>true</PolyUseEmbeddedAttribute>

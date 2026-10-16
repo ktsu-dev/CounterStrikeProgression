@@ -1,0 +1,9 @@
+<Project>
+  <!-- ktsu.Sdk marks every library packable, after the project sets its own properties. These projects
+       ship only inside the plugin's release zip, so packing is switched off at the last moment. -->
+  <Target Name="KeepPluginOffNuGet" BeforeTargets="_IntermediatePack;GenerateNuspec;Pack" Condition="'$(IsTestProject)' != 'true'">
+    <PropertyGroup>
+      <IsPackable>false</IsPackable>
+    </PropertyGroup>
+  </Target>
+</Project>
