@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Core.Storage;
 using System.Runtime.CompilerServices;
 using Dapper;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Rotation;
 using MySqlConnector;
 
 /// <summary>
@@ -56,6 +57,15 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			PRIMARY KEY (steam_id, weapon, challenge)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+		CREATE TABLE IF NOT EXISTS csp_contracts (
+			steam_id BIGINT UNSIGNED NOT NULL,
+			period VARCHAR(16) NOT NULL,
+			contract VARCHAR(48) NOT NULL,
+			count BIGINT NOT NULL DEFAULT 0,
+			completed TINYINT(1) NOT NULL DEFAULT 0,
+			PRIMARY KEY (steam_id, period, contract)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 		INSERT IGNORE INTO csp_schema (id, version) VALUES (1, @version);
 		""";
 
@@ -80,6 +90,12 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		INSERT INTO csp_challenges (steam_id, weapon, challenge, count, tier)
 		VALUES (@SteamId, @Weapon, @Challenge, @Count, @Tier)
 		ON DUPLICATE KEY UPDATE count = VALUES(count), tier = VALUES(tier);
+		""";
+
+	private const string UpsertContract = """
+		INSERT INTO csp_contracts (steam_id, period, contract, count, completed)
+		VALUES (@SteamId, @Period, @Contract, @Count, @Completed)
+		ON DUPLICATE KEY UPDATE count = VALUES(count), completed = VALUES(completed);
 		""";
 
 	private readonly string connectionString = ConnectionStringFor(settings);
@@ -146,7 +162,14 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			parameters,
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-		return ProgressSnapshot.Rebuild(player, weapons, challenges);
+		// Only the running day and week matter, so older contract rows stay in the table but aren't read.
+		DateOnly today = DailyRotation.Day(DateTime.UtcNow);
+		IEnumerable<ContractRow> contracts = await connection.QueryAsync<ContractRow>(new CommandDefinition(
+			"SELECT steam_id AS SteamId, period AS Period, contract AS Contract, count AS `Count`, completed AS Completed FROM csp_contracts WHERE steam_id = @steamId AND period IN (@day, @week)",
+			new { steamId, day = DailyRotation.DayKey(today), week = DailyRotation.WeekKey(today) },
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+		return ProgressSnapshot.Rebuild(player, weapons, challenges, contracts);
 	}
 
 	/// <inheritdoc/>
@@ -176,6 +199,11 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		if (snapshot.Challenges.Count > 0)
 		{
 			await connection.ExecuteAsync(new CommandDefinition(UpsertChallenge, snapshot.Challenges, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+		}
+
+		if (snapshot.Contracts.Count > 0)
+		{
+			await connection.ExecuteAsync(new CommandDefinition(UpsertContract, snapshot.Contracts, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
 		}
 
 		await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);

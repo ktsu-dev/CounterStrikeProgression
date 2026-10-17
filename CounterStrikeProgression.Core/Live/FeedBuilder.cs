@@ -2,6 +2,7 @@
 
 namespace ktsu.CounterStrikeProgression.Core.Live;
 
+using ktsu.CounterStrikeProgression.Core.Contracts;
 using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
 
@@ -33,6 +34,7 @@ internal static class FeedBuilder
 				NoticeKind.WeaponLevelUp => (FeedKind.WeaponLevelUp, $"{notice.Weapon?.DisplayName} level {notice.Value}"),
 				NoticeKind.TierCompleted => (FeedKind.TierCompleted, $"{notice.ChallengeName} {PanelBuilder.Numeral(notice.Value)}"),
 				NoticeKind.FeatEarned => (FeedKind.FeatEarned, notice.Feat?.Name),
+				NoticeKind.ContractCompleted => (FeedKind.ContractCompleted, notice.Contract is { } contract ? ContractTitle(contract) : null),
 				_ => (FeedKind.SkillShot, null),
 			};
 
@@ -43,5 +45,17 @@ internal static class FeedBuilder
 		}
 
 		return entries;
+	}
+
+	/// <summary>
+	/// Gets the feed title of a finished contract, such as <c>Daily contract: Get 20 kills with SMGs</c>.
+	/// </summary>
+	/// <param name="contract">The contract.</param>
+	/// <returns>The title.</returns>
+	public static string ContractTitle(ActiveContract contract)
+	{
+		Ensure.NotNull(contract);
+		string period = contract.Definition.Period == ContractPeriod.Weekly ? "Weekly" : "Daily";
+		return $"{period} contract: {contract.Definition.Description}";
 	}
 }

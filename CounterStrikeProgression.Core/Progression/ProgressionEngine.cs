@@ -472,11 +472,13 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 
 	private void DropStale(PlayerProgress player, IReadOnlyList<ActiveContract> active)
 	{
-		if (player.Contracts.Count > active.Count)
+		// A row is stale once its contract stops running. It goes only after it has saved, so the count isn't lost.
+		bool IsRunning((string Period, string Contract) key) => active.Any(a => (a.PeriodKey == key.Period) && (a.Definition.Id == key.Contract));
+		if (!player.Contracts.Keys.All(IsRunning))
 		{
 			foreach ((string Period, string Contract) key in player.Contracts.Keys.ToList())
 			{
-				if (!player.Contracts[key].IsDirty && !active.Any(a => (a.PeriodKey == key.Period) && (a.Definition.Id == key.Contract)))
+				if (!player.Contracts[key].IsDirty && !IsRunning(key))
 				{
 					player.Contracts.Remove(key);
 				}

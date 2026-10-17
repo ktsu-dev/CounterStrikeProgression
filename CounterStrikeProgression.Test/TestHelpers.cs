@@ -14,11 +14,12 @@ internal static class TestHelpers
 	public static WeaponInfo Weapon(string name) =>
 		WeaponCatalog.Resolve(name) ?? throw new InvalidOperationException($"No weapon named {name}.");
 
-	public static ProgressionEngine Engine(Action<ProgressionSettings>? configure = null)
+	// Contracts and the featured weapon depend on the day, so they're off unless a test turns them on with a fixed clock.
+	public static ProgressionEngine Engine(Action<ProgressionSettings>? configure = null, TimeProvider? time = null)
 	{
-		ProgressionSettings settings = new();
+		ProgressionSettings settings = new() { ContractsEnabled = false, FeaturedWeaponMultiplier = 1 };
 		configure?.Invoke(settings);
-		return new ProgressionEngine(settings);
+		return new ProgressionEngine(settings, time);
 	}
 
 	public static PlayerProgress Player() => new(SteamId) { Name = "Tester" };

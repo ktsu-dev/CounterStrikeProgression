@@ -14,6 +14,7 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 	private readonly ConcurrentDictionary<ulong, PlayerRow> players = new();
 	private readonly ConcurrentDictionary<(ulong, string), WeaponRow> weapons = new();
 	private readonly ConcurrentDictionary<(ulong, string, string), ChallengeRow> challenges = new();
+	private readonly ConcurrentDictionary<(ulong, string, string), ContractRow> contracts = new();
 
 	/// <summary>Gets the number of successful saves, for tests.</summary>
 	public int SaveCount { get; private set; }
@@ -32,7 +33,8 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 		PlayerProgress progress = ProgressSnapshot.Rebuild(
 			player,
 			weapons.Values.Where(w => w.SteamId == steamId),
-			challenges.Values.Where(c => c.SteamId == steamId));
+			challenges.Values.Where(c => c.SteamId == steamId),
+			contracts.Values.Where(c => c.SteamId == steamId));
 		return Task.FromResult<PlayerProgress?>(progress);
 	}
 
@@ -54,6 +56,11 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 		foreach (ChallengeRow row in snapshot.Challenges)
 		{
 			challenges[(row.SteamId, row.Weapon, row.Challenge)] = row;
+		}
+
+		foreach (ContractRow row in snapshot.Contracts)
+		{
+			contracts[(row.SteamId, row.Period, row.Contract)] = row;
 		}
 
 		SaveCount++;

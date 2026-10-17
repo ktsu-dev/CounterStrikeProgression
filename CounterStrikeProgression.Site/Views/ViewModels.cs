@@ -3,6 +3,7 @@
 namespace ktsu.CounterStrikeProgression.Site.Views;
 
 using ktsu.CounterStrikeProgression.Core.Challenges;
+using ktsu.CounterStrikeProgression.Core.Contracts;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
 
@@ -66,6 +67,7 @@ internal sealed record WeaponView(
 /// <param name="Suggestions">The challenges to try next, closest to a tier first.</param>
 /// <param name="Feats">Every feat, earned or not, with the player's progress toward it.</param>
 /// <param name="Feed">The player's feed, newest first.</param>
+/// <param name="Contracts">The contracts running now, today's first, with the player's progress on each.</param>
 internal sealed record PlayerView(
 	string SteamId,
 	string Name,
@@ -81,7 +83,19 @@ internal sealed record PlayerView(
 	IReadOnlyList<WeaponView> Weapons,
 	IReadOnlyList<SuggestionView> Suggestions,
 	IReadOnlyList<FeatView> Feats,
-	IReadOnlyList<FeedItem> Feed);
+	IReadOnlyList<FeedItem> Feed,
+	IReadOnlyList<ContractView> Contracts);
+
+/// <summary>One running contract on a player's page.</summary>
+/// <param name="Id">The contract id.</param>
+/// <param name="Description">What the player has to do.</param>
+/// <param name="Period">Whether it's a daily or a weekly contract.</param>
+/// <param name="Count">How many matching things the player has done, up to the target.</param>
+/// <param name="Target">The count that finishes it.</param>
+/// <param name="Completed">Whether the player has finished it.</param>
+/// <param name="Xp">The rank XP it pays.</param>
+/// <param name="EndsAt">When it ends, in UTC.</param>
+internal sealed record ContractView(string Id, string Description, ContractPeriod Period, long Count, int Target, bool Completed, int Xp, DateTime EndsAt);
 
 /// <summary>One feat on a player's page.</summary>
 /// <param name="Id">The feat id.</param>

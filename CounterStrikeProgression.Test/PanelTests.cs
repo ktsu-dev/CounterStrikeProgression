@@ -61,7 +61,7 @@ public sealed class PanelTests
 		Assert.AreEqual("ak47", order[1].Key.WeakString);
 		Assert.AreEqual("glock", order[2].Key.WeakString);
 		Assert.HasCount(WeaponCatalog.All.Count, order);
-		Assert.AreEqual(WeaponCatalog.All.Count + 1, PanelBuilder.PageCount);
+		Assert.AreEqual(WeaponCatalog.All.Count + 2, PanelBuilder.PageCount);
 	}
 
 	[TestMethod]

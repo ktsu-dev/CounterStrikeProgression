@@ -33,6 +33,14 @@ internal sealed record WeaponRow(ulong SteamId, string Weapon, long Xp, int Leve
 /// <param name="Tier">The number of tiers finished.</param>
 internal sealed record ChallengeRow(ulong SteamId, string Weapon, string Challenge, long Count, int Tier);
 
+/// <summary>A contract row as stored.</summary>
+/// <param name="SteamId">The 64-bit Steam ID.</param>
+/// <param name="Period">The key of the day or week, such as <c>2026-10-17</c> or <c>2026-W42</c>.</param>
+/// <param name="Contract">The contract id.</param>
+/// <param name="Count">How many matching things the player has done.</param>
+/// <param name="Completed">Whether the contract is finished and paid.</param>
+internal sealed record ContractRow(ulong SteamId, string Period, string Contract, long Count, bool Completed);
+
 /// <summary>
 /// The rows of one player that changed since the last save, copied on the game thread so the database
 /// write can happen elsewhere. Every row holds full values, never increments, so saving the same snapshot
@@ -43,8 +51,11 @@ internal sealed record ChallengeRow(ulong SteamId, string Weapon, string Challen
 /// <param name="Challenges">The challenge rows that changed.</param>
 internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponRow> Weapons, IReadOnlyList<ChallengeRow> Challenges)
 {
+	/// <summary>Gets the contract rows that changed.</summary>
+	public IReadOnlyList<ContractRow> Contracts { get; init; } = [];
+
 	/// <summary>Gets a value indicating whether there's nothing to save.</summary>
-	public bool IsEmpty => (Player is null) && (Weapons.Count == 0) && (Challenges.Count == 0);
+	public bool IsEmpty => (Player is null) && (Weapons.Count == 0) && (Challenges.Count == 0) && (Contracts.Count == 0);
 
 	/// <summary>
 	/// Copies a player's changed rows and clears their dirty flags.
@@ -82,7 +93,17 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 			}
 		}
 
-		return new(player, weapons, challenges);
+		List<ContractRow> contracts = [];
+		foreach (((string period, string id), ContractProgress contract) in progress.Contracts)
+		{
+			if (contract.IsDirty)
+			{
+				contracts.Add(new(progress.SteamId, period, id, contract.Count, contract.Completed));
+				contract.IsDirty = false;
+			}
+		}
+
+		return new(player, weapons, challenges) { Contracts = contracts };
 	}
 
 	/// <summary>
@@ -105,7 +126,8 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 			}
 		}
 
-		return new(ToRow(progress), weapons, challenges);
+		List<ContractRow> contracts = [.. progress.Contracts.Select(c => new ContractRow(progress.SteamId, c.Key.Period, c.Key.Contract, c.Value.Count, c.Value.Completed))];
+		return new(ToRow(progress), weapons, challenges) { Contracts = contracts };
 	}
 
 	/// <summary>
@@ -141,6 +163,11 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 		{
 			progress.Weapon(WeaponKey.Create(row.Weapon)).Challenge(row.Challenge).IsDirty = true;
 		}
+
+		foreach (ContractRow row in Contracts)
+		{
+			progress.Contract(row.Period, row.Contract).IsDirty = true;
+		}
 	}
 
 	/// <summary>
@@ -149,8 +176,9 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 	/// <param name="player">The player row.</param>
 	/// <param name="weapons">The player's weapon rows.</param>
 	/// <param name="challenges">The player's challenge rows.</param>
+	/// <param name="contracts">The player's contract rows, if any.</param>
 	/// <returns>The progress, with nothing flagged dirty.</returns>
-	public static PlayerProgress Rebuild(PlayerRow player, IEnumerable<WeaponRow> weapons, IEnumerable<ChallengeRow> challenges)
+	public static PlayerProgress Rebuild(PlayerRow player, IEnumerable<WeaponRow> weapons, IEnumerable<ChallengeRow> challenges, IEnumerable<ContractRow>? contracts = null)
 	{
 		Ensure.NotNull(player);
 		Ensure.NotNull(weapons);
@@ -191,6 +219,13 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 			ChallengeProgress challenge = progress.Weapon(key).Challenge(row.Challenge);
 			challenge.Count = row.Count;
 			challenge.TierReached = row.Tier;
+		}
+
+		foreach (ContractRow row in contracts ?? [])
+		{
+			ContractProgress contract = progress.Contract(row.Period, row.Contract);
+			contract.Count = row.Count;
+			contract.Completed = row.Completed;
 		}
 
 		return progress;

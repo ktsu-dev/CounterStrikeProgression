@@ -294,5 +294,8 @@ internal static class Endpoints
 		batch is { Snapshot.Players: { } players, Feed: { } feed, Progress: { } progress, Settings: not null }
 		&& players.All(p => p is not null)
 		&& feed.All(e => e is not null)
-		&& progress.All(p => p is { Weapons: { } weapons, Challenges: { } challenges } && weapons.All(w => w is not null) && challenges.All(c => c is not null));
+		&& progress.All(p => p is { Weapons: { } weapons, Challenges: { } challenges, Contracts: { } contracts }
+			&& weapons.All(w => w is not null)
+			&& challenges.All(c => c is not null)
+			&& contracts.All(c => c is { Period: not null, Contract: not null }));
 }

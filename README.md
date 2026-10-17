@@ -21,6 +21,7 @@ Players climb an up-only rank ladder from Silver I to Global Elite. Every weapon
 - **Chickens**: every weapon has a Chickens challenge (1, 5, 15, 40, and 100 chickens), and each chicken pays 2 XP to the weapon and to rank. Twelve chicken skill shots sit on the weapon ladders too, from Nugget (headshot a chicken) and Fowl play (through a wall) to Fried chicken, Rotisserie, and Crossed the road (from long range).
 - **Weapon ladders**: Kills, Headshots, and Hits, plus one challenge for every skill shot the weapon can earn, each with five tiers. Skill tiers pay more than volume tiers.
 - **Skill shots**: about 50, covering movement, distance, wallbangs and smokes, scopes, utility and melee, timing and aim, multi-kills, and round situations.
+- **Daily and weekly contracts**: three daily contracts and one weekly, such as "Get 20 kills with SMGs" or "Get 2 kills through walls", pay 500 and 2,500 rank XP. The picks come from the UTC date, so everyone gets the same ones, and they reset at midnight UTC and on Monday. `!contracts` opens them in the panel, and the site's player page shows your progress.
 - **Bots count, at a reduced rate**: rank XP against bots is scaled down, while weapon levels and ladders still move, so practice against bots isn't wasted.
 - **In-game panel**: `!rank` opens a side panel to the right of the view. It falls back to a center-screen card and then to chat if a way of drawing fails.
 - **XP floaties**: every XP gain floats up as "+XP" text from the center of your screen. Only you see your own. Quick gains add up in one floatie, and skill shots, tiers, and level-ups are named under the number in gold. A `World` mode floats them above the target instead.
@@ -46,9 +47,10 @@ With no database host set, progress is kept in memory and lost when the server r
 | Command | Effect |
 |---|---|
 | `!rank`, `!xp`, `!progress` | Open or close the progress panel |
+| `!contracts` | Open the progress panel on today's contracts |
 | `!top` | Print the 10 players with the most rank XP |
 
-While the panel is open, W and S scroll, A and D move between the overview and each weapon, and R closes it. It also closes when you take damage or die.
+While the panel is open, W and S scroll, A and D move between the overview, the contracts, and each weapon, and R closes it. It also closes when you take damage or die.
 
 ### Admin command
 

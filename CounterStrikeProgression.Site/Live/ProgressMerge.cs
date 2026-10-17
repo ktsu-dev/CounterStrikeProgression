@@ -70,7 +70,15 @@ internal static class ProgressMerge
 			(var o, var n) => LargerPlayer(o!, n!),
 		};
 
-		return new(player, [.. weapons.Values], [.. challenges.Values]);
+		Dictionary<(string Period, string Contract), ContractRow> contracts = older.Contracts.ToDictionary(c => (c.Period, c.Contract));
+		foreach (ContractRow row in newer.Contracts)
+		{
+			contracts[(row.Period, row.Contract)] = contracts.TryGetValue((row.Period, row.Contract), out ContractRow? existing)
+				? existing with { Count = Math.Max(existing.Count, row.Count), Completed = existing.Completed || row.Completed }
+				: row;
+		}
+
+		return new(player, [.. weapons.Values], [.. challenges.Values]) { Contracts = [.. contracts.Values] };
 	}
 
 	/// <summary>
@@ -95,7 +103,12 @@ internal static class ProgressMerge
 			return snapshot.Weapons[0].SteamId;
 		}
 
-		return snapshot.Challenges.Count > 0 ? snapshot.Challenges[0].SteamId : null;
+		if (snapshot.Challenges.Count > 0)
+		{
+			return snapshot.Challenges[0].SteamId;
+		}
+
+		return snapshot.Contracts.Count > 0 ? snapshot.Contracts[0].SteamId : null;
 	}
 
 	private static void CopyStored(PlayerProgress stored, PlayerProgress result)
@@ -120,6 +133,13 @@ internal static class ProgressMerge
 				challengeCopy.Count = challenge.Count;
 				challengeCopy.TierReached = challenge.TierReached;
 			}
+		}
+
+		foreach (((string period, string id), ContractProgress contract) in stored.Contracts)
+		{
+			ContractProgress copy = result.Contract(period, id);
+			copy.Count = contract.Count;
+			copy.Completed = contract.Completed;
 		}
 	}
 
@@ -160,6 +180,13 @@ internal static class ProgressMerge
 			ChallengeProgress challenge = result.Weapon(key).Challenge(row.Challenge);
 			challenge.Count = Math.Max(challenge.Count, row.Count);
 			challenge.TierReached = Math.Max(challenge.TierReached, row.Tier);
+		}
+
+		foreach (ContractRow row in live.Contracts)
+		{
+			ContractProgress contract = result.Contract(row.Period, row.Contract);
+			contract.Count = Math.Max(contract.Count, row.Count);
+			contract.Completed = contract.Completed || row.Completed;
 		}
 	}
 

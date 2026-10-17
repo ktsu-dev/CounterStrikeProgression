@@ -416,6 +416,23 @@ td.name {
 	border-left-color: var(--green);
 }
 
+.suggestion.contract {
+	border-left-color: var(--gold);
+}
+
+.suggestion.contract.done {
+	border-left-color: var(--green);
+	opacity: 0.75;
+}
+
+.suggestion.contract.done .xp {
+	color: var(--green);
+}
+
+.suggestions + .section-title {
+	margin-top: 14px;
+}
+
 .suggestion .head {
 	display: flex;
 	justify-content: space-between;

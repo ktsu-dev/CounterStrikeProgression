@@ -6,12 +6,13 @@ using System.Globalization;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
+using ktsu.CounterStrikeProgression.Core.Contracts;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
 
 /// <summary>
-/// Turns what a player earned into chat lines. Rank-ups, finished tiers, and milestone weapon levels go to
-/// everyone, other level-ups and rare skill shots go to the player, and common skill shots stay quiet unless
+/// Turns what a player earned into chat lines. Rank-ups, finished tiers, milestone weapon levels, and weekly
+/// contracts go to everyone, other level-ups, daily contracts, and rare skill shots go to the player, and common skill shots stay quiet unless
 /// the config turns them on.
 /// </summary>
 /// <param name="config">The chat prefix and announcement settings.</param>
@@ -57,6 +58,14 @@ internal sealed class Announcer(PluginConfig config)
 
 				case NoticeKind.FeatEarned when notice.Feat is not null:
 					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} earned the feat {ChatColors.Gold}{notice.Feat.Name}{ChatColors.Default}: {notice.Feat.Description}!");
+					break;
+
+				case NoticeKind.ContractCompleted when notice.Contract?.Definition.Period == ContractPeriod.Weekly:
+					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} finished the weekly contract {ChatColors.Gold}{notice.Contract.Definition.Description}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
+					break;
+
+				case NoticeKind.ContractCompleted when notice.Contract is not null:
+					player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} Daily contract done: {ChatColors.Yellow}{notice.Contract.Definition.Description}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
 					break;
 
 				case NoticeKind.RankUp:

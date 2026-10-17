@@ -8,11 +8,12 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Admin;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Utils;
+using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Storage;
 
 /// <summary>
-/// The chat and console commands: <c>!rank</c> (also <c>!xp</c> and <c>!progress</c>), <c>!top</c>, and the
+/// The chat and console commands: <c>!rank</c> (also <c>!xp</c> and <c>!progress</c>), <c>!contracts</c>, <c>!top</c>, and the
 /// admin-only <c>css_csp_status</c>.
 /// </summary>
 /// <param name="services">The shared plugin pieces.</param>
@@ -35,6 +36,7 @@ internal sealed class PlayerCommands(ProgressionServices services, string module
 		plugin.AddCommand("css_rank", "Open or close your progress panel", OnRank);
 		plugin.AddCommand("css_xp", "Open or close your progress panel", OnRank);
 		plugin.AddCommand("css_progress", "Open or close your progress panel", OnRank);
+		plugin.AddCommand("css_contracts", "Open your progress panel on today's contracts", OnContracts);
 		plugin.AddCommand("css_top", "Show the players with the most rank XP", OnTop);
 		plugin.AddCommand("css_csp_status", "Show progression storage and session diagnostics", OnStatus);
 	}
@@ -44,6 +46,14 @@ internal sealed class PlayerCommands(ProgressionServices services, string module
 		if ((player is not null) && (services.Sessions.Get(player) is PlayerSession session))
 		{
 			services.Panel.Toggle(player, session);
+		}
+	}
+
+	private void OnContracts(CCSPlayerController? player, CommandInfo command)
+	{
+		if ((player is not null) && (services.Sessions.Get(player) is PlayerSession session))
+		{
+			services.Panel.Toggle(player, session, PanelBuilder.ContractsPage);
 		}
 	}
 
