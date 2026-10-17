@@ -82,6 +82,11 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		ON DUPLICATE KEY UPDATE count = VALUES(count), tier = VALUES(tier);
 		""";
 
+	private const string DeletePlayerRows = """
+		DELETE FROM csp_challenges WHERE steam_id = @SteamId;
+		DELETE FROM csp_weapons WHERE steam_id = @SteamId;
+		""";
+
 	private readonly string connectionString = ConnectionStringFor(settings);
 
 	/// <summary>
@@ -178,6 +183,21 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			await connection.ExecuteAsync(new CommandDefinition(UpsertChallenge, snapshot.Challenges, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
 		}
 
+		await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+	}
+
+	/// <inheritdoc/>
+	public async Task ResetAsync(PlayerRow player, CancellationToken cancellationToken)
+	{
+		Ensure.NotNull(player);
+
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		MySqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable transactionScope = transaction.ConfigureAwait(false);
+
+		await connection.ExecuteAsync(new CommandDefinition(DeletePlayerRows, new { player.SteamId }, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+		await connection.ExecuteAsync(new CommandDefinition(UpsertPlayer, player, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
 		await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 	}
 

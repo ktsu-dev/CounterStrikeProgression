@@ -51,6 +51,15 @@ internal interface IProgressionStore
 	public Task SaveAsync(ProgressSnapshot snapshot, CancellationToken cancellationToken);
 
 	/// <summary>
+	/// Deletes a player's weapon and ladder rows and writes their player row, in one transaction. Used by the
+	/// admin reset, the only thing that ever removes rows.
+	/// </summary>
+	/// <param name="player">The player row to keep, with its XP and rank already cleared.</param>
+	/// <param name="cancellationToken">Cancels the operation.</param>
+	/// <returns>A task that completes when the rows are gone.</returns>
+	public Task ResetAsync(PlayerRow player, CancellationToken cancellationToken);
+
+	/// <summary>
 	/// Gets the players with the most rank XP.
 	/// </summary>
 	/// <param name="count">How many to return.</param>

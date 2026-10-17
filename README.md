@@ -50,9 +50,17 @@ With no database host set, progress is kept in memory and lost when the server r
 
 While the panel is open, W and S scroll, A and D move between the overview and each weapon, and R closes it. It also closes when you take damage or die.
 
-### Admin command
+### Admin commands
 
-`css_csp_status` (requires `@css/root`) prints the plugin version, the store in use, how many players have loaded, and whether the match is in warmup or free-for-all.
+All three require `@css/root`.
+
+| Command | Effect |
+|---|---|
+| `css_csp_status` | Print the plugin version, the store in use, how many players have loaded, and whether the match is in warmup or free-for-all |
+| `css_csp_grant <player> <xp>` | Add rank XP, or take it away with a negative amount. Taking XP away also takes away the ranks it bought, and it stops at 0 |
+| `css_csp_reset <player>` | Delete every rank, weapon, and ladder row the player has. Run it twice within 15 seconds to confirm, because it can't be undone |
+
+`<player>` is `#userid`, part of a connected player's name, or a SteamID64, which also works for players who aren't on the server. Both corrections are written to the database straight away and logged with the admin, the player, and the XP and rank before and after.
 
 ### Basic configuration
 

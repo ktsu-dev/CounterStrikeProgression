@@ -387,6 +387,29 @@ public sealed class SiteLiveTests
 	}
 
 	[TestMethod]
+	public void Apply_CorrectedPlayer_DropsTheOverlayBeforeMerging()
+	{
+		LiveState state = NewState(new ManualTime());
+		ulong other = TestHelpers.SteamId + 1;
+		ProgressSnapshot before = new(
+			new PlayerRow(TestHelpers.SteamId, "Tester", 5_000, 4, Start, Start),
+			[new WeaponRow(TestHelpers.SteamId, "ak47", 900, 9, 50, 10, 100, 300)],
+			[]);
+		ProgressSnapshot otherRows = new(new PlayerRow(other, "Other", 70, 0, Start, Start), [], []);
+		state.Apply(Batch(Server(Start), progress: [before, otherRows]));
+
+		ProgressSnapshot reset = new(new PlayerRow(TestHelpers.SteamId, "Tester", 0, 0, Start, Start.AddMinutes(1)), [], []);
+		LiveChanges changes = state.Apply(Batch(Server(Start.AddSeconds(1)), progress: [reset]) with { Corrected = [TestHelpers.SteamId] });
+
+		CollectionAssert.AreEqual(new[] { TestHelpers.SteamId }, changes.ChangedPlayers.ToArray());
+		ProgressSnapshot? overlay = state.Overlay(TestHelpers.SteamId);
+		Assert.IsNotNull(overlay);
+		Assert.AreEqual(0, overlay.Player?.RankXp);
+		Assert.IsEmpty(overlay.Weapons);
+		Assert.AreEqual(70, state.Overlay(other)?.Player?.RankXp);
+	}
+
+	[TestMethod]
 	public void Apply_StaleProgressBatch_DoesNotLowerTheOverlay()
 	{
 		LiveState state = NewState(new ManualTime());

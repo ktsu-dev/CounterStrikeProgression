@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 /// <summary>What one applied batch changed.</summary>
 /// <param name="SnapshotChanged">Whether the server snapshot was replaced.</param>
 /// <param name="NewFeed">The feed entries the batch added.</param>
-/// <param name="ChangedPlayers">The Steam IDs whose progress rows the batch carried.</param>
+/// <param name="ChangedPlayers">The Steam IDs whose progress rows the batch carried or cleared.</param>
 internal sealed record LiveChanges(bool SnapshotChanged, IReadOnlyList<FeedEntry> NewFeed, IReadOnlyList<ulong> ChangedPlayers);
 
 /// <summary>
@@ -123,7 +123,8 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 				SaveFeed(AddToPlayerFeeds(batch.Feed));
 			}
 
-			return new(snapshotChanged, batch.Feed, MergeProgress(batch.Progress));
+			List<ulong> changed = MergeProgress(batch.Corrected ?? [], batch.Progress);
+			return new(snapshotChanged, batch.Feed, changed);
 		}
 	}
 
@@ -153,9 +154,18 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 		}
 	}
 
-	private List<ulong> MergeProgress(IReadOnlyList<ProgressSnapshot> progress)
+	private List<ulong> MergeProgress(IReadOnlyList<ulong> corrected, IReadOnlyList<ProgressSnapshot> progress)
 	{
+		// Live rows only ever merge upward, so a correction that lowered someone's progress has to clear them first.
 		List<ulong> changed = [];
+		foreach (ulong steamId in corrected)
+		{
+			if (overlays.Remove(steamId) && !changed.Contains(steamId))
+			{
+				changed.Add(steamId);
+			}
+		}
+
 		foreach (ProgressSnapshot rows in progress)
 		{
 			if (ProgressMerge.SteamIdOf(rows) is not { } steamId)

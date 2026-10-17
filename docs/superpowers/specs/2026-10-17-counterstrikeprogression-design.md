@@ -212,6 +212,7 @@ The overview shows rank, an XP bar, totals, and the weapons closest to their nex
 - `!rank` (also `!xp`, `!progress`): opens or closes the panel.
 - `!top`: prints the top 10 by rank XP to chat.
 - `css_csp_status` (root admin only): storage and session diagnostics.
+- `css_csp_grant <player> <xp>` and `css_csp_reset <player>` (root admin only, logged): repair a bad save or remove exploited XP. These are the one exception to up-only ranks, since a negative grant puts the rank back to what the remaining XP earns. A correction tells the site to drop its live rows for that player, because the site otherwise keeps the larger of stored and live values.
 
 ### Storage
 

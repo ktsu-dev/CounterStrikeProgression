@@ -184,6 +184,69 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 	}
 
 	/// <summary>
+	/// Applies an admin correction to a player, whether or not they're connected, and writes it at once.
+	/// </summary>
+	/// <remarks>
+	/// The write joins the player's chain of saves, so it lands after any save already queued and before any
+	/// load that follows, and a reconnect can't read the old rows back.
+	/// </remarks>
+	/// <param name="steamId">The player's 64-bit Steam ID.</param>
+	/// <param name="correction">The correction.</param>
+	/// <param name="ranks">The rank ladder.</param>
+	/// <param name="done">Called on the game thread once the write finishes, with the outcome, or <see langword="null"/> when it failed or the player has no stored progress.</param>
+	/// <returns><see langword="false"/> when the player is connected but their progress hasn't loaded, so nothing was done.</returns>
+	public bool Correct(ulong steamId, AdminCorrection correction, RankLadder ranks, Action<CorrectionOutcome?> done)
+	{
+		Ensure.NotNull(correction);
+		Ensure.NotNull(ranks);
+		Ensure.NotNull(done);
+
+		PlayerSession? session = sessions.Values.FirstOrDefault(s => s.SteamId == steamId);
+		PlayerProgress? progress = session?.Progress ?? recentlyLeft.GetValueOrDefault(steamId);
+		if ((session is not null) && (session.Progress is null))
+		{
+			return false;
+		}
+
+		if (progress is not null)
+		{
+			CorrectionOutcome outcome = correction.Apply(progress, ranks);
+			ProgressSnapshot snapshot = ProgressSnapshot.Capture(progress);
+			Chain(steamId, async () =>
+			{
+				bool written = await WriteAsync(steamId, correction, snapshot).ConfigureAwait(false);
+				if (!written)
+				{
+					await Server.NextFrameAsync(() => snapshot.Restore(progress)).ConfigureAwait(false);
+				}
+
+				await Server.NextFrameAsync(() => done(written ? outcome : null)).ConfigureAwait(false);
+			});
+			return true;
+		}
+
+		Chain(steamId, async () =>
+		{
+			CorrectionOutcome? outcome = null;
+			try
+			{
+				if (await Store.LoadAsync(steamId, CancellationToken.None).ConfigureAwait(false) is PlayerProgress stored)
+				{
+					CorrectionOutcome applied = correction.Apply(stored, ranks);
+					outcome = await WriteAsync(steamId, correction, ProgressSnapshot.Capture(stored)).ConfigureAwait(false) ? applied : null;
+				}
+			}
+			catch (Exception exception) when (IsStorageFailure(exception))
+			{
+				Log.LoadFailed(logger, steamId, exception);
+			}
+
+			await Server.NextFrameAsync(() => done(outcome)).ConfigureAwait(false);
+		});
+		return true;
+	}
+
+	/// <summary>
 	/// Gets a value indicating whether an exception is a storage problem the plugin should survive.
 	/// </summary>
 	/// <param name="exception">The exception.</param>
@@ -237,9 +300,30 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 			return;
 		}
 
-		ulong steamId = progress.SteamId;
+		Chain(progress.SteamId, async () =>
+		{
+			if (!await SaveWithRetriesAsync(progress.SteamId, () => Store.SaveAsync(snapshot, CancellationToken.None)).ConfigureAwait(false))
+			{
+				// Out of retries: flag the rows again, so whichever save comes next for this player writes them.
+				await Server.NextFrameAsync(() => snapshot.Restore(progress)).ConfigureAwait(false);
+			}
+		});
+	}
+
+	/// <summary>
+	/// Runs a player's database work after everything already in their chain, once the tables exist.
+	/// </summary>
+	/// <param name="steamId">The player's 64-bit Steam ID.</param>
+	/// <param name="work">The work.</param>
+	private void Chain(ulong steamId, Func<Task> work)
+	{
 		Task previous = saveChains.GetValueOrDefault(steamId) ?? Task.CompletedTask;
-		Task next = Task.Run(() => SaveAfterAsync(previous, snapshot, progress));
+		Task next = Task.Run(async () =>
+		{
+			await WaitQuietly(previous).ConfigureAwait(false);
+			await initialized.ConfigureAwait(false);
+			await work().ConfigureAwait(false);
+		});
 		saveChains[steamId] = next;
 		_ = next.ContinueWith(
 			_ => Server.NextFrame(() => ForgetChain(steamId, next)),
@@ -248,28 +332,28 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 			TaskScheduler.Default);
 	}
 
-	[SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "A save runs unobserved on the thread pool, so anything it throws must be logged here or it vanishes.")]
-	private async Task SaveAfterAsync(Task previous, ProgressSnapshot snapshot, PlayerProgress progress)
-	{
-		await WaitQuietly(previous).ConfigureAwait(false);
-		await initialized.ConfigureAwait(false);
+	private Task<bool> WriteAsync(ulong steamId, AdminCorrection correction, ProgressSnapshot snapshot) =>
+		correction.Kind == CorrectionKind.Reset
+			? SaveWithRetriesAsync(steamId, () => Store.ResetAsync(snapshot.Player!, CancellationToken.None))
+			: SaveWithRetriesAsync(steamId, () => Store.SaveAsync(snapshot, CancellationToken.None));
 
+	[SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "A save runs unobserved on the thread pool, so anything it throws must be logged here or it vanishes.")]
+	private async Task<bool> SaveWithRetriesAsync(ulong steamId, Func<Task> write)
+	{
 		TimeSpan delay = FirstSaveRetryDelay;
 		for (int attempt = 1; ; attempt++)
 		{
 			try
 			{
-				await Store.SaveAsync(snapshot, CancellationToken.None).ConfigureAwait(false);
-				return;
+				await write().ConfigureAwait(false);
+				return true;
 			}
 			catch (Exception exception)
 			{
-				Log.SaveFailed(logger, progress.SteamId, exception);
+				Log.SaveFailed(logger, steamId, exception);
 				if (attempt >= SaveAttempts)
 				{
-					// Out of retries: flag the rows again, so whichever save comes next for this player writes them.
-					await Server.NextFrameAsync(() => snapshot.Restore(progress)).ConfigureAwait(false);
-					return;
+					return false;
 				}
 			}
 
