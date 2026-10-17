@@ -67,7 +67,7 @@ public sealed class PanelSettings
 /// </summary>
 public enum FloatieMode
 {
-	/// <summary>At the center of the screen, floating up, whatever the player is looking at.</summary>
+	/// <summary>At the crosshair where the XP was earned, floating up from there.</summary>
 	Hud = 0,
 
 	/// <summary>In the world, above the target the XP was earned on.</summary>
@@ -86,14 +86,20 @@ public sealed class FloatieSettings
 	[JsonConverter(typeof(JsonStringEnumConverter<FloatieMode>))]
 	public FloatieMode Mode { get; set; } = FloatieMode.Hud;
 
-	/// <summary>Gets or sets how far in front of the eyes HUD floaties are drawn, in units.</summary>
+	/// <summary>Gets or sets how far in front of the eyes a HUD floatie appears, in units.</summary>
 	public double HudDistance { get; set; } = 20;
 
 	/// <summary>Gets or sets how far above the crosshair a HUD floatie starts, in units at <see cref="HudDistance"/>.</summary>
 	public double HudStartOffset { get; set; } = 1.5;
 
-	/// <summary>Gets or sets how far a HUD floatie rises over its life, in units at <see cref="HudDistance"/>.</summary>
+	/// <summary>Gets or sets how far a HUD floatie rises over its life, in units.</summary>
 	public double HudRise { get; set; } = 5;
+
+	/// <summary>
+	/// Gets or sets how far, in degrees, the crosshair can move from where a HUD floatie appeared and still
+	/// add new XP to it. Aiming further away starts a new floatie.
+	/// </summary>
+	public double HudReuseDegrees { get; set; } = 8;
 
 	/// <summary>Gets or sets how long a floatie lasts, in seconds.</summary>
 	public double LifetimeSeconds { get; set; } = 1.4;

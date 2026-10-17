@@ -11,12 +11,12 @@ using ktsu.CounterStrikeProgression.Core.Floaties;
 using ktsu.CounterStrikeProgression.Core.Progression;
 
 /// <summary>
-/// Draws "+XP" text that floats up when a player earns XP. In <see cref="FloatieMode.Hud"/> mode it starts at
-/// the center of the screen, re-placed in front of the player's eyes every tick, so it holds its place on screen
-/// but can lag a fast turn slightly. In <see cref="FloatieMode.World"/> mode it appears above the target for
-/// hits and kills, and just in front of the player for XP with no target. Only the player who earned it can
-/// see it. Each floatie rises
-/// and fades, and gains on the same target close together add up in one floatie. Floaties are rescaled
+/// Draws "+XP" text that floats up when a player earns XP. In <see cref="FloatieMode.Hud"/> mode it appears
+/// just above the crosshair and stays at that spot in the world as the player moves, and gains close together
+/// add up in it while the crosshair stays near where it appeared. In <see cref="FloatieMode.World"/> mode it
+/// appears above the target for hits and kills, and just in front of the player for XP with no target, and
+/// gains on the same target close together add up in one floatie. Only the player who earned it can see it.
+/// Each floatie rises and fades. Floaties are rescaled
 /// every tick by their distance from the player, so they keep the same size on screen. With a
 /// <see cref="FloatieSettings.DrawDistance"/> set, they're drawn that close on the player's line of sight, so
 /// walls don't clip them.
@@ -51,6 +51,9 @@ internal sealed class XpFloaties(FloatieSettings settings)
 	private readonly Dictionary<int, FloatieMerger> mergers = [];
 	private (int Slot, uint Index)[] shown = [];
 
+	// HUD floaties each get their own merge key, counting down below the self key so they never match a slot.
+	private int nextHudKey = FloatieMerger.SelfKey;
+
 	/// <summary>
 	/// Gets each floatie entity's owner and entity index, stroke copies included, for the transmit filter.
 	/// </summary>
@@ -79,10 +82,10 @@ internal sealed class XpFloaties(FloatieSettings settings)
 			mergers[owner.Slot] = merger;
 		}
 
-		// On the HUD every gain comes from the same spot, so they all share one floatie.
+		// On the HUD a gain adds to the floatie the crosshair is still near, and otherwise starts a new one.
 		if (settings.Mode == FloatieMode.Hud)
 		{
-			key = FloatieMerger.SelfKey;
+			key = NearHudFloatie(owner.Slot, pawn, now)?.Key ?? --nextHudKey;
 		}
 
 		if (merger.Add(key, now, result) is not FloatieUpdate update)
@@ -93,6 +96,8 @@ internal sealed class XpFloaties(FloatieSettings settings)
 		Floatie? existing = update.IsNew ? null : active.Find(f => (f.Owner == owner.Slot) && (f.Key == key) && f.Text.IsValid);
 		if (existing is not null)
 		{
+			// It carries on rising from where it is, rather than dropping back to where it started.
+			existing.Anchor = Risen(existing, ProgressAt(existing, now));
 			existing.Highlight = update.Highlight;
 			existing.Born = now;
 			foreach (CPointWorldText layer in existing.Layers)
@@ -107,7 +112,7 @@ internal sealed class XpFloaties(FloatieSettings settings)
 
 		RetireOldestIfFull(owner.Slot);
 		Vector anchor = settings.Mode == FloatieMode.Hud
-			? OnHud(pawn, 0)
+			? AtCrosshair(pawn, settings.HudStartOffset)
 			: at is null ? InFrontOf(pawn) : new Vector(at.X, at.Y, at.Z + HeadHeight);
 		Floatie? floatie = Create(update, owner.Slot, key, pawn, anchor);
 		if (floatie is null)
@@ -116,6 +121,7 @@ internal sealed class XpFloaties(FloatieSettings settings)
 		}
 
 		floatie.Born = now;
+		floatie.AimPoint = AtCrosshair(pawn, 0);
 		active.Add(floatie);
 		Place(floatie, pawn, anchor);
 		RefreshShown();
@@ -148,10 +154,7 @@ internal sealed class XpFloaties(FloatieSettings settings)
 			double progress = age / settings.LifetimeSeconds;
 			if (GameState.PawnOf(Utilities.GetPlayerFromSlot(floatie.Owner)) is CCSPlayerPawn pawn)
 			{
-				Vector position = settings.Mode == FloatieMode.Hud
-					? OnHud(pawn, progress)
-					: new Vector(floatie.Anchor.X, floatie.Anchor.Y, (float)(floatie.Anchor.Z + (settings.RiseUnits * progress)));
-				Place(floatie, pawn, position);
+				Place(floatie, pawn, Risen(floatie, progress));
 			}
 
 			if (progress > FadeStart)
@@ -308,19 +311,52 @@ internal sealed class XpFloaties(FloatieSettings settings)
 		}
 	}
 
-	// A point in front of the eyes, just above the crosshair, raised along the view's own up as the floatie ages.
-	private Vector OnHud(CCSPlayerPawn pawn, double progress)
+	// The point on the crosshair HudDistance in front of the eyes, raised along the view's own up.
+	private Vector AtCrosshair(CCSPlayerPawn pawn, double above)
 	{
 		Vector eye = Eye(pawn);
+		(double forwardX, double forwardY, double forwardZ) = Forward(pawn);
 		double pitch = pawn.EyeAngles.X * Math.PI / 180;
 		double yaw = pawn.EyeAngles.Y * Math.PI / 180;
-		(double forwardX, double forwardY, double forwardZ) = (Math.Cos(pitch) * Math.Cos(yaw), Math.Cos(pitch) * Math.Sin(yaw), -Math.Sin(pitch));
 		(double upX, double upY, double upZ) = (Math.Sin(pitch) * Math.Cos(yaw), Math.Sin(pitch) * Math.Sin(yaw), Math.Cos(pitch));
-		double rise = settings.HudStartOffset + (settings.HudRise * progress);
 		return new Vector(
-			(float)(eye.X + (forwardX * settings.HudDistance) + (upX * rise)),
-			(float)(eye.Y + (forwardY * settings.HudDistance) + (upY * rise)),
-			(float)(eye.Z + (forwardZ * settings.HudDistance) + (upZ * rise)));
+			(float)(eye.X + (forwardX * settings.HudDistance) + (upX * above)),
+			(float)(eye.Y + (forwardY * settings.HudDistance) + (upY * above)),
+			(float)(eye.Z + (forwardZ * settings.HudDistance) + (upZ * above)));
+	}
+
+	// The owner's newest HUD floatie that can still grow and that the crosshair is still pointing near.
+	private Floatie? NearHudFloatie(int owner, CCSPlayerPawn pawn, double now)
+	{
+		Vector eye = Eye(pawn);
+		(double forwardX, double forwardY, double forwardZ) = Forward(pawn);
+		double minCosine = Math.Cos(settings.HudReuseDegrees * Math.PI / 180);
+		return active
+			.Where(f => (f.Owner == owner) && (f.AimPoint is not null) && f.Text.IsValid && ((now - f.Born) <= settings.MergeSeconds))
+			.OrderByDescending(f => f.Born)
+			.FirstOrDefault(f =>
+			{
+				double dx = f.AimPoint!.X - eye.X;
+				double dy = f.AimPoint.Y - eye.Y;
+				double dz = f.AimPoint.Z - eye.Z;
+				double length = Math.Sqrt((dx * dx) + (dy * dy) + (dz * dz));
+				return (length > 0.001) && ((((dx * forwardX) + (dy * forwardY) + (dz * forwardZ)) / length) >= minCosine);
+			});
+	}
+
+	private double ProgressAt(Floatie floatie, double now) => Math.Clamp((now - floatie.Born) / settings.LifetimeSeconds, 0, 1);
+
+	private Vector Risen(Floatie floatie, double progress)
+	{
+		double rise = settings.Mode == FloatieMode.Hud ? settings.HudRise : settings.RiseUnits;
+		return new Vector(floatie.Anchor.X, floatie.Anchor.Y, (float)(floatie.Anchor.Z + (rise * progress)));
+	}
+
+	private static (double X, double Y, double Z) Forward(CCSPlayerPawn pawn)
+	{
+		double pitch = pawn.EyeAngles.X * Math.PI / 180;
+		double yaw = pawn.EyeAngles.Y * Math.PI / 180;
+		return (Math.Cos(pitch) * Math.Cos(yaw), Math.Cos(pitch) * Math.Sin(yaw), -Math.Sin(pitch));
 	}
 
 	private Vector InFrontOf(CCSPlayerPawn pawn)
@@ -440,7 +476,10 @@ internal sealed class XpFloaties(FloatieSettings settings)
 
 		public int Key { get; } = key;
 
-		public Vector Anchor { get; } = anchor;
+		public Vector Anchor { get; set; } = anchor;
+
+		// Where the crosshair pointed when a HUD floatie appeared, for deciding whether new XP adds to it.
+		public Vector? AimPoint { get; set; }
 
 		public double Born { get; set; }
 
