@@ -24,6 +24,22 @@ public sealed class LadderTests
 	}
 
 	[TestMethod]
+	public void RankTagsAreShortAndMatchTheNames()
+	{
+		Assert.HasCount(RankLadder.RankNames.Count, RankLadder.RankAbbreviations);
+		Assert.HasCount(RankLadder.Names.Count, RankLadder.Tags);
+		Assert.AreEqual("[S I]", RankLadder.TagFor(0));
+		Assert.AreEqual("[GN III]", RankLadder.TagFor(17));
+		Assert.AreEqual("Gold Nova · III", RankLadder.Names[17]);
+		Assert.AreEqual("[GE V]", RankLadder.TagFor(RankLadder.TopRank));
+		Assert.AreEqual("[S I]", RankLadder.TagFor(-1));
+		Assert.AreEqual("[GE V]", RankLadder.TagFor(RankLadder.TopRank + 1));
+
+		// The scoreboard's clan tag field holds 31 bytes.
+		Assert.IsTrue(RankLadder.Tags.All(tag => tag.Length < 32));
+	}
+
+	[TestMethod]
 	public void EachRankCostsMoreThanTheLast()
 	{
 		Assert.AreEqual(0, Ranks.ThresholdFor(0));

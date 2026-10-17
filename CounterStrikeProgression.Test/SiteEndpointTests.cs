@@ -9,6 +9,7 @@ using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Storage;
+using ktsu.CounterStrikeProgression.Core.Weapons;
 using ktsu.CounterStrikeProgression.Site;
 using ktsu.CounterStrikeProgression.Site.Data;
 using ktsu.CounterStrikeProgression.Site.Live;
@@ -310,12 +311,13 @@ public sealed class SiteEndpointTests
 		LiveState live = NewState();
 		live.Apply(Batch(new FeedEntry(Start, TestHelpers.SteamId, "Tester", FeedKind.SkillShot, "Wallbang", "AK-47", 25)));
 
-		IResult result = Endpoints.Live(live, new FeatIndex());
+		IResult result = Endpoints.Live(live, new FeatIndex(), new ManualTime());
 
 		Ok<LiveView> ok = Assert.IsInstanceOfType<Ok<LiveView>>(result);
 		Assert.IsTrue(ok.Value!.Online);
 		Assert.AreEqual("de_inferno", ok.Value.Snapshot?.Map);
 		Assert.HasCount(1, ok.Value.Feed);
+		Assert.AreEqual("2026-10-17", ok.Value.Featured?.Day);
 	}
 
 	[TestMethod]
@@ -493,7 +495,11 @@ public sealed class SiteEndpointTests
 
 		public Task SaveAsync(ProgressSnapshot snapshot, CancellationToken cancellationToken) => Task.CompletedTask;
 
+		public Task ResetAsync(PlayerRow player, CancellationToken cancellationToken) => Task.CompletedTask;
+
 		public Task<IReadOnlyList<LeaderboardEntry>> TopAsync(int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<LeaderboardEntry>>([]);
+
+		public Task<IReadOnlyList<WeaponLeaderboardEntry>> TopByWeaponAsync(WeaponKey weapon, int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<WeaponLeaderboardEntry>>([]);
 
 		public Task<IReadOnlyList<RankingEntry>> RankingsAsync(int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<RankingEntry>>([]);
 

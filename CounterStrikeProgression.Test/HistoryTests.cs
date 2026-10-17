@@ -165,7 +165,7 @@ public sealed class HistoryTests
 		using ProgressReader reader = new(store);
 		ManualTime time = new();
 
-		IResult result = await Endpoints.PlayerHistoryAsync(TestHelpers.SteamId.ToString(System.Globalization.CultureInfo.InvariantCulture), 7, reader, NewState(time), time, TestContext.CancellationToken).ConfigureAwait(false);
+		IResult result = await HistoryEndpoints.PlayerHistoryAsync(TestHelpers.SteamId.ToString(System.Globalization.CultureInfo.InvariantCulture), 7, reader, NewState(time), time, TestContext.CancellationToken).ConfigureAwait(false);
 
 		HistoryView view = Assert.IsInstanceOfType<Ok<HistoryView>>(result).Value!;
 		Assert.HasCount(7, view.Days);
@@ -180,7 +180,7 @@ public sealed class HistoryTests
 		using ProgressReader reader = new(new InMemoryProgressionStore());
 		ManualTime time = new();
 
-		IResult result = await Endpoints.PlayerHistoryAsync("76561197993183173", null, reader, NewState(time), time, TestContext.CancellationToken).ConfigureAwait(false);
+		IResult result = await HistoryEndpoints.PlayerHistoryAsync("76561197993183173", null, reader, NewState(time), time, TestContext.CancellationToken).ConfigureAwait(false);
 
 		Assert.IsInstanceOfType<NotFound>(result);
 	}

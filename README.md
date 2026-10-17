@@ -22,9 +22,11 @@ Players climb an up-only rank ladder from Silver I to Global Elite. Every weapon
 - **Weapon ladders**: Kills, Headshots, and Hits, plus one challenge for every skill shot the weapon can earn, each with five tiers. Skill tiers pay more than volume tiers.
 - **Skill shots**: about 50, covering movement, distance, wallbangs and smokes, scopes, utility and melee, timing and aim, multi-kills, and round situations.
 - **Bots count, at a reduced rate**: rank XP against bots is scaled down, while weapon levels and ladders still move, so practice against bots isn't wasted.
+- **Featured weapon of the day**: one gun class (pistols, SMGs, rifles, snipers, shotguns, or machine guns) earns double weapon XP and ladder progress each UTC day. The pick comes from the date, so the panel overview and the site's live page always agree. `FeaturedWeaponMultiplier` sets the multiplier, and 1 turns it off.
 - **In-game panel**: `!rank` opens a side panel to the right of the view. It falls back to a center-screen card and then to chat if a way of drawing fails.
 - **XP floaties**: every XP gain floats up as "+XP" text from the center of your screen. Only you see your own. Quick gains add up in one floatie, and skill shots, tiers, and level-ups are named under the number in gold. A `World` mode floats them above the target instead.
 - **Feats**: eight really difficult feats, such as Global Elite, Millionaire, Weapon master, Full ladder, Collector, and Chicken overlord. They are worked out from the stored progress, announced to the server when earned, and shown as medallions on the progression site.
+- **Rank tags**: everyone's rank, such as `[GN III]`, shows as their scoreboard clan tag and before their name in chat.
 - **Announcements**: rank-ups, finished tiers, and every fifth weapon level go to the whole server.
 - **Map recap**: when the map ends, each player gets one chat line with the XP, kills and deaths, skill shots, levels, and tiers they earned, and their best moment. The recap also goes to the progression site, which shows it as "Last session" on the player page, and a player who leaves early still gets one there. `AnnounceMapRecap` turns the chat line off.
 - **Durable storage**: progress is kept in MariaDB or MySQL in `csp_` tables, saved off the game thread, and retried after a failed save without double counting.
@@ -48,12 +50,27 @@ With no database host set, progress is kept in memory and lost when the server r
 |---|---|
 | `!rank`, `!xp`, `!progress` | Open or close the progress panel |
 | `!top` | Print the 10 players with the most rank XP |
+| `!top <weapon>` | Print the 10 players with the most XP with one weapon, such as `!top ak` or `!top awp` |
+| `!next` | Print your three challenges closest to their next tier |
+| `!feats` | Print every feat, with the ones you've earned and how close you are to the rest |
+| `!stats [name]` | Print your rank, XP, kills, headshot share, best weapon, and feats, or a connected player's |
+| `!site` | Print the link to your page on the progression site |
+
+When a player first spawns, they get a welcome line with their rank, a link to their page on the site (when `Site.PublicUrl` is set), and the commands. `"WelcomeMessage": false` turns it off.
 
 While the panel is open, W and S scroll, A and D move between the overview and each weapon, and R closes it. It also closes when you take damage or die.
 
-### Admin command
+### Admin commands
 
-`css_csp_status` (requires `@css/root`) prints the plugin version, the store in use, how many players have loaded, and whether the match is in warmup or free-for-all.
+All three require `@css/root`.
+
+| Command | Effect |
+|---|---|
+| `css_csp_status` | Print the plugin version, the store in use, how many players have loaded, and whether the match is in warmup or free-for-all |
+| `css_csp_grant <player> <xp>` | Add rank XP, or take it away with a negative amount. Taking XP away also takes away the ranks it bought, and it stops at 0 |
+| `css_csp_reset <player>` | Delete every rank, weapon, and ladder row the player has. Run it twice within 15 seconds to confirm, because it can't be undone |
+
+`<player>` is `#userid`, part of a connected player's name, or a SteamID64, which also works for players who aren't on the server. Both corrections are written to the database straight away and logged with the admin, the player, and the XP and rank before and after.
 
 ### Basic configuration
 
@@ -96,6 +113,10 @@ Settings left out keep their defaults.
 
 `Panel` sets the draw mode (`Auto`, `WorldText`, `CenterHtml`, or `Chat`), how many lines each mode shows, and the side panel's font size, scale, color, and offsets. The default placement suits a 16:9 display. CS2 has no client-predicted anchor for world text, so the side panel trails slightly behind fast turns.
 
+### Rank tags
+
+`RankTags` turns the scoreboard clan tag (`ClanTag`) and the chat prefix (`ChatPrefix`) on or off. Both are on by default. The clan tag replaces any Steam group tag the player has. The chat prefix is added to the name in the chat message itself, so gags, team chat, and dead chat work as before, and CS2-SimpleAdmin's gag hook is unaffected.
+
 ### Progression site
 
 `Site` sends the server's live state to the progression site: the map and mode, the scoreboard, the feed of skill shots, rank-ups, level-ups, and finished tiers, and each player's changed progress. With an empty `Url`, the default, the plugin sends nothing.
@@ -104,6 +125,7 @@ Settings left out keep their defaults.
 {
   "Site": {
     "Url": "http://cs2-progression-site.cs2.svc.cluster.local:8081/api/ingest",
+    "PublicUrl": "https://cs2-progression.example.com",
     "Token": "change-me",
     "IntervalSeconds": 2,
     "QueueLimit": 20,
@@ -113,6 +135,7 @@ Settings left out keep their defaults.
 ```
 
 - **`Url`:** the site's ingest endpoint. A URL that isn't absolute http or https is logged and ignored.
+- **`PublicUrl`:** the address players reach the site at, which the welcome line, `!site`, and `!stats` link to. Empty, the default, shows no link.
 - **`Token`:** the shared token the site checks on every batch.
 - **`IntervalSeconds`:** the seconds between batches. Values under 1 count as 1.
 - **`QueueLimit`:** how many batches wait to send. When the site is slow or down, the oldest is dropped, so the game never waits on it.
@@ -122,11 +145,11 @@ Sending runs on the thread pool with a 3 second timeout, and a failure is logged
 
 #### The site
 
-The site is a small ASP.NET Core app, published as the image `ghcr.io/ktsu-dev/counterstrikeprogression-site:<version>` with each release (and as `latest`). It shows the live scoreboard and feed on `/`, the rank ladder on `/ranks`, and each player's profile on `/players/{steamId}` (a SteamID64), with their XP feed and suggested next challenges. Ranks show as badges: the color and emblem mark the rank's family, and the pips along the bottom fill with the stage. Pages update live over server-sent events, and a server counts as offline after a few seconds without a batch.
+The site is a small ASP.NET Core app, published as the image `ghcr.io/ktsu-dev/counterstrikeprogression-site:<version>` with each release (and as `latest`). It shows the live scoreboard and feed on `/`, the rank ladder on `/ranks`, leaderboards for every weapon (by level) and every skill shot (by count), plus the most feats and the rarest skill shots, on `/leaderboards`, a guide to every skill shot with its rarity, weapons, XP, tiers, and how many players have earned it on `/skillshots`, and each player's profile on `/players/{steamId}` (a SteamID64), with their XP feed and suggested next challenges. Ranks show as badges: the color and emblem mark the rank's family, and the pips along the bottom fill with the stage. Pages update live over server-sent events, and a server counts as offline after a few seconds without a batch.
 
 The image listens on two ports:
 
-- **8080 (public):** `/`, `/ranks`, `/players/{steamId}`, `/api/live`, `/api/ranks`, `/api/players/{id}`, `/api/stream`, and `/healthz`. Route this port to visitors.
+- **8080 (public):** `/`, `/ranks`, `/leaderboards`, `/skillshots`, `/players/{steamId}`, `/api/live`, `/api/ranks`, `/api/leaderboards`, `/api/skillshots`, `/api/players/{id}`, `/api/stream`, and `/healthz`. Route this port to visitors.
 - **8081 (ingest):** `POST /api/ingest` with the header `Authorization: Bearer <token>`. Keep this port inside your network, because only the plugin needs it.
 
 Point the health probe at `/healthz` on port 8080. Port 8081 answers nothing but the ingest route, so a probe there always fails.

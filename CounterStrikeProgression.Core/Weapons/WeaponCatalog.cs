@@ -139,6 +139,43 @@ internal static class WeaponCatalog
 		return ByName.GetValueOrDefault(name);
 	}
 
+	/// <summary>
+	/// Finds a weapon from what a player typed, such as <c>ak</c>, <c>AK-47</c>, <c>deagle</c>, or <c>m4a1-s</c>.
+	/// A CS2 name or alias wins, then an exact key or display name, then a prefix that matches only one weapon.
+	/// Case, spaces, and punctuation are ignored.
+	/// </summary>
+	/// <param name="query">What the player typed.</param>
+	/// <returns>The weapon, or <see langword="null"/> when nothing matches or a prefix matches more than one.</returns>
+	public static WeaponInfo? Search(string? query)
+	{
+		if (string.IsNullOrWhiteSpace(query))
+		{
+			return null;
+		}
+
+		if (Resolve(query) is { } resolved)
+		{
+			return resolved;
+		}
+
+		string wanted = Compact(query);
+		if (wanted.Length == 0)
+		{
+			return null;
+		}
+
+		WeaponInfo? exact = All.FirstOrDefault(w => (Compact(w.Key.WeakString) == wanted) || (Compact(w.DisplayName) == wanted));
+		if (exact is not null)
+		{
+			return exact;
+		}
+
+		List<WeaponInfo> prefixed = [.. All.Where(w => Compact(w.Key.WeakString).StartsWith(wanted, StringComparison.Ordinal) || Compact(w.DisplayName).StartsWith(wanted, StringComparison.Ordinal))];
+		return prefixed.Count == 1 ? prefixed[0] : null;
+	}
+
+	private static string Compact(string text) => new([.. text.ToLowerInvariant().Where(char.IsLetterOrDigit)]);
+
 	private static WeaponInfo Weapon(string key, string displayName, WeaponClass weaponClass, bool isScoped = false) =>
 		new(WeaponKey.Create(key), displayName, weaponClass, isScoped);
 }
