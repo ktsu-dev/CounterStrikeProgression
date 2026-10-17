@@ -47,6 +47,7 @@ internal static class Program
 		services.AddSingleton(provider => new ProgressReader(provider.GetRequiredService<IProgressionStore>(), provider.GetRequiredService<TimeProvider>()));
 		services.AddHostedService<OnlineWatcher>();
 		services.AddSingleton<FeatIndex>();
+		services.AddSingleton(provider => new BoardIndex(provider.GetRequiredService<TimeProvider>()));
 		services.AddHostedService<FeatRefresher>();
 	}
 
@@ -67,11 +68,15 @@ internal static class Program
 		app.MapGet("/", (IWebHostEnvironment environment) => Endpoints.Page(environment, "index.html"));
 		app.MapGet("/ranks", (IWebHostEnvironment environment) => Endpoints.Page(environment, "ranks.html"));
 		app.MapGet("/ladder", (IWebHostEnvironment environment) => Endpoints.Page(environment, "ladder.html"));
+		app.MapGet("/leaderboards", (IWebHostEnvironment environment) => Endpoints.Page(environment, "leaderboards.html"));
+		app.MapGet("/skillshots", (IWebHostEnvironment environment) => Endpoints.Page(environment, "skillshots.html"));
 		app.MapGet("/players/{id}", Endpoints.PlayerPage);
 		app.MapGet("/healthz", Endpoints.Health);
 		app.MapGet("/api/live", Endpoints.Live);
 		app.MapGet("/api/ranks", Endpoints.RanksAsync);
 		app.MapGet("/api/ladder", Endpoints.LadderAsync);
+		app.MapGet("/api/leaderboards", Endpoints.LeaderboardsAsync);
+		app.MapGet("/api/skillshots", Endpoints.SkillShotsAsync);
 		app.MapGet("/api/players/{id}", Endpoints.PlayerAsync);
 		app.MapGet("/api/stream", Endpoints.Stream);
 		app.MapPost(Endpoints.IngestRoute, Endpoints.IngestAsync);

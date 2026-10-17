@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Challenges;
 using ktsu.CounterStrikeProgression.Core.Events;
 using ktsu.CounterStrikeProgression.Core.Feats;
+using ktsu.CounterStrikeProgression.Core.Rotation;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
@@ -14,13 +15,36 @@ using ktsu.CounterStrikeProgression.Core.Weapons;
 /// <remarks>
 /// Rank XP from anything done to a bot is scaled by <see cref="ProgressionSettings.BotXpMultiplier"/>, but
 /// weapon XP and ladder counts aren't, so practice against bots still moves a weapon forward. Tier and
-/// level-up bonuses are paid in full, because they reward the ladder rather than one event.
+/// level-up bonuses are paid in full, because they reward the ladder rather than one event. The day's featured
+/// weapon class earns <see cref="ProgressionSettings.FeaturedWeaponMultiplier"/> times the weapon XP and ladder
+/// progress, but not the rank XP.
 /// </remarks>
 /// <param name="settings">The XP values and thresholds.</param>
-internal sealed class ProgressionEngine(ProgressionSettings settings)
+/// <param name="time">The clock that decides the day, or the system clock when omitted.</param>
+internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvider? time = null)
 {
 	/// <summary>Gets the settings in use.</summary>
 	public ProgressionSettings Settings { get; } = settings;
+
+	/// <summary>Gets the clock that decides the day.</summary>
+	public TimeProvider Time { get; } = time ?? TimeProvider.System;
+
+	/// <summary>Gets the current UTC day.</summary>
+	public DateOnly Today => DailyRotation.Day(Time.GetUtcNow().UtcDateTime);
+
+	/// <summary>Gets the weapon class featured today, or <see langword="null"/> when the featured weapon is off.</summary>
+	public WeaponClass? FeaturedClass => FeaturedWeapon.On(Settings, Today);
+
+	/// <summary>
+	/// Gets whether a weapon is in today's featured class.
+	/// </summary>
+	/// <param name="weapon">The weapon.</param>
+	/// <returns><see langword="true"/> when it earns the featured multiplier.</returns>
+	public bool IsFeatured(WeaponInfo weapon)
+	{
+		Ensure.NotNull(weapon);
+		return weapon.Class == FeaturedClass;
+	}
 
 	/// <summary>Gets the rank thresholds.</summary>
 	public RankLadder Ranks { get; } = new(settings.FirstRankXp, settings.RankGrowth);
@@ -88,7 +112,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings)
 			return result;
 		}
 
-		Award award = new(combat.Weapon, combat.VictimIsBot);
+		Award award = NewAward(combat.Weapon, combat.VictimIsBot);
 		WeaponProgress weapon = player.Weapon(combat.Weapon.Key);
 		weapon.IsDirty = true;
 
@@ -137,7 +161,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings)
 		Ensure.NotNull(chicken);
 
 		ProgressionResult result = new();
-		Award award = new(chicken.Weapon, vsBot: false);
+		Award award = NewAward(chicken.Weapon, vsBot: false);
 		WeaponProgress progress = player.Weapon(chicken.Weapon.Key);
 		progress.IsDirty = true;
 		award.EventXp += Settings.ChickenXp;
@@ -246,7 +270,8 @@ internal sealed class ProgressionEngine(ProgressionSettings settings)
 		Ensure.NotNull(assist);
 
 		ProgressionResult result = new();
-		Award award = new(assist.Weapon, assist.VictimIsBot) { EventXp = Settings.AssistXp };
+		Award award = NewAward(assist.Weapon, assist.VictimIsBot);
+		award.EventXp = Settings.AssistXp;
 		WeaponProgress weapon = player.Weapon(assist.Weapon.Key);
 		weapon.IsDirty = true;
 
@@ -331,7 +356,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings)
 			return;
 		}
 
-		Award award = new(weaponInfo, vsBot);
+		Award award = NewAward(weaponInfo, vsBot);
 		WeaponProgress weapon = player.Weapon(weaponInfo.Key);
 		weapon.IsDirty = true;
 		EarnSkillShot(weapon, award, skillShot, result);
@@ -355,7 +380,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings)
 		}
 
 		ChallengeProgress progress = weapon.Challenge(challengeId);
-		progress.Count++;
+		progress.Count += award.LadderStep;
 		progress.IsDirty = true;
 
 		int tier = definition.TierFor(progress.Count);
@@ -380,7 +405,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings)
 	private void Credit(PlayerProgress player, WeaponProgress weapon, Award award, ProgressionResult result)
 	{
 		int levelBefore = weapon.Level;
-		weapon.Xp += award.EventXp;
+		weapon.Xp += (long)Math.Round(award.EventXp * award.Multiplier);
 		weapon.Level = Math.Max(weapon.Level, Levels.LevelFor(weapon.Xp));
 		for (int level = levelBefore + 1; level <= weapon.Level; level++)
 		{
@@ -422,11 +447,20 @@ internal sealed class ProgressionEngine(ProgressionSettings settings)
 
 	private double ScaleForBots(double xp, bool vsBot) => vsBot ? xp * Settings.BotXpMultiplier : xp;
 
-	private sealed class Award(WeaponInfo weapon, bool vsBot)
+	private Award NewAward(WeaponInfo weapon, bool vsBot) =>
+		new(weapon, vsBot, IsFeatured(weapon) ? Settings.FeaturedWeaponMultiplier : 1);
+
+	private sealed class Award(WeaponInfo weapon, bool vsBot, double multiplier)
 	{
 		public WeaponInfo Weapon { get; } = weapon;
 
 		public bool VsBot { get; } = vsBot;
+
+		/// <summary>Gets the featured multiplier on weapon XP, or 1 for a weapon that isn't featured.</summary>
+		public double Multiplier { get; } = multiplier;
+
+		/// <summary>Gets how far each ladder moves.</summary>
+		public int LadderStep { get; } = FeaturedWeapon.LadderStep(multiplier);
 
 		public long EventXp { get; set; }
 

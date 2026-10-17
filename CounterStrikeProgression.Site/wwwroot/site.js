@@ -467,6 +467,8 @@
 
 	function initLive(root) {
 		const top = el("div", "top");
+		const featuredBox = el("div", "featured");
+		featuredBox.hidden = true;
 		const grid = el("div", "live-grid");
 		const boardBox = el("section");
 		const feedBox = el("section");
@@ -477,13 +479,31 @@
 		boardBox.append(board);
 		grid.append(boardBox, feedBox);
 		const panel = el("div", "panel");
-		panel.append(top, grid);
+		panel.append(top, featuredBox, grid);
 		root.replaceChildren(panel);
 
 		let serverOnline = false;
 		let snapshot = null;
 		let feats = {};
 		let feed = [];
+		let featured = null;
+
+		function renderFeatured() {
+			featuredBox.hidden = !featured;
+			if (!featured) {
+				return;
+			}
+			const times = `×${Number(featured.multiplier)}`;
+			const line = el("span");
+			line.append(el("b", null, `Featured today: ${featured.name}`), ` earn ${times} weapon XP and ladder progress`);
+			const weapons = Array.isArray(featured.weapons) ? featured.weapons.join(", ") : "";
+			featuredBox.replaceChildren(line, el("span", "muted", weapons));
+		}
+
+		// The pick changes at midnight UTC, so the page asks again once the day it was given is over.
+		function featuredStale() {
+			return featured !== null && featured.day !== new Date().toISOString().slice(0, 10);
+		}
 
 		function renderTop() {
 			const offline = !serverOnline || streamLost();
@@ -577,10 +597,12 @@
 				snapshot = live.snapshot ?? null;
 				feed = mergeFeed(Array.isArray(live.feed) ? live.feed : []);
 				feats = live.feats && typeof live.feats === "object" ? live.feats : {};
+				featured = live.featured ?? null;
 			} catch {
 				serverOnline = false;
 			}
 			renderTop();
+			renderFeatured();
 			renderBoard();
 			renderFeed();
 		}
@@ -613,7 +635,13 @@
 				renderTop();
 			}
 		});
-		setInterval(renderFeed, 30000);
+		setInterval(() => {
+			if (featuredStale()) {
+				load();
+			} else {
+				renderFeed();
+			}
+		}, 30000);
 		load();
 	}
 
@@ -1164,7 +1192,399 @@
 		load();
 	}
 
-	const pages = { live: initLive, ranks: initRanks, player: initPlayer, ladder: initLadder };
+	const WEAPON_CLASS_NAMES = {
+		Pistol: "Pistols",
+		Smg: "SMGs",
+		Rifle: "Rifles",
+		Sniper: "Snipers",
+		Shotgun: "Shotguns",
+		MachineGun: "Machine guns",
+		Knife: "Knife",
+		Taser: "Zeus",
+		Grenade: "Grenades",
+	};
+
+	function plural(count, one, many) {
+		return `${formatXp(count)} ${Number(count) === 1 ? one : many}`;
+	}
+
+	function rarityTag(rarity) {
+		return rarity ? el("span", `rarity ${String(rarity).toLowerCase()}`, rarity) : null;
+	}
+
+	function skillShotTitle(shot, tag = "b") {
+		const title = el("span", "title");
+		const icon = challengeIcon(shot.id);
+		if (icon) {
+			title.append(icon, " ");
+		}
+		title.append(el(tag, null, shot.name));
+		const rarity = rarityTag(shot.rarity);
+		if (rarity) {
+			title.append(rarity);
+		}
+		return title;
+	}
+
+	function hashParams() {
+		return new URLSearchParams(location.hash.replace(/^#/, ""));
+	}
+
+	function boardTable(rows, columns, values, empty) {
+		if (!Array.isArray(rows) || rows.length === 0) {
+			return message(empty);
+		}
+		const trs = rows.map((row) => {
+			const tr = el("tr");
+			tr.append(cell("num", row.position), cell("name", playerLink(row.steamId, row.name)), ...values(row));
+			return tr;
+		});
+		return table([["#", "num"], ["Player"], ...columns], trs);
+	}
+
+	function picker(label, groups, selected, onChange) {
+		const wrap = el("label", "picker");
+		wrap.append(el("span", "muted", label));
+		const select = el("select");
+		for (const [groupLabel, options] of groups) {
+			const group = el("optgroup");
+			group.label = groupLabel;
+			for (const [value, text] of options) {
+				const option = el("option", null, text);
+				option.value = value;
+				option.selected = value === selected;
+				group.append(option);
+			}
+			select.append(group);
+		}
+		select.addEventListener("change", () => onChange(select.value));
+		wrap.append(select);
+		return wrap;
+	}
+
+	function initLeaderboards(root) {
+		const top = el("div", "top");
+		const title = el("span");
+		title.append(el("b", null, "Leaderboards"));
+		top.append(title);
+		const overview = el("div", "live-grid");
+		const head = el("div", "panel");
+		head.append(top, overview);
+		const weaponPanel = el("div", "panel");
+		const shotPanel = el("div", "panel");
+		root.replaceChildren(head, weaponPanel, shotPanel);
+
+		let last = null;
+		let weaponKey = hashParams().get("weapon");
+		let shotId = hashParams().get("shot");
+
+		function saveHash() {
+			const params = new URLSearchParams();
+			if (weaponKey) {
+				params.set("weapon", weaponKey);
+			}
+			if (shotId) {
+				params.set("shot", shotId);
+			}
+			history.replaceState(null, "", `#${params}`);
+		}
+
+		function renderOverview(view) {
+			const feats = el("section");
+			feats.append(el("h3", "section-title", "Most feats"), boardTable(view.feats, [["Feats", "num"]], (row) => {
+				const count = cell("num");
+				count.append(`${row.value}/${Object.keys(FEATS).length}`);
+				return [count];
+			}, "Nobody has a feat yet."));
+
+			const rarest = el("section");
+			rarest.append(el("h3", "section-title", "Rarest skill shots"));
+			if (!Array.isArray(view.rarest) || view.rarest.length === 0) {
+				rarest.append(message("No skill shots earned yet."));
+			} else {
+				const list = el("ul", "challenges single");
+				for (const shot of view.rarest) {
+					const li = el("li", "challenge");
+					const row = el("div", "head");
+					const link = el("a", null);
+					link.href = `#shot=${encodeURIComponent(shot.id)}`;
+					link.addEventListener("click", (event) => {
+						event.preventDefault();
+						shotId = shot.id;
+						saveHash();
+						render(last);
+						shotPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+					});
+					link.append(skillShotTitle(shot));
+					row.append(link, el("span", "tier", `${plural(shot.players, "player", "players")} · ${formatXp(shot.total)}×`));
+					li.append(row);
+					list.append(li);
+				}
+				rarest.append(list);
+			}
+			overview.replaceChildren(feats, rarest);
+		}
+
+		function renderWeapon(view) {
+			const weapons = Array.isArray(view.weapons) ? view.weapons : [];
+			if (!weapons.some((w) => w.key === weaponKey)) {
+				weaponKey = [...weapons].sort((a, b) => b.players - a.players)[0]?.key ?? null;
+			}
+			const board = weapons.find((w) => w.key === weaponKey);
+			const strip = el("div", "top");
+			const label = el("span");
+			label.append(el("b", null, "Weapons"));
+			strip.append(label, el("span", null, board ? plural(board.players, "player", "players") : ""));
+
+			const groups = [];
+			for (const weapon of weapons) {
+				const name = WEAPON_CLASS_NAMES[weapon.class] ?? "Other";
+				let group = groups.find(([g]) => g === name);
+				if (!group) {
+					group = [name, []];
+					groups.push(group);
+				}
+				group[1].push([weapon.key, weapon.players > 0 ? `${weapon.name} · ${weapon.players}` : weapon.name]);
+			}
+			const body = el("div", "pad");
+			body.append(picker("Weapon", groups, weaponKey, (value) => {
+				weaponKey = value;
+				saveHash();
+				render(last);
+			}));
+			body.append(board
+				? boardTable(board.rows, [["Level", "num"], ["XP", "num"], ["Kills", "num"]], (row) => [
+					cell("num", row.value),
+					cell("num", formatXp(row.xp)),
+					cell("num", formatXp(row.kills)),
+				], `Nobody has used the ${board.name} yet.`)
+				: message("No weapons."));
+			weaponPanel.replaceChildren(strip, body);
+		}
+
+		function renderShot(view) {
+			const shots = Array.isArray(view.skillShots) ? view.skillShots : [];
+			if (!shots.some((s) => s.id === shotId)) {
+				shotId = [...shots].sort((a, b) => b.players - a.players)[0]?.id ?? null;
+			}
+			const board = shots.find((s) => s.id === shotId);
+			const strip = el("div", "top");
+			const label = el("span");
+			label.append(el("b", null, "Skill shots"));
+			strip.append(label, el("span", null, board ? `${plural(board.players, "player", "players")} · ${formatXp(board.total)} earned` : ""));
+
+			const groups = ["Common", "Rare", "Epic"].map((rarity) => [rarity, shots
+				.filter((s) => s.rarity === rarity)
+				.map((s) => [s.id, s.players > 0 ? `${s.name} · ${s.players}` : s.name])]);
+			const body = el("div", "pad");
+			const controls = el("div", "board-controls");
+			controls.append(picker("Skill shot", groups, shotId, (value) => {
+				shotId = value;
+				saveHash();
+				render(last);
+			}));
+			if (board) {
+				const guide = el("a", "muted", "What is it?");
+				guide.href = `/skillshots#${encodeURIComponent(board.id)}`;
+				controls.append(skillShotTitle(board), guide);
+			}
+			body.append(controls);
+			body.append(board
+				? boardTable(board.rows, [["Earned", "num"]], (row) => [cell("num", formatXp(row.value))], `Nobody has earned ${board.name} yet.`)
+				: message("No skill shots."));
+			shotPanel.replaceChildren(strip, body);
+		}
+
+		function render(view) {
+			last = view;
+			if (!view.updated) {
+				top.replaceChildren(title, el("span", null, "Counting…"));
+			} else {
+				top.replaceChildren(title, el("span", "muted", `Updated ${ago(view.updated)}`));
+			}
+			renderOverview(view);
+			renderWeapon(view);
+			renderShot(view);
+		}
+
+		async function load() {
+			try {
+				render(await getJson("/api/leaderboards"));
+			} catch {
+				overview.replaceChildren(message("The leaderboards can't be loaded right now."));
+			}
+		}
+
+		window.addEventListener("hashchange", () => {
+			weaponKey = hashParams().get("weapon") ?? weaponKey;
+			shotId = hashParams().get("shot") ?? shotId;
+			if (last) {
+				render(last);
+			}
+		});
+		const refetch = throttle(load, REFETCH_EVERY_MS);
+		on("progress", (changed) => {
+			if (Array.isArray(changed) && changed.length > 0) {
+				refetch();
+			}
+		});
+		onStatus(({ reconnected }) => {
+			if (reconnected) {
+				refetch();
+			}
+		});
+		load();
+	}
+
+	const GUIDE_FILTERS = [
+		["all", "All"],
+		["Common", "Common"],
+		["Rare", "Rare"],
+		["Epic", "Epic"],
+		["unearned", "Not yet earned"],
+	];
+
+	function guideEntry(shot) {
+		const li = el("li", shot.players > 0 ? "challenge guide-entry started" : "challenge guide-entry");
+		li.id = shot.id;
+		const head = el("div", "head");
+		head.append(skillShotTitle(shot), el("span", "tier xp", `+${formatXp(shot.xp)} XP`));
+		li.append(head, el("div", null, shot.description));
+
+		const facts = el("div", "muted");
+		facts.append(`${shot.when} · ${shot.weapons}`);
+		li.append(facts);
+		const tiers = Array.isArray(shot.tiers) ? shot.tiers : [];
+		if (tiers.length > 0) {
+			li.append(el("div", "muted", `Tiers per weapon: ${tiers.map(formatXp).join(" · ")}`));
+		}
+
+		const earned = el("div", "guide-earned");
+		if (shot.players > 0) {
+			const link = el("a", null, `${plural(shot.players, "player", "players")} · ${formatXp(shot.total)} earned`);
+			link.href = `/leaderboards#shot=${encodeURIComponent(shot.id)}`;
+			earned.append(link);
+		} else {
+			earned.append(el("span", "muted", "Nobody has earned it yet"));
+		}
+		li.append(earned);
+		return li;
+	}
+
+	function initSkillShots(root) {
+		const top = el("div", "top");
+		const title = el("span");
+		title.append(el("b", null, "Skill shots"));
+		top.append(title);
+		const tabs = el("div", "tabs");
+		const body = el("div", "pad");
+		const panel = el("div", "panel");
+		panel.append(top, tabs, body);
+		root.replaceChildren(panel);
+
+		let last = null;
+		let filter = "all";
+		let scrolled = false;
+
+		function matches(shot) {
+			if (filter === "all") {
+				return true;
+			}
+			if (filter === "unearned") {
+				return !(shot.players > 0);
+			}
+			return shot.rarity === filter;
+		}
+
+		function renderTabs(shots) {
+			tabs.setAttribute("role", "tablist");
+			tabs.replaceChildren(...GUIDE_FILTERS.map(([key, label]) => {
+				const count = shots.filter((shot) => key === "all" || (key === "unearned" ? !(shot.players > 0) : shot.rarity === key)).length;
+				const button = el("button", "tab", `${label} · ${count}`);
+				button.type = "button";
+				button.setAttribute("role", "tab");
+				button.setAttribute("aria-selected", key === filter ? "true" : "false");
+				button.addEventListener("click", () => {
+					filter = key;
+					render(last);
+				});
+				return button;
+			}));
+		}
+
+		function render(view) {
+			last = view;
+			const shots = Array.isArray(view.skillShots) ? view.skillShots : [];
+			const earned = shots.filter((shot) => shot.players > 0).length;
+			top.replaceChildren(title, el("span", null, view.updated
+				? `${earned}/${shots.length} earned on the server`
+				: `${shots.length} skill shots`));
+			renderTabs(shots);
+
+			const shown = shots.filter(matches);
+			if (shown.length === 0) {
+				body.replaceChildren(message(filter === "unearned" ? "Every skill shot has been earned." : "No skill shots."));
+				return;
+			}
+			const groups = [];
+			for (const shot of shown) {
+				let group = groups.find(([name]) => name === shot.group);
+				if (!group) {
+					group = [shot.group, []];
+					groups.push(group);
+				}
+				group[1].push(shot);
+			}
+			body.replaceChildren(...groups.map(([name, members]) => {
+				const box = el("div", "challenge-group");
+				box.append(el("h3", "section-title", `${name} · ${members.length}`));
+				const list = el("ul", "challenges");
+				list.append(...members.map(guideEntry));
+				box.append(list);
+				return box;
+			}));
+
+			const target = decodeURIComponent(location.hash.replace(/^#/, ""));
+			if (!scrolled && target) {
+				const node = document.getElementById(target);
+				if (node) {
+					scrolled = true;
+					node.classList.add("highlight");
+					node.scrollIntoView({ block: "center" });
+				}
+			}
+		}
+
+		async function load() {
+			try {
+				render(await getJson("/api/skillshots"));
+			} catch {
+				body.replaceChildren(message("The skill shots can't be loaded right now."));
+			}
+		}
+
+		const refetch = throttle(load, REFETCH_EVERY_MS * 5);
+		on("progress", (changed) => {
+			if (Array.isArray(changed) && changed.length > 0) {
+				refetch();
+			}
+		});
+		onStatus(({ reconnected }) => {
+			if (reconnected) {
+				refetch();
+			}
+		});
+		load();
+	}
+
+	const pages = {
+		live: initLive,
+		ranks: initRanks,
+		player: initPlayer,
+		ladder: initLadder,
+		leaderboards: initLeaderboards,
+		skillshots: initSkillShots,
+	};
 
 	document.addEventListener("DOMContentLoaded", () => {
 		const root = document.getElementById("app");

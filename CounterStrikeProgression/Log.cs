@@ -39,9 +39,15 @@ internal static partial class Log
 	[LoggerMessage(EventId = 10, Level = LogLevel.Error, Message = "The progression site URL {Url} isn't an absolute http or https URL, so nothing is sent to the site")]
 	public static partial void SiteUrlInvalid(ILogger logger, string url);
 
-	[LoggerMessage(EventId = 11, Level = LogLevel.Warning, Message = "Posting to the Discord webhook failed")]
+	[LoggerMessage(EventId = 11, Level = LogLevel.Warning, Message = "Admin {Admin} ({AdminSteamId}) applied {Correction} to {SteamId}: rank XP {XpBefore} -> {XpAfter}, rank {RankBefore} -> {RankAfter}, {WeaponsCleared} weapon rows cleared")]
+	public static partial void CorrectionApplied(ILogger logger, string admin, ulong adminSteamId, string correction, ulong steamId, long xpBefore, long xpAfter, int rankBefore, int rankAfter, int weaponsCleared);
+
+	[LoggerMessage(EventId = 12, Level = LogLevel.Error, Message = "Admin {Admin} ({AdminSteamId}) tried {Correction} on {SteamId}, but it wasn't written")]
+	public static partial void CorrectionFailed(ILogger logger, string admin, ulong adminSteamId, string correction, ulong steamId);
+
+	[LoggerMessage(EventId = 13, Level = LogLevel.Warning, Message = "Posting to the Discord webhook failed")]
 	public static partial void DiscordFailed(ILogger logger, Exception exception);
 
-	[LoggerMessage(EventId = 12, Level = LogLevel.Error, Message = "The Discord webhook URL isn't an absolute https URL, so nothing is posted to Discord")]
+	[LoggerMessage(EventId = 14, Level = LogLevel.Error, Message = "The Discord webhook URL isn't an absolute https URL, so nothing is posted to Discord")]
 	public static partial void DiscordUrlInvalid(ILogger logger);
 }

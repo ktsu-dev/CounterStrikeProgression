@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Core.Storage;
 using System.Runtime.CompilerServices;
 using Dapper;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Weapons;
 using MySqlConnector;
 
 /// <summary>
@@ -80,6 +81,11 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		INSERT INTO csp_challenges (steam_id, weapon, challenge, count, tier)
 		VALUES (@SteamId, @Weapon, @Challenge, @Count, @Tier)
 		ON DUPLICATE KEY UPDATE count = VALUES(count), tier = VALUES(tier);
+		""";
+
+	private const string DeletePlayerRows = """
+		DELETE FROM csp_challenges WHERE steam_id = @SteamId;
+		DELETE FROM csp_weapons WHERE steam_id = @SteamId;
 		""";
 
 	private readonly string connectionString = ConnectionStringFor(settings);
@@ -182,6 +188,21 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 	}
 
 	/// <inheritdoc/>
+	public async Task ResetAsync(PlayerRow player, CancellationToken cancellationToken)
+	{
+		Ensure.NotNull(player);
+
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		MySqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable transactionScope = transaction.ConfigureAwait(false);
+
+		await connection.ExecuteAsync(new CommandDefinition(DeletePlayerRows, new { player.SteamId }, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+		await connection.ExecuteAsync(new CommandDefinition(UpsertPlayer, player, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+		await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+	}
+
+	/// <inheritdoc/>
 	public async Task<IReadOnlyList<LeaderboardEntry>> TopAsync(int count, CancellationToken cancellationToken)
 	{
 		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
@@ -189,6 +210,19 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		IEnumerable<LeaderboardEntry> top = await connection.QueryAsync<LeaderboardEntry>(new CommandDefinition(
 			"SELECT name AS Name, rank_xp AS RankXp, rank_index AS `Rank` FROM csp_players ORDER BY rank_xp DESC LIMIT @count",
 			new { count },
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+		return [.. top];
+	}
+
+	/// <inheritdoc/>
+	public async Task<IReadOnlyList<WeaponLeaderboardEntry>> TopByWeaponAsync(WeaponKey weapon, int count, CancellationToken cancellationToken)
+	{
+		Ensure.NotNull(weapon);
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		IEnumerable<WeaponLeaderboardEntry> top = await connection.QueryAsync<WeaponLeaderboardEntry>(new CommandDefinition(
+			"SELECT p.name AS Name, w.xp AS Xp, w.level AS Level FROM csp_weapons w JOIN csp_players p ON p.steam_id = w.steam_id WHERE w.weapon = @weapon AND w.xp > 0 ORDER BY w.xp DESC, w.steam_id ASC LIMIT @count",
+			new { weapon = weapon.WeakString, count },
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 		return [.. top];
 	}

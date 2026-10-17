@@ -5,9 +5,11 @@ namespace ktsu.CounterStrikeProgression.Site;
 using System.Data.Common;
 using System.Globalization;
 using System.Text.Json;
+using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Feats;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Rotation;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Site.Data;
 using ktsu.CounterStrikeProgression.Site.Live;
@@ -23,7 +25,8 @@ using Microsoft.Extensions.Hosting;
 /// <param name="Snapshot">The latest server snapshot, or <see langword="null"/> before the first batch.</param>
 /// <param name="Feed">The feed, newest first.</param>
 /// <param name="Feats">The ids of the feats each player on the server has earned, keyed by Steam ID.</param>
-internal sealed record LiveView(bool Online, ServerSnapshot? Snapshot, IReadOnlyList<FeedItem> Feed, IReadOnlyDictionary<string, IReadOnlyList<string>> Feats);
+/// <param name="Featured">Today's featured weapon class, or <see langword="null"/> when the plugin turned it off.</param>
+internal sealed record LiveView(bool Online, ServerSnapshot? Snapshot, IReadOnlyList<FeedItem> Feed, IReadOnlyDictionary<string, IReadOnlyList<string>> Feats, FeaturedDay? Featured);
 
 /// <summary>
 /// The site's route handlers.
@@ -90,11 +93,13 @@ internal static class Endpoints
 	/// </summary>
 	/// <param name="live">The live state.</param>
 	/// <param name="feats">The feats each player has earned.</param>
-	/// <returns>The online flag, the snapshot, the feed, and the feats of the players on the server.</returns>
-	public static IResult Live(LiveState live, FeatIndex feats)
+	/// <param name="time">The clock that decides the day.</param>
+	/// <returns>The online flag, the snapshot, the feed, the feats of the players on the server, and the featured weapon.</returns>
+	public static IResult Live(LiveState live, FeatIndex feats, TimeProvider time)
 	{
 		Ensure.NotNull(live);
 		Ensure.NotNull(feats);
+		Ensure.NotNull(time);
 
 		ServerSnapshot? snapshot = live.Snapshot;
 		Dictionary<string, IReadOnlyList<string>> earned = [];
@@ -106,7 +111,8 @@ internal static class Endpoints
 			}
 		}
 
-		return TypedResults.Ok(new LiveView(live.IsOnline, snapshot, FeedCaptions.For(live.Feed, live.Settings), earned));
+		ProgressionSettings settings = live.Settings;
+		return TypedResults.Ok(new LiveView(live.IsOnline, snapshot, FeedCaptions.For(live.Feed, settings), earned, FeaturedWeapon.Describe(settings, DailyRotation.Day(time.GetUtcNow().UtcDateTime))));
 	}
 
 	/// <summary>
@@ -200,6 +206,37 @@ internal static class Endpoints
 		PlayerView view = PlayerViewBuilder.Build(merged, live.Settings, live.IsPlaying(steamId), live.PlayerFeed(steamId), live.LastSession(steamId));
 		feats.Set(steamId, view.Feats.Where(f => f.Earned).Select(f => FeatCatalog.All.First(d => d.Id == f.Id)));
 		return TypedResults.Ok(view);
+	}
+
+	/// <summary>
+	/// Gets the leaderboards: each weapon by level, each skill shot by count, the most feats, and the rarest skill shots.
+	/// </summary>
+	/// <param name="boards">Every ranked player's tally.</param>
+	/// <param name="reader">Reads the stored progress of the players on the server.</param>
+	/// <param name="live">The live state.</param>
+	/// <param name="cancellationToken">Stops waiting when the request is aborted.</param>
+	/// <returns>The boards.</returns>
+	public static async Task<IResult> LeaderboardsAsync(BoardIndex boards, ProgressReader reader, LiveState live, CancellationToken cancellationToken)
+	{
+		Ensure.NotNull(boards);
+		await boards.RefreshPlayingAsync(reader, live, cancellationToken).ConfigureAwait(false);
+		return TypedResults.Ok(LeaderboardViewBuilder.Build(boards.All, boards.Updated));
+	}
+
+	/// <summary>
+	/// Gets the skill shot guide: every skill shot, what it asks for, the weapons that can earn it, and how many players have.
+	/// </summary>
+	/// <param name="boards">Every ranked player's tally.</param>
+	/// <param name="reader">Reads the stored progress of the players on the server.</param>
+	/// <param name="live">The live state.</param>
+	/// <param name="cancellationToken">Stops waiting when the request is aborted.</param>
+	/// <returns>The guide.</returns>
+	public static async Task<IResult> SkillShotsAsync(BoardIndex boards, ProgressReader reader, LiveState live, CancellationToken cancellationToken)
+	{
+		Ensure.NotNull(boards);
+		Ensure.NotNull(live);
+		await boards.RefreshPlayingAsync(reader, live, cancellationToken).ConfigureAwait(false);
+		return TypedResults.Ok(SkillShotGuideBuilder.Build(boards.All, live.Settings, boards.Updated));
 	}
 
 	/// <summary>
