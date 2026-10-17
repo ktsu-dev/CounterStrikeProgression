@@ -118,6 +118,46 @@ public sealed class FeaturedWeaponTests
 	}
 
 	[TestMethod]
+	public void WeeksAreIsoWeeksStartingOnMonday()
+	{
+		Assert.AreEqual("2026-10-17", DailyRotation.DayKey(Day));
+		Assert.AreEqual("2026-W42", DailyRotation.WeekKey(Day));
+		Assert.AreEqual(new DateOnly(2026, 10, 12), DailyRotation.WeekStart(Day));
+		Assert.AreEqual(new DateOnly(2026, 10, 12), DailyRotation.WeekStart(new DateOnly(2026, 10, 12)));
+		Assert.AreEqual("2026-W53", DailyRotation.WeekKey(new DateOnly(2027, 1, 1)));
+	}
+
+	[TestMethod]
+	public void EveryClassHasAPluralName()
+	{
+		Dictionary<WeaponClass, string> expected = new()
+		{
+			[WeaponClass.Pistol] = "pistols",
+			[WeaponClass.Smg] = "SMGs",
+			[WeaponClass.Rifle] = "rifles",
+			[WeaponClass.Sniper] = "snipers",
+			[WeaponClass.Shotgun] = "shotguns",
+			[WeaponClass.MachineGun] = "machine guns",
+			[WeaponClass.Knife] = "knives",
+			[WeaponClass.Grenade] = "grenades",
+			[WeaponClass.Taser] = "the Zeus",
+			[WeaponClass.Unknown] = "weapons",
+		};
+
+		foreach ((WeaponClass weaponClass, string name) in expected)
+		{
+			Assert.AreEqual(name, DailyRotation.ClassName(weaponClass));
+		}
+	}
+
+	[TestMethod]
+	public void TheHashIsStableAndSalted()
+	{
+		Assert.AreEqual(DailyRotation.Hash("2026-10-17", "featured"), DailyRotation.Hash("2026-10-17", "featured"));
+		Assert.AreNotEqual(DailyRotation.Hash("2026-10-17", "featured"), DailyRotation.Hash("2026-10-17", "contracts"));
+	}
+
+	[TestMethod]
 	public void TheLadderStepRoundsTheMultiplier()
 	{
 		Assert.AreEqual(1, FeaturedWeapon.LadderStep(1));

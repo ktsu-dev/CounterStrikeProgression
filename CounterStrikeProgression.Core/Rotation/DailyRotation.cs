@@ -43,7 +43,7 @@ internal static class DailyRotation
 	/// <returns>The key.</returns>
 	public static string WeekKey(DateOnly day)
 	{
-		DateTime date = day.ToDateTime(TimeOnly.MinValue);
+		DateTime date = day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
 		return string.Create(CultureInfo.InvariantCulture, $"{ISOWeek.GetYear(date)}-W{ISOWeek.GetWeekOfYear(date):00}");
 	}
 
