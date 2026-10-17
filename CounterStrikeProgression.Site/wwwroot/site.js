@@ -1346,15 +1346,16 @@
 		async function load() {
 			try {
 				render(await getJson(`/api/players/${id}`));
-				if (tab === "history" && history !== null) {
-					loadHistory();
-				}
 			} catch (error) {
 				if (error.status === 404) {
 					notFound();
 				} else {
 					panel.replaceChildren(message("This player can't be loaded right now."));
 				}
+				return;
+			}
+			if (tab === "history" && history !== null) {
+				loadHistory();
 			}
 		}
 

@@ -175,6 +175,54 @@ public sealed class HistoryTests
 	}
 
 	[TestMethod]
+	public async Task HistoryEndpoint_BadId_Returns404()
+	{
+		using ProgressReader reader = new(new InMemoryProgressionStore());
+		ManualTime time = new();
+
+		IResult result = await HistoryEndpoints.PlayerHistoryAsync("not-a-steam-id", 30, reader, NewState(time), time, TestContext.CancellationToken).ConfigureAwait(false);
+
+		Assert.IsInstanceOfType<NotFound>(result);
+	}
+
+	[TestMethod]
+	public async Task WeeklyEndpoint_RanksThisWeeksGains()
+	{
+		InMemoryProgressionStore store = new();
+		await store.SaveAsync(Save(TestHelpers.SteamId, 1000, Monday.AddDays(-30), Monday.AddDays(-1)), TestContext.CancellationToken).ConfigureAwait(false);
+		await store.SaveAsync(Save(TestHelpers.SteamId, 1400, Monday.AddDays(-30), Today), TestContext.CancellationToken).ConfigureAwait(false);
+		using ProgressReader reader = new(store);
+		ManualTime time = new();
+
+		IResult result = await HistoryEndpoints.WeeklyAsync(reader, NewState(time), time, TestContext.CancellationToken).ConfigureAwait(false);
+
+		WeeklyView view = Assert.IsInstanceOfType<Ok<WeeklyView>>(result).Value!;
+		Assert.AreEqual(Monday, view.Start);
+		Assert.HasCount(1, view.Rows);
+		Assert.AreEqual(400L, view.Rows[0].Gained);
+	}
+
+	[TestMethod]
+	public async Task ProgressReader_CachesHistoryAndGains()
+	{
+		InMemoryProgressionStore store = new();
+		ManualTime time = new();
+		using ProgressReader reader = new(store, time);
+
+		Assert.IsEmpty(await reader.HistoryAsync(TestHelpers.SteamId, Monday, TestContext.CancellationToken).ConfigureAwait(false));
+		Assert.IsEmpty(await reader.GainsSinceAsync(Monday, 10, TestContext.CancellationToken).ConfigureAwait(false));
+		await store.SaveAsync(Save(TestHelpers.SteamId, 500, Today, Today), TestContext.CancellationToken).ConfigureAwait(false);
+
+		time.Advance(TimeSpan.FromSeconds(9));
+		Assert.IsEmpty(await reader.HistoryAsync(TestHelpers.SteamId, Monday, TestContext.CancellationToken).ConfigureAwait(false));
+		Assert.IsEmpty(await reader.GainsSinceAsync(Monday, 10, TestContext.CancellationToken).ConfigureAwait(false));
+
+		time.Advance(TimeSpan.FromSeconds(2));
+		Assert.HasCount(1, await reader.HistoryAsync(TestHelpers.SteamId, Monday, TestContext.CancellationToken).ConfigureAwait(false));
+		Assert.HasCount(1, await reader.GainsSinceAsync(Monday, 10, TestContext.CancellationToken).ConfigureAwait(false));
+	}
+
+	[TestMethod]
 	public async Task HistoryEndpoint_UnknownPlayer_Returns404()
 	{
 		using ProgressReader reader = new(new InMemoryProgressionStore());
