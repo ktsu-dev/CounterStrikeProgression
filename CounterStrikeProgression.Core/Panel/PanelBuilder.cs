@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Core.Panel;
 using System.Globalization;
 using ktsu.CounterStrikeProgression.Core.Challenges;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Rotation;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
 /// <summary>
@@ -78,14 +79,20 @@ internal sealed class PanelBuilder(ProgressionEngine engine)
 		int levelled = player.Weapons.Values.Count(w => w.Level > 1);
 		int tiers = player.Weapons.Values.Sum(w => w.Challenges.Values.Sum(c => c.TierReached));
 
-		List<PanelLine> lines =
+		List<PanelLine> lines = [];
+		if (engine.FeaturedClass is WeaponClass featured)
+		{
+			lines.Add(new($"Featured: {FeaturedWeapon.Title(featured)}", $"{FeaturedWeapon.Times(engine.Settings.FeaturedWeaponMultiplier)} weapon XP", LineState.InProgress));
+		}
+
+		lines.AddRange(
 		[
 			new("Kills", Number(kills), LineState.InProgress),
 			new("Headshots", Number(headshots), LineState.InProgress),
 			new("Weapons levelled", $"{levelled} of {WeaponCatalog.All.Count}", LineState.InProgress),
 			new("Tiers finished", Number(tiers), LineState.InProgress),
 			PanelLine.Heading("Closest tiers"),
-		];
+		]);
 
 		lines.AddRange(ClosestTiers(player, ClosestTiersShown));
 		return new PanelPage(RankLadder.Names[rank], "Overview", engine.Ranks.ProgressToNext(player.RankXp), progressLabel, lines);
@@ -115,7 +122,10 @@ internal sealed class PanelBuilder(ProgressionEngine engine)
 		lines.Add(PanelLine.Heading("Skill"));
 		lines.AddRange(ladder.Where(c => c.Kind == ChallengeKind.Skill).Select(c => ChallengeLine(c, progress)));
 
-		return new PanelPage(weapon.DisplayName, $"Level {level}", engine.Levels.ProgressToNext(xp), progressLabel, lines);
+		string subtitle = engine.IsFeatured(weapon)
+			? $"Level {level} · {FeaturedWeapon.Times(engine.Settings.FeaturedWeaponMultiplier)} today"
+			: $"Level {level}";
+		return new PanelPage(weapon.DisplayName, subtitle, engine.Levels.ProgressToNext(xp), progressLabel, lines);
 	}
 
 	/// <summary>

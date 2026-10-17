@@ -311,12 +311,13 @@ public sealed class SiteEndpointTests
 		LiveState live = NewState();
 		live.Apply(Batch(new FeedEntry(Start, TestHelpers.SteamId, "Tester", FeedKind.SkillShot, "Wallbang", "AK-47", 25)));
 
-		IResult result = Endpoints.Live(live, new FeatIndex());
+		IResult result = Endpoints.Live(live, new FeatIndex(), new ManualTime());
 
 		Ok<LiveView> ok = Assert.IsInstanceOfType<Ok<LiveView>>(result);
 		Assert.IsTrue(ok.Value!.Online);
 		Assert.AreEqual("de_inferno", ok.Value.Snapshot?.Map);
 		Assert.HasCount(1, ok.Value.Feed);
+		Assert.AreEqual("2026-10-17", ok.Value.Featured?.Day);
 	}
 
 	[TestMethod]
