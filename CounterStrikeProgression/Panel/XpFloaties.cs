@@ -16,6 +16,12 @@ using ktsu.CounterStrikeProgression.Core.Progression;
 /// and fades, and gains on the same target close together add up in one floatie. Floaties are rescaled
 /// every tick by their distance from the player, so they keep the same size on screen.
 /// </summary>
+/// <remarks>
+/// World text has no outline, so the stroke is four copies of the text in the stroke color, nudged
+/// diagonally by <see cref="FloatieSettings.StrokeWidthPixels"/> across the player's view and set just
+/// behind the main text. Their offsets are worked out every tick from where the player is looking from, so
+/// the stroke stays even as they move.
+/// </remarks>
 /// <param name="settings">How floaties look and how long they last.</param>
 internal sealed class XpFloaties(FloatieSettings settings)
 {
@@ -28,12 +34,20 @@ internal sealed class XpFloaties(FloatieSettings settings)
 	// Keeps a floatie at the player's own position from shrinking to nothing.
 	private const double MinWorldUnitsPerPixel = 0.001;
 
+	// How far behind the main text, in pixels at its scale, the stroke copies sit so they draw underneath.
+	private const double StrokeDepthPixels = 1.5;
+
+	// Fully opaque for this share of a floatie's life, then fading out.
+	private const double FadeStart = 0.6;
+
+	private static readonly (int Right, int Up)[] StrokeDirections = [(-1, -1), (-1, 1), (1, -1), (1, 1)];
+
 	private readonly List<Floatie> active = [];
 	private readonly Dictionary<int, FloatieMerger> mergers = [];
 	private (int Slot, uint Index)[] shown = [];
 
 	/// <summary>
-	/// Gets each floatie's owner and entity index, for the transmit filter.
+	/// Gets each floatie entity's owner and entity index, stroke copies included, for the transmit filter.
 	/// </summary>
 	public IReadOnlyList<(int Slot, uint Index)> Shown => shown;
 
@@ -65,32 +79,37 @@ internal sealed class XpFloaties(FloatieSettings settings)
 			return;
 		}
 
-		Floatie? existing = update.IsNew ? null : active.Find(f => (f.Owner == owner.Slot) && (f.Key == key) && f.Entity.IsValid);
+		Floatie? existing = update.IsNew ? null : active.Find(f => (f.Owner == owner.Slot) && (f.Key == key) && f.Text.IsValid);
 		if (existing is not null)
 		{
-			existing.Entity.MessageText = update.Text;
-			existing.Entity.Color = ColorFor(update.Highlight, 255);
 			existing.Highlight = update.Highlight;
 			existing.Born = now;
-			Utilities.SetStateChanged(existing.Entity, "CPointWorldText", "m_messageText");
-			Utilities.SetStateChanged(existing.Entity, "CPointWorldText", "m_Color");
+			foreach (CPointWorldText layer in existing.Layers)
+			{
+				layer.MessageText = update.Text;
+				Utilities.SetStateChanged(layer, "CPointWorldText", "m_messageText");
+			}
+
+			SetAlpha(existing, 255);
 			return;
 		}
 
 		RetireOldestIfFull(owner.Slot);
 		Vector anchor = at is null ? InFrontOf(pawn) : new Vector(at.X, at.Y, at.Z + HeadHeight);
-		CPointWorldText? entity = Create(update, pawn, anchor);
-		if (entity is null)
+		Floatie? floatie = Create(update, owner.Slot, key, pawn, anchor);
+		if (floatie is null)
 		{
 			return;
 		}
 
-		active.Add(new Floatie(entity, owner.Slot, key, anchor) { Born = now, Highlight = update.Highlight, Scale = entity.WorldUnitsPerPx });
+		floatie.Born = now;
+		active.Add(floatie);
+		Place(floatie, pawn, anchor);
 		RefreshShown();
 	}
 
 	/// <summary>
-	/// Moves every floatie up, fades it, and removes the ones that have finished. Called every tick.
+	/// Moves every floatie up, rescales and fades it, and removes the ones that have finished. Called every tick.
 	/// </summary>
 	public void Tick()
 	{
@@ -105,7 +124,7 @@ internal sealed class XpFloaties(FloatieSettings settings)
 		{
 			Floatie floatie = active[i];
 			double age = now - floatie.Born;
-			if (!floatie.Entity.IsValid || (age >= settings.LifetimeSeconds))
+			if (!floatie.Text.IsValid || (age >= settings.LifetimeSeconds))
 			{
 				Remove(floatie);
 				active.RemoveAt(i);
@@ -115,16 +134,15 @@ internal sealed class XpFloaties(FloatieSettings settings)
 
 			double progress = age / settings.LifetimeSeconds;
 			Vector position = new(floatie.Anchor.X, floatie.Anchor.Y, (float)(floatie.Anchor.Z + (settings.RiseUnits * progress)));
-			floatie.Entity.Teleport(position, null, null);
-			Rescale(floatie, position);
+			if (GameState.PawnOf(Utilities.GetPlayerFromSlot(floatie.Owner)) is CCSPlayerPawn pawn)
+			{
+				Place(floatie, pawn, position);
+			}
 
-			// Fully opaque for the first part of its life, then fading out.
-			const double FadeStart = 0.6;
 			if (progress > FadeStart)
 			{
 				int alpha = (int)Math.Round(255 * (1 - ((progress - FadeStart) / (1 - FadeStart))));
-				floatie.Entity.Color = ColorFor(floatie.Highlight, Math.Clamp(alpha, 0, 255));
-				Utilities.SetStateChanged(floatie.Entity, "CPointWorldText", "m_Color");
+				SetAlpha(floatie, Math.Clamp(alpha, 0, 255));
 			}
 		}
 
@@ -170,7 +188,36 @@ internal sealed class XpFloaties(FloatieSettings settings)
 		RefreshShown();
 	}
 
-	private CPointWorldText? Create(FloatieUpdate update, CCSPlayerPawn ownerPawn, Vector anchor)
+	private Floatie? Create(FloatieUpdate update, int owner, int key, CCSPlayerPawn ownerPawn, Vector anchor)
+	{
+		double scale = ScaleFor(Distance(ownerPawn, anchor));
+		List<CPointWorldText> strokes = [];
+		if (settings.StrokeWidthPixels > 0)
+		{
+			foreach ((int _, int _) in StrokeDirections)
+			{
+				if (CreateLayer(update.Text, ParseColor(settings.StrokeColor), scale, ownerPawn, anchor) is CPointWorldText stroke)
+				{
+					strokes.Add(stroke);
+				}
+			}
+		}
+
+		CPointWorldText? text = CreateLayer(update.Text, ColorFor(update.Highlight, 255), scale, ownerPawn, anchor);
+		if (text is null)
+		{
+			foreach (CPointWorldText stroke in strokes)
+			{
+				stroke.Remove();
+			}
+
+			return null;
+		}
+
+		return new Floatie(text, strokes, owner, key, anchor) { Highlight = update.Highlight, Scale = scale };
+	}
+
+	private CPointWorldText? CreateLayer(string text, Color color, double scale, CCSPlayerPawn ownerPawn, Vector anchor)
 	{
 		CPointWorldText? entity = Utilities.CreateEntityByName<CPointWorldText>("point_worldtext");
 		if (entity is null)
@@ -180,13 +227,13 @@ internal sealed class XpFloaties(FloatieSettings settings)
 
 		try
 		{
-			entity.MessageText = update.Text;
+			entity.MessageText = text;
 			entity.Enabled = true;
 			entity.Fullbright = true;
 			entity.FontSize = settings.FontSize;
 			entity.FontName = "Arial Bold";
-			entity.WorldUnitsPerPx = (float)ScaleFor(Distance(ownerPawn, anchor));
-			entity.Color = ColorFor(update.Highlight, 255);
+			entity.WorldUnitsPerPx = (float)scale;
+			entity.Color = color;
 			entity.JustifyHorizontal = PointWorldTextJustifyHorizontal_t.POINT_WORLD_TEXT_JUSTIFY_HORIZONTAL_CENTER;
 			entity.JustifyVertical = PointWorldTextJustifyVertical_t.POINT_WORLD_TEXT_JUSTIFY_VERTICAL_BOTTOM;
 			entity.ReorientMode = PointWorldTextReorientMode_t.POINT_WORLD_TEXT_REORIENT_AROUND_UP;
@@ -204,44 +251,98 @@ internal sealed class XpFloaties(FloatieSettings settings)
 		}
 	}
 
-	private Vector InFrontOf(CCSPlayerPawn pawn)
+	// Puts the text at a position and the stroke copies around it, all sized for the owner's distance.
+	private void Place(Floatie floatie, CCSPlayerPawn ownerPawn, Vector position)
 	{
-		Vector origin = pawn.AbsOrigin ?? new Vector(0, 0, 0);
-		double yaw = pawn.EyeAngles.Y * Math.PI / 180;
-		return new Vector(
-			(float)(origin.X + (Math.Cos(yaw) * settings.SelfDistance)),
-			(float)(origin.Y + (Math.Sin(yaw) * settings.SelfDistance)),
-			origin.Z + pawn.ViewOffset.Z);
-	}
+		Vector eye = Eye(ownerPawn);
+		double dx = position.X - eye.X;
+		double dy = position.Y - eye.Y;
+		double dz = position.Z - eye.Z;
+		double distance = Math.Sqrt((dx * dx) + (dy * dy) + (dz * dz));
+		Rescale(floatie, distance);
 
-	private void Rescale(Floatie floatie, Vector position)
-	{
-		if (GameState.PawnOf(Utilities.GetPlayerFromSlot(floatie.Owner)) is not CCSPlayerPawn pawn)
+		floatie.Text.Teleport(position, null, null);
+		if (floatie.Strokes.Count == 0)
 		{
 			return;
 		}
 
-		double scale = ScaleFor(Distance(pawn, position));
+		// The text turns to face the player around the vertical axis, so its right is horizontal and
+		// perpendicular to the line of sight, and its up is world up.
+		double horizontal = Math.Sqrt((dx * dx) + (dy * dy));
+		(double rightX, double rightY) = horizontal > 0.001 ? (dy / horizontal, -dx / horizontal) : (1.0, 0.0);
+		(double awayX, double awayY, double awayZ) = distance > 0.001 ? (dx / distance, dy / distance, dz / distance) : (0.0, 0.0, 0.0);
+		double offset = settings.StrokeWidthPixels * floatie.Scale;
+		double depth = StrokeDepthPixels * floatie.Scale;
+
+		for (int i = 0; i < floatie.Strokes.Count; i++)
+		{
+			(int right, int up) = StrokeDirections[i % StrokeDirections.Length];
+			floatie.Strokes[i].Teleport(
+				new Vector(
+					(float)(position.X + (rightX * offset * right) + (awayX * depth)),
+					(float)(position.Y + (rightY * offset * right) + (awayY * depth)),
+					(float)(position.Z + (offset * up) + (awayZ * depth))),
+				null,
+				null);
+		}
+	}
+
+	private Vector InFrontOf(CCSPlayerPawn pawn)
+	{
+		Vector eye = Eye(pawn);
+		double yaw = pawn.EyeAngles.Y * Math.PI / 180;
+		return new Vector(
+			(float)(eye.X + (Math.Cos(yaw) * settings.SelfDistance)),
+			(float)(eye.Y + (Math.Sin(yaw) * settings.SelfDistance)),
+			eye.Z);
+	}
+
+	private void Rescale(Floatie floatie, double distance)
+	{
+		double scale = ScaleFor(distance);
 		if (Math.Abs(scale - floatie.Scale) <= (floatie.Scale * RescaleThreshold))
 		{
 			return;
 		}
 
 		floatie.Scale = scale;
-		floatie.Entity.WorldUnitsPerPx = (float)scale;
-		Utilities.SetStateChanged(floatie.Entity, "CPointWorldText", "m_flWorldUnitsPerPx");
+		foreach (CPointWorldText layer in floatie.Layers)
+		{
+			layer.WorldUnitsPerPx = (float)scale;
+			Utilities.SetStateChanged(layer, "CPointWorldText", "m_flWorldUnitsPerPx");
+		}
 	}
 
 	// World units per pixel proportional to distance is what holds the on-screen size constant.
 	private double ScaleFor(double distance) => Math.Max(MinWorldUnitsPerPixel, distance * settings.ScreenSize);
 
+	private static Vector Eye(CCSPlayerPawn pawn)
+	{
+		Vector origin = pawn.AbsOrigin ?? new Vector(0, 0, 0);
+		return new Vector(origin.X, origin.Y, origin.Z + pawn.ViewOffset.Z);
+	}
+
 	private static double Distance(CCSPlayerPawn pawn, Vector point)
 	{
-		Vector origin = pawn.AbsOrigin ?? point;
-		double dx = origin.X - point.X;
-		double dy = origin.Y - point.Y;
-		double dz = origin.Z + pawn.ViewOffset.Z - point.Z;
+		Vector eye = Eye(pawn);
+		double dx = eye.X - point.X;
+		double dy = eye.Y - point.Y;
+		double dz = eye.Z - point.Z;
 		return Math.Sqrt((dx * dx) + (dy * dy) + (dz * dz));
+	}
+
+	private void SetAlpha(Floatie floatie, int alpha)
+	{
+		floatie.Text.Color = ColorFor(floatie.Highlight, alpha);
+		Utilities.SetStateChanged(floatie.Text, "CPointWorldText", "m_Color");
+
+		Color stroke = ParseColor(settings.StrokeColor);
+		foreach (CPointWorldText layer in floatie.Strokes)
+		{
+			layer.Color = System.Drawing.Color.FromArgb(alpha, stroke.R, stroke.G, stroke.B);
+			Utilities.SetStateChanged(layer, "CPointWorldText", "m_Color");
+		}
 	}
 
 	private void RetireOldestIfFull(int owner)
@@ -260,13 +361,19 @@ internal sealed class XpFloaties(FloatieSettings settings)
 		return System.Drawing.Color.FromArgb(alpha, baseColor.R, baseColor.G, baseColor.B);
 	}
 
-	private void RefreshShown() => shown = [.. active.Where(f => f.Entity.IsValid).Select(f => (f.Owner, f.Entity.Index))];
+	private void RefreshShown() => shown =
+	[
+		.. active.SelectMany(f => f.Layers.Where(layer => layer.IsValid).Select(layer => (f.Owner, layer.Index))),
+	];
 
 	private static void Remove(Floatie floatie)
 	{
-		if (floatie.Entity.IsValid)
+		foreach (CPointWorldText layer in floatie.Layers)
 		{
-			floatie.Entity.Remove();
+			if (layer.IsValid)
+			{
+				layer.Remove();
+			}
 		}
 	}
 
@@ -278,9 +385,13 @@ internal sealed class XpFloaties(FloatieSettings settings)
 			: System.Drawing.Color.White;
 	}
 
-	private sealed class Floatie(CPointWorldText entity, int owner, int key, Vector anchor)
+	private sealed class Floatie(CPointWorldText text, List<CPointWorldText> strokes, int owner, int key, Vector anchor)
 	{
-		public CPointWorldText Entity { get; } = entity;
+		public CPointWorldText Text { get; } = text;
+
+		public List<CPointWorldText> Strokes { get; } = strokes;
+
+		public IEnumerable<CPointWorldText> Layers => Strokes.Append(Text);
 
 		public int Owner { get; } = owner;
 

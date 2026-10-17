@@ -88,9 +88,15 @@ public sealed class FloatieSettings
 	/// <summary>
 	/// Gets or sets how big floaties look on screen. A floatie is scaled by this times its distance from the
 	/// player every tick, so it stays the same size on screen however near or far it is. The default draws the
-	/// number about 28 pixels tall at 1080p with the default font size.
+	/// number about 21 pixels tall at 1080p with the default font size.
 	/// </summary>
-	public double ScreenSize { get; set; } = 0.0008;
+	public double ScreenSize { get; set; } = 0.0006;
+
+	/// <summary>Gets or sets how thick the outline around floatie text is, in pixels. 0 turns it off.</summary>
+	public double StrokeWidthPixels { get; set; } = 2;
+
+	/// <summary>Gets or sets the outline color, as #RRGGBB.</summary>
+	public string StrokeColor { get; set; } = "#000000";
 
 	/// <summary>Gets or sets how far in front of the player a floatie with no target appears, in units.</summary>
 	public double SelfDistance { get; set; } = 90;
