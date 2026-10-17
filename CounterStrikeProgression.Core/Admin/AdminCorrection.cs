@@ -85,6 +85,10 @@ internal sealed record AdminCorrection(CorrectionKind Kind, long Xp = 0)
 			player.RankXp = 0;
 			player.Rank = 0;
 			player.PendingXp = 0;
+			player.SeasonStart = null;
+			player.SeasonXp = 0;
+			player.IsSeasonDirty = false;
+			player.EndedSeason = null;
 		}
 		else
 		{

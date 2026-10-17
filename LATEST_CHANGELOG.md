@@ -1,11 +1,16 @@
-## v1.9.0 (minor)
+## v1.10.0 (minor)
 
-Changes since v1.8.0:
+Changes since v1.9.0:
 
-- Move the empty-recap check into Core and cover the recap edge cases (Claude)
-- Move the welcome and !stats lookup into Core, with tests (Claude)
-- Add a map recap in chat and a last session on the player page [minor] (Claude)
-- Filter connected players with LINQ in !stats (Claude)
-- Add a join message and more chat commands [minor] (Claude)
-- Show rank as the clan tag and a chat prefix [minor] (Claude)
+- [minor] Add a featured weapon class of the day (#6) (matt-edmondson)
+- Merge remote-tracking branch 'origin/main' into claude/project-thread-4a8m2s (Claude)
+- Merge remote-tracking branch 'origin/main' into claude/project-thread-4btt0h (Claude)
+- Merge remote-tracking branch 'origin/main' into claude/project-thread-f720x9 (Claude)
+- Describe the featured class in Core and order the banner styles by specificity (Claude)
+- Make the test null checks explicit and filter the target loop up front (Claude)
+- Move the correction logic into Core so it's tested (Claude)
+- Cover the rotation helpers and give week dates a UTC kind (Claude)
+- Add weapon and skill shot leaderboards and a skill shot guide [minor] (Claude)
+- [minor] Add admin commands to grant XP and reset a player (Claude)
+- [minor] Add a featured weapon class of the day (Claude)
 

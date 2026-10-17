@@ -78,7 +78,13 @@ internal static class ProgressMerge
 				: row;
 		}
 
-		return new(player, [.. weapons.Values], [.. challenges.Values]) { Contracts = [.. contracts.Values] };
+		Dictionary<DateTime, SeasonRow> seasons = older.Seasons.ToDictionary(r => r.Start);
+		foreach (SeasonRow row in newer.Seasons)
+		{
+			seasons[row.Start] = seasons.TryGetValue(row.Start, out SeasonRow? existing) && existing.Xp > row.Xp ? existing : row;
+		}
+
+		return new(player, [.. weapons.Values], [.. challenges.Values]) { Contracts = [.. contracts.Values], Seasons = [.. seasons.Values.OrderBy(r => r.Start)] };
 	}
 
 	/// <summary>
@@ -108,7 +114,12 @@ internal static class ProgressMerge
 			return snapshot.Challenges[0].SteamId;
 		}
 
-		return snapshot.Contracts.Count > 0 ? snapshot.Contracts[0].SteamId : null;
+		if (snapshot.Contracts.Count > 0)
+		{
+			return snapshot.Contracts[0].SteamId;
+		}
+
+		return snapshot.Seasons.Count > 0 ? snapshot.Seasons[0].SteamId : null;
 	}
 
 	private static void CopyStored(PlayerProgress stored, PlayerProgress result)
@@ -118,6 +129,8 @@ internal static class ProgressMerge
 		result.Rank = stored.Rank;
 		result.FirstSeen = stored.FirstSeen;
 		result.LastSeen = stored.LastSeen;
+		result.SeasonStart = stored.SeasonStart;
+		result.SeasonXp = stored.SeasonXp;
 		foreach (WeaponProgress weapon in stored.Weapons.Values)
 		{
 			WeaponProgress copy = result.Weapon(weapon.Weapon);
@@ -187,6 +200,21 @@ internal static class ProgressMerge
 			ContractProgress contract = result.Contract(row.Period, row.Contract);
 			contract.Count = Math.Max(contract.Count, row.Count);
 			contract.Completed = contract.Completed || row.Completed;
+		}
+
+		// Only the latest season is kept, so a live row for a later season replaces the stored one.
+		foreach (SeasonRow row in live.Seasons)
+		{
+			DateOnly start = DateOnly.FromDateTime(row.Start);
+			if ((result.SeasonStart is null) || (start > result.SeasonStart))
+			{
+				result.SeasonStart = start;
+				result.SeasonXp = row.Xp;
+			}
+			else if (start == result.SeasonStart)
+			{
+				result.SeasonXp = Math.Max(result.SeasonXp, row.Xp);
+			}
 		}
 	}
 

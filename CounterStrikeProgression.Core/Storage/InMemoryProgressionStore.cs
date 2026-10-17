@@ -16,6 +16,7 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 	private readonly ConcurrentDictionary<(ulong, string), WeaponRow> weapons = new();
 	private readonly ConcurrentDictionary<(ulong, string, string), ChallengeRow> challenges = new();
 	private readonly ConcurrentDictionary<(ulong, string, string), ContractRow> contracts = new();
+	private readonly ConcurrentDictionary<(ulong, DateTime), SeasonRow> seasons = new();
 
 	/// <summary>Gets the number of successful saves, for tests.</summary>
 	public int SaveCount { get; private set; }
@@ -35,6 +36,7 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 			player,
 			weapons.Values.Where(w => w.SteamId == steamId),
 			challenges.Values.Where(c => c.SteamId == steamId),
+			seasons.Values.Where(s => s.SteamId == steamId).MaxBy(s => s.Start),
 			contracts.Values.Where(c => c.SteamId == steamId));
 		return Task.FromResult<PlayerProgress?>(progress);
 	}
@@ -64,6 +66,11 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 			contracts[(row.SteamId, row.Period, row.Contract)] = row;
 		}
 
+		foreach (SeasonRow row in snapshot.Seasons)
+		{
+			seasons[(row.SteamId, row.Start)] = row;
+		}
+
 		SaveCount++;
 		return Task.CompletedTask;
 	}
@@ -86,6 +93,11 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 		foreach ((ulong, string, string) key in contracts.Keys.Where(k => k.Item1 == player.SteamId).ToList())
 		{
 			contracts.TryRemove(key, out _);
+		}
+
+		foreach ((ulong, DateTime) key in seasons.Keys.Where(k => k.Item1 == player.SteamId).ToList())
+		{
+			seasons.TryRemove(key, out _);
 		}
 
 		players[player.SteamId] = player;
@@ -121,5 +133,32 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 			.Take(count)
 			.Select(p => new RankingEntry(p.SteamId, p.Name, p.RankXp, p.Rank, p.LastSeen))];
 		return Task.FromResult(rankings);
+	}
+
+	/// <inheritdoc/>
+	public Task<IReadOnlyList<SeasonStanding>> SeasonStandingsAsync(DateOnly start, int count, CancellationToken cancellationToken)
+	{
+		DateTime day = start.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+		IReadOnlyList<SeasonStanding> standings = [.. seasons.Values
+			.Where(s => s.Start == day && s.Xp > 0 && players.ContainsKey(s.SteamId))
+			.OrderByDescending(s => s.Xp)
+			.ThenBy(s => s.SteamId)
+			.Take(count)
+			.Select(s => new SeasonStanding(s.SteamId, players[s.SteamId].Name, players[s.SteamId].Rank, s.Xp))];
+		return Task.FromResult(standings);
+	}
+
+	/// <inheritdoc/>
+	public Task<IReadOnlyList<SeasonResult>> SeasonResultsAsync(ulong steamId, CancellationToken cancellationToken)
+	{
+		IReadOnlyList<SeasonResult> results = [.. seasons.Values
+			.Where(s => s.SteamId == steamId && s.Xp > 0)
+			.OrderByDescending(s => s.Start)
+			.Select(s =>
+			{
+				SeasonRow[] season = [.. seasons.Values.Where(o => o.Start == s.Start && o.Xp > 0)];
+				return new SeasonResult(s.Start, s.Xp, season.LongCount(o => o.Xp > s.Xp) + 1, season.LongLength);
+			})];
+		return Task.FromResult(results);
 	}
 }

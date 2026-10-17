@@ -118,6 +118,24 @@ internal sealed class PlayerProgress(ulong steamId)
 	/// <summary>Gets the player's contracts, keyed by the period's key and the contract id. Only current periods are loaded.</summary>
 	public Dictionary<(string Period, string Contract), ContractProgress> Contracts { get; } = [];
 
+	/// <summary>
+	/// Gets or sets the first day of the season <see cref="SeasonXp"/> was earned in, or <see langword="null"/> before
+	/// the player has earned any. Only the latest season is loaded, so it can be a season that has already ended.
+	/// </summary>
+	public DateOnly? SeasonStart { get; set; }
+
+	/// <summary>Gets or sets the rank XP earned in the season that starts on <see cref="SeasonStart"/>.</summary>
+	public long SeasonXp { get; set; }
+
+	/// <summary>Gets or sets a value indicating whether the season row changed since it was last saved.</summary>
+	public bool IsSeasonDirty { get; set; }
+
+	/// <summary>
+	/// Gets or sets the final XP of a season that ended before its last change was saved, so the next save
+	/// still writes it. <see langword="null"/> when there's nothing waiting.
+	/// </summary>
+	public (DateOnly Start, long Xp)? EndedSeason { get; set; }
+
 	/// <summary>Gets or sets a value indicating whether the player row changed since it was last saved.</summary>
 	public bool IsDirty { get; set; }
 

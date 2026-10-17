@@ -145,6 +145,32 @@ Settings left out keep their defaults.
 
 Sending runs on the thread pool with a 3 second timeout, and a failure is logged at most once a minute.
 
+### Discord announcements
+
+`Discord` posts the server's big moments to a Discord channel through a webhook: earned feats, epic skill shots, and rank-ups from Gold Nova up. It's off by default, because it sends player names and progress outside the server. With an empty `WebhookUrl`, nothing is posted.
+
+```json
+{
+  "Discord": {
+    "WebhookUrl": "https://discord.com/api/webhooks/<id>/<token>",
+    "Username": "CS2 Progression",
+    "Feats": true,
+    "EpicSkillShots": true,
+    "RankUps": true,
+    "MinimumRank": "Gold Nova",
+    "QueueLimit": 50
+  }
+}
+```
+
+- **`WebhookUrl`:** the channel's webhook URL, from the channel's Integrations settings in Discord. It must be https, and because it holds the webhook's secret it is never written to the log.
+- **`Username`:** the name posts appear under. Empty keeps the name set on the webhook.
+- **`Feats`, `EpicSkillShots`, `RankUps`:** which moments to post.
+- **`MinimumRank`:** the lowest rank whose rank-ups are posted, either a whole rank such as `Gold Nova` (all of its stages) or one stage such as `Gold Nova · III`. A name that matches neither counts as `Gold Nova`.
+- **`QueueLimit`:** how many lines wait to post. When Discord is slow or down, the oldest is dropped.
+
+Posting runs on the thread pool, at most one post a second. Lines that arrive meanwhile are joined into the next post, a post Discord rate limits is retried after the wait it asks for, and a failure is logged at most once a minute. Player names are escaped, and posts never ping anyone.
+
 #### The site
 
 The site is a small ASP.NET Core app, published as the image `ghcr.io/ktsu-dev/counterstrikeprogression-site:<version>` with each release (and as `latest`). It shows the live scoreboard and feed on `/`, the rank ladder on `/ranks`, leaderboards for every weapon (by level) and every skill shot (by count), plus the most feats and the rarest skill shots, on `/leaderboards`, a guide to every skill shot with its rarity, weapons, XP, tiers, and how many players have earned it on `/skillshots`, and each player's profile on `/players/{steamId}` (a SteamID64), with their XP feed and suggested next challenges. Ranks show as badges: the color and emblem mark the rank's family, and the pips along the bottom fill with the stage. Pages update live over server-sent events, and a server counts as offline after a few seconds without a batch.
@@ -156,7 +182,7 @@ The image listens on two ports:
 
 Point the health probe at `/healthz` on port 8080. Port 8081 answers nothing but the ingest route, so a probe there always fails.
 
-The site reads progress from the plugin's database and never writes to it. Give it a user with `SELECT` on `csp_players`, `csp_weapons`, and `csp_challenges` and nothing else. The live state and the feed history live in the site's memory and in a file under `/data`, so mount a volume there if the feed should survive a restart. The image runs as the non-root user with UID 1654, so that user must be able to write to the volume (in Kubernetes, set the pod's `fsGroup` to 1654).
+The site reads progress from the plugin's database and never writes to it. Give it a user with `SELECT` on `csp_players`, `csp_weapons`, `csp_challenges`, and `csp_seasons` and nothing else. The live state and the feed history live in the site's memory and in a file under `/data`, so mount a volume there if the feed should survive a restart. The image runs as the non-root user with UID 1654, so that user must be able to write to the volume (in Kubernetes, set the pod's `fsGroup` to 1654).
 
 Configure the site with environment variables:
 
@@ -196,6 +222,7 @@ Point the plugin's `Site.Url` at port 8081 and set `Site.Token` to the same valu
 | `csp_players` | Steam ID, name, rank XP, rank, first and last seen |
 | `csp_weapons` | Steam ID, weapon, weapon XP, level, kills, headshots, hits, shots |
 | `csp_challenges` | Steam ID, weapon, challenge, count, tier reached |
+| `csp_seasons` | Steam ID, season start, rank XP earned in the season |
 | `csp_schema` | The schema version |
 
 Skill shot ids double as challenge ids in `csp_challenges`, so an id is never renamed once released.

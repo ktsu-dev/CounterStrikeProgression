@@ -163,6 +163,7 @@ internal sealed class PanelBuilder(ProgressionEngine engine)
 			new("Headshots", Number(headshots), LineState.InProgress),
 			new("Weapons levelled", $"{levelled} of {WeaponCatalog.All.Count}", LineState.InProgress),
 			new("Tiers finished", Number(tiers), LineState.InProgress),
+			new($"Season {engine.CurrentSeason.Name}", $"{Number(engine.SeasonXp(player))} XP", LineState.InProgress),
 		]);
 
 		IReadOnlyList<ActiveContract> contracts = engine.ActiveContracts;

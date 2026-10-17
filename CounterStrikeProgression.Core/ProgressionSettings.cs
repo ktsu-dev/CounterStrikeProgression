@@ -185,4 +185,7 @@ public sealed class ProgressionSettings
 
 	/// <summary>Gets or sets the rank XP for finishing the weekly contract.</summary>
 	public int WeeklyContractXp { get; set; } = 2500;
+
+	/// <summary>Gets or sets how long each season lasts, in months. Seasons start on 1 January and every this many months after.</summary>
+	public int SeasonMonths { get; set; } = 3;
 }
