@@ -1,7 +1,7 @@
-## v1.4.0 (minor)
+## v1.5.0 (minor)
 
-Changes since v1.3.0:
+Changes since v1.4.0:
 
-- [minor] Split each rank into five stages, raise the rank XP, and show rank badges (matt-edmondson)
-- [patch] Caption feed lines with how the moment was earned (matt-edmondson)
+- [minor] Add a Chickens challenge to every weapon (matt-edmondson)
+- [minor] Fold numbered ranks into one rank each, so stage names never double up (matt-edmondson)
 
