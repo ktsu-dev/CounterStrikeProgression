@@ -63,17 +63,42 @@ public sealed class PanelSettings
 }
 
 /// <summary>
-/// The "+XP" text that floats in the world when a player earns XP.
+/// Where XP floaties appear.
+/// </summary>
+public enum FloatieMode
+{
+	/// <summary>At the center of the screen, floating up, whatever the player is looking at.</summary>
+	Hud = 0,
+
+	/// <summary>In the world, above the target the XP was earned on.</summary>
+	World,
+}
+
+/// <summary>
+/// The "+XP" text that floats up when a player earns XP.
 /// </summary>
 public sealed class FloatieSettings
 {
 	/// <summary>Gets or sets a value indicating whether floaties are shown.</summary>
 	public bool Enabled { get; set; } = true;
 
+	/// <summary>Gets or sets where floaties appear.</summary>
+	[JsonConverter(typeof(JsonStringEnumConverter<FloatieMode>))]
+	public FloatieMode Mode { get; set; } = FloatieMode.Hud;
+
+	/// <summary>Gets or sets how far in front of the eyes HUD floaties are drawn, in units.</summary>
+	public double HudDistance { get; set; } = 20;
+
+	/// <summary>Gets or sets how far above the crosshair a HUD floatie starts, in units at <see cref="HudDistance"/>.</summary>
+	public double HudStartOffset { get; set; } = 1.5;
+
+	/// <summary>Gets or sets how far a HUD floatie rises over its life, in units at <see cref="HudDistance"/>.</summary>
+	public double HudRise { get; set; } = 5;
+
 	/// <summary>Gets or sets how long a floatie lasts, in seconds.</summary>
 	public double LifetimeSeconds { get; set; } = 1.4;
 
-	/// <summary>Gets or sets how far a floatie rises over its life, in units.</summary>
+	/// <summary>Gets or sets how far a world floatie rises over its life, in units.</summary>
 	public double RiseUnits { get; set; } = 28;
 
 	/// <summary>Gets or sets how soon after one gain the next on the same target adds to the same floatie, in seconds.</summary>

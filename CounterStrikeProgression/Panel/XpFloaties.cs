@@ -11,8 +11,11 @@ using ktsu.CounterStrikeProgression.Core.Floaties;
 using ktsu.CounterStrikeProgression.Core.Progression;
 
 /// <summary>
-/// Draws "+XP" text in the world where a player earned it: above the target for hits and kills, and just in
-/// front of the player for XP with no target. Only the player who earned it can see it. Each floatie rises
+/// Draws "+XP" text that floats up when a player earns XP. In <see cref="FloatieMode.Hud"/> mode it starts at
+/// the center of the screen, re-placed in front of the player's eyes every tick, so it holds its place on screen
+/// but can lag a fast turn slightly. In <see cref="FloatieMode.World"/> mode it appears above the target for
+/// hits and kills, and just in front of the player for XP with no target. Only the player who earned it can
+/// see it. Each floatie rises
 /// and fades, and gains on the same target close together add up in one floatie. Floaties are rescaled
 /// every tick by their distance from the player, so they keep the same size on screen. With a
 /// <see cref="FloatieSettings.DrawDistance"/> set, they're drawn that close on the player's line of sight, so
@@ -76,6 +79,12 @@ internal sealed class XpFloaties(FloatieSettings settings)
 			mergers[owner.Slot] = merger;
 		}
 
+		// On the HUD every gain comes from the same spot, so they all share one floatie.
+		if (settings.Mode == FloatieMode.Hud)
+		{
+			key = FloatieMerger.SelfKey;
+		}
+
 		if (merger.Add(key, now, result) is not FloatieUpdate update)
 		{
 			return;
@@ -97,7 +106,9 @@ internal sealed class XpFloaties(FloatieSettings settings)
 		}
 
 		RetireOldestIfFull(owner.Slot);
-		Vector anchor = at is null ? InFrontOf(pawn) : new Vector(at.X, at.Y, at.Z + HeadHeight);
+		Vector anchor = settings.Mode == FloatieMode.Hud
+			? OnHud(pawn, 0)
+			: at is null ? InFrontOf(pawn) : new Vector(at.X, at.Y, at.Z + HeadHeight);
 		Floatie? floatie = Create(update, owner.Slot, key, pawn, anchor);
 		if (floatie is null)
 		{
@@ -135,9 +146,11 @@ internal sealed class XpFloaties(FloatieSettings settings)
 			}
 
 			double progress = age / settings.LifetimeSeconds;
-			Vector position = new(floatie.Anchor.X, floatie.Anchor.Y, (float)(floatie.Anchor.Z + (settings.RiseUnits * progress)));
 			if (GameState.PawnOf(Utilities.GetPlayerFromSlot(floatie.Owner)) is CCSPlayerPawn pawn)
 			{
+				Vector position = settings.Mode == FloatieMode.Hud
+					? OnHud(pawn, progress)
+					: new Vector(floatie.Anchor.X, floatie.Anchor.Y, (float)(floatie.Anchor.Z + (settings.RiseUnits * progress)));
 				Place(floatie, pawn, position);
 			}
 
@@ -293,6 +306,21 @@ internal sealed class XpFloaties(FloatieSettings settings)
 				null,
 				null);
 		}
+	}
+
+	// A point in front of the eyes, just above the crosshair, raised along the view's own up as the floatie ages.
+	private Vector OnHud(CCSPlayerPawn pawn, double progress)
+	{
+		Vector eye = Eye(pawn);
+		double pitch = pawn.EyeAngles.X * Math.PI / 180;
+		double yaw = pawn.EyeAngles.Y * Math.PI / 180;
+		(double forwardX, double forwardY, double forwardZ) = (Math.Cos(pitch) * Math.Cos(yaw), Math.Cos(pitch) * Math.Sin(yaw), -Math.Sin(pitch));
+		(double upX, double upY, double upZ) = (Math.Sin(pitch) * Math.Cos(yaw), Math.Sin(pitch) * Math.Sin(yaw), Math.Cos(pitch));
+		double rise = settings.HudStartOffset + (settings.HudRise * progress);
+		return new Vector(
+			(float)(eye.X + (forwardX * settings.HudDistance) + (upX * rise)),
+			(float)(eye.Y + (forwardY * settings.HudDistance) + (upY * rise)),
+			(float)(eye.Z + (forwardZ * settings.HudDistance) + (upZ * rise)));
 	}
 
 	private Vector InFrontOf(CCSPlayerPawn pawn)
