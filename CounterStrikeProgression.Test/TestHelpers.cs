@@ -33,3 +33,13 @@ internal static class TestHelpers
 	public static IReadOnlyList<string> SkillShots(ProgressionResult result) =>
 		[.. result.Notices.Where(n => n.Kind == NoticeKind.SkillShot).Select(n => n.SkillShot!.Id.WeakString)];
 }
+
+/// <summary>A clock that moves only when a test advances it.</summary>
+internal sealed class ManualTime : TimeProvider
+{
+	private DateTimeOffset now = new(2026, 10, 17, 12, 0, 0, TimeSpan.Zero);
+
+	public override DateTimeOffset GetUtcNow() => now;
+
+	public void Advance(TimeSpan by) => now += by;
+}

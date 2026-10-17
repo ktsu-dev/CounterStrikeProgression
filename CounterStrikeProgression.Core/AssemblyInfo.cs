@@ -4,3 +4,4 @@ using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("ktsu.CounterStrikeProgression.Test")]
 [assembly: InternalsVisibleTo("CounterStrikeProgression")]
+[assembly: InternalsVisibleTo("ktsu.CounterStrikeProgression.Site")]

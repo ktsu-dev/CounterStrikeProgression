@@ -24,15 +24,6 @@ public sealed class LiveSenderTests
 		}
 	}
 
-	private sealed class ManualTime : TimeProvider
-	{
-		private DateTimeOffset now = new(2026, 10, 17, 12, 0, 0, TimeSpan.Zero);
-
-		public override DateTimeOffset GetUtcNow() => now;
-
-		public void Advance(TimeSpan by) => now += by;
-	}
-
 	private static LiveBatch Batch(string map) => new(
 		new ServerSnapshot(new DateTime(2026, 10, 17, 12, 0, 0, DateTimeKind.Utc), map, "Casual", 10, []),
 		[],

@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CounterStrikeProgression.Core\CounterStrikeProgression.Core.csproj" />
+    <ProjectReference Include="..\CounterStrikeProgression.Site\CounterStrikeProgression.Site.csproj" />
   </ItemGroup>
 
   <ItemGroup>
