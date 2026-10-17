@@ -197,7 +197,7 @@ internal sealed class XpFloaties(FloatieSettings settings)
 		{
 			foreach ((int _, int _) in StrokeDirections)
 			{
-				if (CreateLayer(update.Text, ParseColor(settings.StrokeColor), scale, ownerPawn, anchor) is CPointWorldText stroke)
+				if (CreateLayer(update.Text, StrokeColor(255), scale, ownerPawn, anchor) is CPointWorldText stroke)
 				{
 					strokes.Add(stroke);
 				}
@@ -343,10 +343,10 @@ internal sealed class XpFloaties(FloatieSettings settings)
 		floatie.Text.Color = ColorFor(floatie.Highlight, alpha);
 		Utilities.SetStateChanged(floatie.Text, "CPointWorldText", "m_Color");
 
-		Color stroke = ParseColor(settings.StrokeColor);
+		Color stroke = StrokeColor(alpha);
 		foreach (CPointWorldText layer in floatie.Strokes)
 		{
-			layer.Color = System.Drawing.Color.FromArgb(alpha, stroke.R, stroke.G, stroke.B);
+			layer.Color = stroke;
 			Utilities.SetStateChanged(layer, "CPointWorldText", "m_Color");
 		}
 	}
@@ -359,6 +359,14 @@ internal sealed class XpFloaties(FloatieSettings settings)
 			Remove(mine[i]);
 			active.Remove(mine[i]);
 		}
+	}
+
+	// The outline is a share of the text's opacity, so it fades out with the text.
+	private Color StrokeColor(int textAlpha)
+	{
+		Color baseColor = ParseColor(settings.StrokeColor);
+		int alpha = (int)Math.Round(textAlpha * Math.Clamp(settings.StrokeOpacity, 0, 1));
+		return System.Drawing.Color.FromArgb(alpha, baseColor.R, baseColor.G, baseColor.B);
 	}
 
 	private Color ColorFor(bool highlight, int alpha)

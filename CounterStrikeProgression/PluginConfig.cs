@@ -105,6 +105,9 @@ public sealed class FloatieSettings
 	/// <summary>Gets or sets the outline color, as #RRGGBB.</summary>
 	public string StrokeColor { get; set; } = "#000000";
 
+	/// <summary>Gets or sets the outline's opacity as a share of the text's, from 0 to 1.</summary>
+	public double StrokeOpacity { get; set; } = 0.5;
+
 	/// <summary>Gets or sets how far in front of the player a floatie with no target appears, in units.</summary>
 	public double SelfDistance { get; set; } = 90;
 
