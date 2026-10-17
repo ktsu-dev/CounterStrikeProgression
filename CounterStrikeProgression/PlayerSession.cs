@@ -67,6 +67,9 @@ internal sealed class PlayerSession(int slot, ulong steamId)
 	/// <summary>Gets or sets when the player was last told about a skill shot, to keep chat readable.</summary>
 	public double LastSkillShotMessage { get; set; } = double.NegativeInfinity;
 
+	/// <summary>Gets or sets the rank last set as the player's clan tag, or -1 to set it again.</summary>
+	public int ClanTagRank { get; set; } = -1;
+
 	/// <summary>Gets the player's panel state.</summary>
 	public PanelState Panel { get; } = new();
 }

@@ -25,6 +25,7 @@ Players climb an up-only rank ladder from Silver I to Global Elite. Every weapon
 - **In-game panel**: `!rank` opens a side panel to the right of the view. It falls back to a center-screen card and then to chat if a way of drawing fails.
 - **XP floaties**: every XP gain floats up as "+XP" text from the center of your screen. Only you see your own. Quick gains add up in one floatie, and skill shots, tiers, and level-ups are named under the number in gold. A `World` mode floats them above the target instead.
 - **Feats**: eight really difficult feats, such as Global Elite, Millionaire, Weapon master, Full ladder, Collector, and Chicken overlord. They are worked out from the stored progress, announced to the server when earned, and shown as medallions on the progression site.
+- **Rank tags**: everyone's rank, such as `[GN III]`, shows as their scoreboard clan tag and before their name in chat.
 - **Announcements**: rank-ups, finished tiers, and every fifth weapon level go to the whole server.
 - **Map recap**: when the map ends, each player gets one chat line with the XP, kills and deaths, skill shots, levels, and tiers they earned, and their best moment. The recap also goes to the progression site, which shows it as "Last session" on the player page, and a player who leaves early still gets one there. `AnnounceMapRecap` turns the chat line off.
 - **Durable storage**: progress is kept in MariaDB or MySQL in `csp_` tables, saved off the game thread, and retried after a failed save without double counting.
@@ -95,6 +96,10 @@ Settings left out keep their defaults.
 `Floaties` picks `World` (the default) or `Hud` mode, turns the floating XP text on or off, and sets how long it lasts, how far it rises, how quickly gains merge, how many one player can have at once, its colors, how big it's drawn by distance (`SizePerUnitOfDistance`, `MinWorldUnitsPerPixel`, `MaxWorldUnitsPerPixel`), and the outline (`StrokeWidthPixels`, `StrokeColor`, `StrokeOpacity`). In `Hud` mode a floatie appears just above the crosshair and stays at that spot as you move, and new XP adds to it while your crosshair stays within `HudReuseDegrees` of where it appeared. In `World` mode a floatie appears above the target, or in front of you for XP with no target. A floatie's size is set when it appears and doesn't change after, and it has a half-opacity black outline for contrast.
 
 `Panel` sets the draw mode (`Auto`, `WorldText`, `CenterHtml`, or `Chat`), how many lines each mode shows, and the side panel's font size, scale, color, and offsets. The default placement suits a 16:9 display. CS2 has no client-predicted anchor for world text, so the side panel trails slightly behind fast turns.
+
+### Rank tags
+
+`RankTags` turns the scoreboard clan tag (`ClanTag`) and the chat prefix (`ChatPrefix`) on or off. Both are on by default. The clan tag replaces any Steam group tag the player has. The chat prefix is added to the name in the chat message itself, so gags, team chat, and dead chat work as before, and CS2-SimpleAdmin's gag hook is unaffected.
 
 ### Progression site
 
