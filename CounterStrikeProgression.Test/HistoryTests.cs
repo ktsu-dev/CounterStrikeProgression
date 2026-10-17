@@ -139,6 +139,22 @@ public sealed class HistoryTests
 	}
 
 	[TestMethod]
+	public async Task InMemory_ResetStartsTheHistoryAgain()
+	{
+		InMemoryProgressionStore store = new();
+		await store.SaveAsync(Save(TestHelpers.SteamId, 1000, Monday.AddDays(-30), Monday.AddDays(-1)), TestContext.CancellationToken).ConfigureAwait(false);
+		await store.SaveAsync(Save(TestHelpers.SteamId, 5000, Monday.AddDays(-30), Monday.AddDays(2)), TestContext.CancellationToken).ConfigureAwait(false);
+
+		await store.ResetAsync(new PlayerRow(TestHelpers.SteamId, "Tester", 0, 0, At(Monday.AddDays(-30)), At(Monday.AddDays(3))), TestContext.CancellationToken).ConfigureAwait(false);
+		await store.SaveAsync(Save(TestHelpers.SteamId, 200, Monday.AddDays(-30), Monday.AddDays(3)), TestContext.CancellationToken).ConfigureAwait(false);
+
+		IReadOnlyList<DailyXp> rows = await store.HistoryAsync(TestHelpers.SteamId, Monday, TestContext.CancellationToken).ConfigureAwait(false);
+		CollectionAssert.AreEqual(new DailyXp[] { new(Monday.AddDays(2), 0), new(Monday.AddDays(3), 200) }, rows.ToList());
+		IReadOnlyList<XpGainEntry> gains = await store.GainsSinceAsync(Monday, 10, TestContext.CancellationToken).ConfigureAwait(false);
+		Assert.AreEqual(200L, gains.Single().Gained);
+	}
+
+	[TestMethod]
 	public void Weekly_LaysLiveProgressOverTheStoredGains()
 	{
 		XpGainEntry[] stored = [new(TestHelpers.SteamId, "Tester", 1000, 0, 100), new(TestHelpers.SteamId + 1, "Other", 5000, 0, 150)];
@@ -259,6 +275,10 @@ public sealed class HistoryTests
 
 		IReadOnlyList<XpGainEntry> gains = await store.GainsSinceAsync(Monday, 1000, TestContext.CancellationToken).ConfigureAwait(false);
 		Assert.AreEqual(300L, gains.Single(g => g.SteamId == steamId).Gained);
+
+		await store.ResetAsync(new PlayerRow(steamId, "Tester", 0, 0, At(Monday.AddDays(-30)), At(Monday.AddDays(3))), TestContext.CancellationToken).ConfigureAwait(false);
+		rows = await store.HistoryAsync(steamId, Monday, TestContext.CancellationToken).ConfigureAwait(false);
+		CollectionAssert.AreEqual(new DailyXp[] { new(Monday.AddDays(2), 0) }, rows.ToList());
 	}
 
 	private static LiveState NewState(TimeProvider time) =>

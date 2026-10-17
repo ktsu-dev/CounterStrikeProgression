@@ -69,6 +69,14 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			PRIMARY KEY (steam_id, day)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+		CREATE TABLE IF NOT EXISTS csp_seasons (
+			steam_id BIGINT UNSIGNED NOT NULL,
+			season_start DATE NOT NULL,
+			xp BIGINT NOT NULL DEFAULT 0,
+			PRIMARY KEY (steam_id, season_start),
+			KEY idx_csp_seasons_xp (season_start, xp)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 		INSERT IGNORE INTO csp_schema (id, version) VALUES (1, @version);
 		""";
 
@@ -143,9 +151,41 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		ON DUPLICATE KEY UPDATE count = VALUES(count), tier = VALUES(tier);
 		""";
 
+	private const string UpsertSeason = """
+		INSERT INTO csp_seasons (steam_id, season_start, xp)
+		VALUES (@SteamId, @Start, @Xp)
+		ON DUPLICATE KEY UPDATE xp = VALUES(xp);
+		""";
+
+	private const string SelectLatestSeason =
+		"SELECT steam_id AS SteamId, season_start AS Start, xp AS Xp FROM csp_seasons WHERE steam_id = @steamId ORDER BY season_start DESC LIMIT 1";
+
+	private const string SelectSeasonStandings = """
+		SELECT s.steam_id AS SteamId, p.name AS Name, p.rank_index AS `Rank`, s.xp AS Xp
+		FROM csp_seasons s JOIN csp_players p ON p.steam_id = s.steam_id
+		WHERE s.season_start = @start AND s.xp > 0
+		ORDER BY s.xp DESC, s.steam_id ASC LIMIT @count
+		""";
+
+	private const string SelectSeasonResults = """
+		SELECT s.season_start AS Start, s.xp AS Xp,
+			(SELECT COUNT(*) FROM csp_seasons o WHERE o.season_start = s.season_start AND o.xp > s.xp) + 1 AS Place,
+			(SELECT COUNT(*) FROM csp_seasons o WHERE o.season_start = s.season_start AND o.xp > 0) AS Players
+		FROM csp_seasons s
+		WHERE s.steam_id = @steamId AND s.xp > 0
+		ORDER BY s.season_start DESC
+		""";
+
+	/// <summary>
+	/// Clears a player's rows for a reset. Their daily history starts again from the day before, so the XP they
+	/// keep isn't counted as earned.
+	/// </summary>
 	private const string DeletePlayerRows = """
 		DELETE FROM csp_challenges WHERE steam_id = @SteamId;
 		DELETE FROM csp_weapons WHERE steam_id = @SteamId;
+		DELETE FROM csp_seasons WHERE steam_id = @SteamId;
+		DELETE FROM csp_daily WHERE steam_id = @SteamId;
+		INSERT INTO csp_daily (steam_id, day, rank_xp) VALUES (@SteamId, DATE(@LastSeen) - INTERVAL 1 DAY, @RankXp);
 		""";
 
 	private readonly string connectionString = ConnectionStringFor(settings);
@@ -213,7 +253,12 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			parameters,
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-		return ProgressSnapshot.Rebuild(player, weapons, challenges);
+		SeasonRow? season = await connection.QueryFirstOrDefaultAsync<SeasonRow>(new CommandDefinition(
+			SelectLatestSeason,
+			parameters,
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+		return ProgressSnapshot.Rebuild(player, weapons, challenges, season);
 	}
 
 	/// <inheritdoc/>
@@ -246,6 +291,11 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			await connection.ExecuteAsync(new CommandDefinition(UpsertChallenge, snapshot.Challenges, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
 		}
 
+		if (snapshot.Seasons.Count > 0)
+		{
+			await connection.ExecuteAsync(new CommandDefinition(UpsertSeason, snapshot.Seasons, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+		}
+
 		await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 	}
 
@@ -259,7 +309,7 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		MySqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
 		await using ConfiguredAsyncDisposable transactionScope = transaction.ConfigureAwait(false);
 
-		await connection.ExecuteAsync(new CommandDefinition(DeletePlayerRows, new { player.SteamId }, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+		await connection.ExecuteAsync(new CommandDefinition(DeletePlayerRows, new { player.SteamId, player.LastSeen, player.RankXp }, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
 		await connection.ExecuteAsync(new CommandDefinition(UpsertPlayer, player, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
 		await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 	}
@@ -323,6 +373,30 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			new { start = start.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc), count },
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 		return [.. gains];
+	}
+
+	/// <inheritdoc/>
+	public async Task<IReadOnlyList<SeasonStanding>> SeasonStandingsAsync(DateOnly start, int count, CancellationToken cancellationToken)
+	{
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		IEnumerable<SeasonStanding> standings = await connection.QueryAsync<SeasonStanding>(new CommandDefinition(
+			SelectSeasonStandings,
+			new { start = start.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc), count },
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+		return [.. standings];
+	}
+
+	/// <inheritdoc/>
+	public async Task<IReadOnlyList<SeasonResult>> SeasonResultsAsync(ulong steamId, CancellationToken cancellationToken)
+	{
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		IEnumerable<SeasonResult> results = await connection.QueryAsync<SeasonResult>(new CommandDefinition(
+			SelectSeasonResults,
+			new { steamId },
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+		return [.. results];
 	}
 
 	private async Task<MySqlConnection> OpenAsync(CancellationToken cancellationToken)

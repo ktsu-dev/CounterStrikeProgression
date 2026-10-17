@@ -173,4 +173,7 @@ public sealed class ProgressionSettings
 	/// bonuses sooner. 1 turns the featured weapon off.
 	/// </summary>
 	public double FeaturedWeaponMultiplier { get; set; } = 2;
+
+	/// <summary>Gets or sets how long each season lasts, in months. Seasons start on 1 January and every this many months after.</summary>
+	public int SeasonMonths { get; set; } = 3;
 }

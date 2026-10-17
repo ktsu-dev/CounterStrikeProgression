@@ -44,4 +44,10 @@ internal static partial class Log
 
 	[LoggerMessage(EventId = 12, Level = LogLevel.Error, Message = "Admin {Admin} ({AdminSteamId}) tried {Correction} on {SteamId}, but it wasn't written")]
 	public static partial void CorrectionFailed(ILogger logger, string admin, ulong adminSteamId, string correction, ulong steamId);
+
+	[LoggerMessage(EventId = 13, Level = LogLevel.Warning, Message = "Posting to the Discord webhook failed")]
+	public static partial void DiscordFailed(ILogger logger, Exception exception);
+
+	[LoggerMessage(EventId = 14, Level = LogLevel.Error, Message = "The Discord webhook URL isn't an absolute https URL, so nothing is posted to Discord")]
+	public static partial void DiscordUrlInvalid(ILogger logger);
 }

@@ -43,6 +43,10 @@ internal sealed partial class ProgressReader(IProgressionStore store, TimeProvid
 	private readonly Dictionary<ulong, Lazy<Task<PlayerProgress?>>> loadingPlayers = [];
 	private readonly Dictionary<int, (IReadOnlyList<RankingEntry> Rankings, DateTimeOffset Until)> rankings = [];
 	private readonly Dictionary<int, Lazy<Task<IReadOnlyList<RankingEntry>>>> loadingRankings = [];
+	private readonly Dictionary<DateOnly, (IReadOnlyList<SeasonStanding> Standings, DateTimeOffset Until)> standings = [];
+	private readonly Dictionary<DateOnly, Lazy<Task<IReadOnlyList<SeasonStanding>>>> loadingStandings = [];
+	private readonly Dictionary<ulong, (IReadOnlyList<SeasonResult> Results, DateTimeOffset Until)> results = [];
+	private readonly Dictionary<ulong, Lazy<Task<IReadOnlyList<SeasonResult>>>> loadingResults = [];
 
 	/// <summary>
 	/// Parses a SteamID64 from a URL.
@@ -130,8 +134,86 @@ internal sealed partial class ProgressReader(IProgressionStore store, TimeProvid
 		return load.Value.WaitAsync(cancellationToken);
 	}
 
+	/// <summary>
+	/// Gets the stored standings of one season, most season XP first.
+	/// </summary>
+	/// <param name="start">The season's first day.</param>
+	/// <param name="cancellationToken">Stops this caller waiting. A query other callers share runs on.</param>
+	/// <returns>Up to <see cref="RankingsCount"/> rows.</returns>
+	public Task<IReadOnlyList<SeasonStanding>> SeasonStandingsAsync(DateOnly start, CancellationToken cancellationToken = default) =>
+		Cached(standings, loadingStandings, start, () => store.SeasonStandingsAsync(start, RankingsCount, CancellationToken.None), cancellationToken);
+
+	/// <summary>
+	/// Gets where a player finished in each season they played.
+	/// </summary>
+	/// <param name="steamId">The 64-bit Steam ID.</param>
+	/// <param name="cancellationToken">Stops this caller waiting. A query other callers share runs on.</param>
+	/// <returns>The results, latest season first.</returns>
+	public Task<IReadOnlyList<SeasonResult>> SeasonResultsAsync(ulong steamId, CancellationToken cancellationToken = default) =>
+		Cached(results, loadingResults, steamId, () => store.SeasonResultsAsync(steamId, CancellationToken.None), cancellationToken);
+
 	/// <inheritdoc/>
 	public void Dispose() => slots.Dispose();
+
+	private Task<T> Cached<TKey, T>(
+		Dictionary<TKey, (T Value, DateTimeOffset Until)> cache,
+		Dictionary<TKey, Lazy<Task<T>>> loading,
+		TKey key,
+		Func<Task<T>> query,
+		CancellationToken cancellationToken)
+		where TKey : notnull
+	{
+		Lazy<Task<T>> load;
+		lock (gate)
+		{
+			if (cache.TryGetValue(key, out (T Value, DateTimeOffset Until) cached) && clock.GetUtcNow() < cached.Until)
+			{
+				return Task.FromResult(cached.Value);
+			}
+
+			if (!loading.TryGetValue(key, out Lazy<Task<T>>? existing))
+			{
+				existing = new(() => LoadCachedAsync(cache, loading, key, query));
+				loading[key] = existing;
+			}
+
+			load = existing;
+		}
+
+		return load.Value.WaitAsync(cancellationToken);
+	}
+
+	private async Task<T> LoadCachedAsync<TKey, T>(
+		Dictionary<TKey, (T Value, DateTimeOffset Until)> cache,
+		Dictionary<TKey, Lazy<Task<T>>> loading,
+		TKey key,
+		Func<Task<T>> query)
+		where TKey : notnull
+	{
+		try
+		{
+			DateTimeOffset now = clock.GetUtcNow();
+			T fresh = await QueryAsync(query).ConfigureAwait(false);
+			lock (gate)
+			{
+				if (cache.Count >= MaxCachedPlayers && !cache.ContainsKey(key))
+				{
+					cache.Clear();
+				}
+
+				cache[key] = (fresh, now + CacheFor);
+			}
+
+			return fresh;
+		}
+		finally
+		{
+			lock (gate)
+			{
+				loading.Remove(key);
+			}
+		}
+	}
 
 	private async Task<IReadOnlyList<RankingEntry>> LoadRankingsAsync(int count)
 	{

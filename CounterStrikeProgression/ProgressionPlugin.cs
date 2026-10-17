@@ -78,6 +78,7 @@ public sealed class ProgressionPlugin : BasePlugin, IPluginConfig<PluginConfig>
 		services?.Floaties.RemoveAll();
 		services?.Sessions.Shutdown(TimeSpan.FromSeconds(5));
 		services?.Site?.Dispose();
+		services?.Discord?.Dispose();
 	}
 
 	private IProgressionStore CreateStore()
