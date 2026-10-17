@@ -48,7 +48,7 @@ public sealed class ProgressionSettings
 	public long FirstRankXp { get; set; } = 5000;
 
 	/// <summary>Gets or sets how much more each rank costs than the one before, as a multiplier.</summary>
-	public double RankGrowth { get; set; } = 1.0436;
+	public double RankGrowth { get; set; } = 1.0765;
 
 	/// <summary>Gets or sets the weapon XP needed to go from level 1 to level 2.</summary>
 	public long WeaponLevelBaseXp { get; set; } = 300;

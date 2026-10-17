@@ -6,18 +6,12 @@
 	// Matches RankLadder.RankNames and RankLadder.Names in CounterStrikeProgression.Core, because the live
 	// snapshot sends only the rank index.
 	const RANK_BASE_NAMES = [
-		"Silver I",
-		"Silver II",
-		"Silver III",
-		"Silver IV",
+		"Silver",
 		"Silver Elite",
 		"Silver Elite Master",
-		"Gold Nova I",
-		"Gold Nova II",
-		"Gold Nova III",
+		"Gold Nova",
 		"Gold Nova Master",
-		"Master Guardian I",
-		"Master Guardian II",
+		"Master Guardian",
 		"Master Guardian Elite",
 		"Distinguished Master Guardian",
 		"Legendary Eagle",
@@ -32,11 +26,11 @@
 	// Each family of ranks shares a badge color and emblem, and marks on the badge count the rank within it.
 	const RANK_FAMILIES = [
 		{ from: 0, color: "#b9c3cd", emblem: "star" },
-		{ from: 6, color: "#f2c94c", emblem: "star" },
-		{ from: 10, color: "#5fa8ff", emblem: "shield" },
-		{ from: 14, color: "#c77dff", emblem: "wings" },
-		{ from: 16, color: "#ff8a3d", emblem: "wings" },
-		{ from: 17, color: "#ff4d6d", emblem: "globe" },
+		{ from: 3, color: "#f2c94c", emblem: "star" },
+		{ from: 5, color: "#5fa8ff", emblem: "shield" },
+		{ from: 8, color: "#c77dff", emblem: "wings" },
+		{ from: 10, color: "#ff8a3d", emblem: "wings" },
+		{ from: 11, color: "#ff4d6d", emblem: "globe" },
 	];
 
 	const FEED_LIMIT = 50;

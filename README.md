@@ -16,7 +16,7 @@ Players climb an up-only rank ladder from Silver I to Global Elite. Every weapon
 
 ## Features
 
-- **Up-only ranks**: 18 matchmaking-style ranks with five stages each, from Silver I · I to Global Elite · V. The first stage takes 5,000 XP, each one after costs about 4% more, and Global Elite · V takes about 5 million XP in total. Nobody loses progress for a bad night.
+- **Up-only ranks**: 12 matchmaking-style ranks with five stages each, from Silver · I to Global Elite · V. Numbered ranks such as Silver I to IV are one rank here, because the stages number it. The first stage takes 5,000 XP, each one after costs about 7.7% more, and Global Elite · V takes about 5 million XP in total. Nobody loses progress for a bad night.
 - **Weapon levels**: every weapon, grenade, the knife, and the Zeus levels up to 40, and each level-up pays rank XP.
 - **Weapon ladders**: Kills, Headshots, and Hits, plus one challenge for every skill shot the weapon can earn, each with five tiers. Skill tiers pay more than volume tiers.
 - **Skill shots**: about 50, covering movement, distance, wallbangs and smokes, scopes, utility and melee, timing and aim, multi-kills, and round situations.

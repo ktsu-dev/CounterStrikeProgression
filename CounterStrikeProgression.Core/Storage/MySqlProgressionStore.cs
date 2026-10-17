@@ -14,10 +14,10 @@ using MySqlConnector;
 internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgressionStore
 {
 	/// <summary>
-	/// The schema version these statements create and expect. Version 2 counts ranks in stages, so a version 1
-	/// database has its rank indexes cleared once, and each player's rank comes back from their XP.
+	/// The schema version these statements create and expect. Version 3 counts ranks in stages of the 12-rank
+	/// ladder, so an older database has its rank indexes cleared once, and each player's rank comes back from their XP.
 	/// </summary>
-	public const int SchemaVersion = 2;
+	public const int SchemaVersion = 3;
 
 	private const string CreateTables = """
 		CREATE TABLE IF NOT EXISTS csp_schema (
@@ -60,8 +60,8 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		""";
 
 	private const string MigrateToStagedRanks = """
-		UPDATE csp_players SET rank_index = 0 WHERE (SELECT version FROM csp_schema WHERE id = 1) < 2;
-		UPDATE csp_schema SET version = 2 WHERE id = 1 AND version < 2;
+		UPDATE csp_players SET rank_index = 0 WHERE (SELECT version FROM csp_schema WHERE id = 1) < 3;
+		UPDATE csp_schema SET version = 3 WHERE id = 1 AND version < 3;
 		""";
 
 	private const string UpsertPlayer = """

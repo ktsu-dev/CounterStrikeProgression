@@ -15,11 +15,12 @@ public sealed class LadderTests
 	[TestMethod]
 	public void RanksStartAtSilverAndEndAtGlobalElite_InFiveStagesEach()
 	{
-		Assert.HasCount(18 * RankLadder.StagesPerRank, RankLadder.Names);
-		Assert.AreEqual("Silver I · I", RankLadder.Names[0]);
-		Assert.AreEqual("Silver I · V", RankLadder.Names[4]);
-		Assert.AreEqual("Silver II · I", RankLadder.Names[5]);
+		Assert.HasCount(12 * RankLadder.StagesPerRank, RankLadder.Names);
+		Assert.AreEqual("Silver · I", RankLadder.Names[0]);
+		Assert.AreEqual("Silver · V", RankLadder.Names[4]);
+		Assert.AreEqual("Silver Elite · I", RankLadder.Names[5]);
 		Assert.AreEqual("Global Elite · V", RankLadder.Names[RankLadder.TopRank]);
+		Assert.IsFalse(RankLadder.RankNames.Any(n => n.EndsWith(" I", StringComparison.Ordinal) || n.EndsWith(" II", StringComparison.Ordinal)));
 	}
 
 	[TestMethod]
@@ -46,7 +47,7 @@ public sealed class LadderTests
 	[DataRow(1000, 1)]
 	[DataRow(2249, 1)]
 	[DataRow(2250, 2)]
-	[DataRow(long.MaxValue, 89)]
+	[DataRow(long.MaxValue, 59)]
 	public void RankForMatchesThresholds(long xp, int expected) => Assert.AreEqual(expected, Ranks.RankFor(xp));
 
 	[TestMethod]

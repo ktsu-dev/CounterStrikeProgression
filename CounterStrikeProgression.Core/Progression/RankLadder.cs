@@ -11,22 +11,17 @@ internal sealed class RankLadder
 	public const int StagesPerRank = 5;
 
 	/// <summary>
-	/// The matchmaking rank names, lowest first. Each has <see cref="StagesPerRank"/> stages in <see cref="Names"/>.
+	/// The matchmaking rank names, lowest first, with the numbered ones such as Silver I to IV folded into one
+	/// rank, because the stages number them instead. Each has <see cref="StagesPerRank"/> stages in <see cref="Names"/>.
 	/// </summary>
 	public static IReadOnlyList<string> RankNames { get; } =
 	[
-		"Silver I",
-		"Silver II",
-		"Silver III",
-		"Silver IV",
+		"Silver",
 		"Silver Elite",
 		"Silver Elite Master",
-		"Gold Nova I",
-		"Gold Nova II",
-		"Gold Nova III",
+		"Gold Nova",
 		"Gold Nova Master",
-		"Master Guardian I",
-		"Master Guardian II",
+		"Master Guardian",
 		"Master Guardian Elite",
 		"Distinguished Master Guardian",
 		"Legendary Eagle",
@@ -39,7 +34,7 @@ internal sealed class RankLadder
 	private static readonly string[] StageNumerals = ["I", "II", "III", "IV", "V"];
 
 	/// <summary>
-	/// The name of every stage, lowest first, such as <c>Silver II · III</c>. A player's rank is an index into this list.
+	/// The name of every stage, lowest first, such as <c>Gold Nova · III</c>. A player's rank is an index into this list.
 	/// </summary>
 	public static IReadOnlyList<string> Names { get; } =
 		[.. RankNames.SelectMany(name => StageNumerals.Select(stage => $"{name} · {stage}"))];

@@ -23,7 +23,7 @@ public sealed class PanelTests
 
 		PanelPage page = new PanelBuilder(engine).Overview(player);
 
-		Assert.AreEqual("Silver I · II", page.Title);
+		Assert.AreEqual("Silver · II", page.Title);
 		Assert.AreEqual("1,500 / 2,250 XP", page.ProgressLabel);
 		Assert.AreEqual(500.0 / 1250, page.Progress, 1e-9);
 	}
@@ -125,7 +125,7 @@ public sealed class PanelTests
 
 		string text = PanelFormatter.ToPlainText(page, 1, PanelBuilder.PageCount, 0, 8);
 
-		StringAssert.StartsWith(text, "SILVER I");
+		StringAssert.StartsWith(text, "SILVER · I");
 		StringAssert.Contains(text, "[--------------------]");
 		StringAssert.Contains(text, "A/D page");
 	}

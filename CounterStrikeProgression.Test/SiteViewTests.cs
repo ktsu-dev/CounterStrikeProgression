@@ -33,8 +33,8 @@ public sealed class SiteViewTests
 		PlayerView view = PlayerViewBuilder.Build(player, settings, online: true);
 
 		Assert.AreEqual(1, view.Rank);
-		Assert.AreEqual("Silver I · II", view.RankName);
-		Assert.AreEqual("Silver I · III", view.NextRankName);
+		Assert.AreEqual("Silver · II", view.RankName);
+		Assert.AreEqual("Silver · III", view.NextRankName);
 		Assert.AreEqual(0.5, view.RankProgress, 0.01);
 		Assert.AreEqual(2250 - 1625, view.XpToNextRank);
 		Assert.IsTrue(view.Online);
@@ -51,7 +51,7 @@ public sealed class SiteViewTests
 		PlayerView view = PlayerViewBuilder.Build(player, Settings(), online: false);
 
 		Assert.AreEqual(5, view.Rank);
-		Assert.AreEqual("Silver II · I", view.RankName);
+		Assert.AreEqual("Silver Elite · I", view.RankName);
 	}
 
 	[TestMethod]
