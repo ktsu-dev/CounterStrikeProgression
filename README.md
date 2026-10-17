@@ -126,7 +126,9 @@ The image listens on two ports:
 - **8080 (public):** `/`, `/ranks`, `/players/{steamId}`, `/api/live`, `/api/ranks`, `/api/players/{id}`, `/api/stream`, and `/healthz`. Route this port to visitors.
 - **8081 (ingest):** `POST /api/ingest` with the header `Authorization: Bearer <token>`. Keep this port inside your network, because only the plugin needs it.
 
-The site reads progress from the plugin's database and never writes to it. Give it a user with `SELECT` on `csp_players`, `csp_weapons`, and `csp_challenges` and nothing else. The live state and the feed history live in the site's memory and in a file under `/data`, so mount a volume there if the feed should survive a restart.
+Point the health probe at `/healthz` on port 8080. Port 8081 answers nothing but the ingest route, so a probe there always fails.
+
+The site reads progress from the plugin's database and never writes to it. Give it a user with `SELECT` on `csp_players`, `csp_weapons`, and `csp_challenges` and nothing else. The live state and the feed history live in the site's memory and in a file under `/data`, so mount a volume there if the feed should survive a restart. The image runs as the non-root user with UID 1654, so that user must be able to write to the volume (in Kubernetes, set the pod's `fsGroup` to 1654).
 
 Configure the site with environment variables:
 
@@ -137,8 +139,9 @@ Configure the site with environment variables:
 | `Site__Database__Database` | `cs2` | The database name. |
 | `Site__Database__User` | `cs2` | The read-only database user. |
 | `Site__Database__Password` | empty | The database password. |
+| `Site__Database__RequireTls` | `false` | Whether the database connection must be encrypted. When it's `false`, the site still uses TLS if the server offers it. |
 | `Site__Token` | empty | The bearer token the plugin sends. Empty rejects every batch. |
-| `Site__DataPath` | `/data` | The folder for the feed history file. |
+| `Site__DataPath` | `/data` | The folder for the feed history file. It must be writable by UID 1654, the user the image runs as. |
 | `Site__OfflineAfterSeconds` | `15` | Seconds without a batch before the server counts as offline. |
 | `Site__FeedLength` | `50` | How many feed entries to keep and show. |
 

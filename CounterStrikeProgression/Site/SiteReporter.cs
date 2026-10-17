@@ -2,6 +2,7 @@
 
 namespace ktsu.CounterStrikeProgression.Site;
 
+using System.Diagnostics.CodeAnalysis;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Cvars;
@@ -24,6 +25,7 @@ internal sealed class SiteReporter : IDisposable
 	private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(3);
 
 	private readonly PluginConfig pluginConfig;
+	private readonly ILogger log;
 	private readonly SessionManager sessionManager;
 	private readonly LiveSender sender;
 	private readonly ProgressChangeTracker tracker = new();
@@ -37,7 +39,7 @@ internal sealed class SiteReporter : IDisposable
 	/// </summary>
 	/// <param name="config">The plugin config, whose <see cref="PluginConfig.Site"/> URL must be an absolute http or https URL.</param>
 	/// <param name="sessions">The connected players.</param>
-	/// <param name="logger">Where send failures are reported.</param>
+	/// <param name="logger">Where collect and send failures are reported.</param>
 	/// <exception cref="ArgumentException">The site URL isn't an absolute http or https URL.</exception>
 	public SiteReporter(PluginConfig config, SessionManager sessions, ILogger logger)
 	{
@@ -47,6 +49,7 @@ internal sealed class SiteReporter : IDisposable
 
 		Uri ingestUrl = ParseUrl(config.Site.Url) ?? throw new ArgumentException("The site URL isn't an absolute http or https URL.", nameof(config));
 		pluginConfig = config;
+		log = logger;
 		sessionManager = sessions;
 		sender = new LiveSender(
 			ingestUrl,
@@ -103,9 +106,39 @@ internal sealed class SiteReporter : IDisposable
 	}
 
 	/// <summary>
-	/// Reads the server's state and queues a batch for the site. Call it on the game thread.
+	/// Reads the server's state and queues a batch for the site. Call it on the game thread. A failure is
+	/// logged and skips this batch, so the site never breaks the game.
 	/// </summary>
+	[SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "Collect runs from a game timer, where an exception would surface in the host. The site is optional, so any failure is logged and the batch skipped.")]
 	public void Collect()
+	{
+		try
+		{
+			CollectBatch();
+		}
+		catch (Exception exception)
+		{
+			Log.EventFailed(log, "the site report", exception);
+		}
+	}
+
+	/// <summary>
+	/// Forgets what was sent for a player who left, so a return sends all of their rows.
+	/// </summary>
+	/// <param name="steamId">The player's 64-bit Steam ID.</param>
+	public void Forget(ulong steamId) => tracker.Forget(steamId);
+
+	/// <summary>
+	/// Stops the sender. Batches still queued are dropped.
+	/// </summary>
+	public void Dispose() => sender.Dispose();
+
+	private static Uri? ParseUrl(string? url) =>
+		Uri.TryCreate(url?.Trim(), UriKind.Absolute, out Uri? parsed) && ((parsed.Scheme == Uri.UriSchemeHttp) || (parsed.Scheme == Uri.UriSchemeHttps))
+			? parsed
+			: null;
+
+	private void CollectBatch()
 	{
 		gameType ??= ConVar.Find("game_type");
 		gameMode ??= ConVar.Find("game_mode");
@@ -135,22 +168,6 @@ internal sealed class SiteReporter : IDisposable
 
 		sender.TryEnqueue(new LiveBatch(snapshot, feed, progress, pluginConfig.Progression));
 	}
-
-	/// <summary>
-	/// Forgets what was sent for a player who left, so a return sends all of their rows.
-	/// </summary>
-	/// <param name="steamId">The player's 64-bit Steam ID.</param>
-	public void Forget(ulong steamId) => tracker.Forget(steamId);
-
-	/// <summary>
-	/// Stops the sender. Batches still queued are dropped.
-	/// </summary>
-	public void Dispose() => sender.Dispose();
-
-	private static Uri? ParseUrl(string? url) =>
-		Uri.TryCreate(url?.Trim(), UriKind.Absolute, out Uri? parsed) && ((parsed.Scheme == Uri.UriSchemeHttp) || (parsed.Scheme == Uri.UriSchemeHttps))
-			? parsed
-			: null;
 
 	private List<LivePlayer> ReadPlayers()
 	{
