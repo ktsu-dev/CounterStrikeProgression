@@ -358,6 +358,21 @@ public sealed class SiteEndpointTests
 	}
 
 	[TestMethod]
+	public async Task Ingest_ContractRows_AreAcceptedAndANullRowIsRejected()
+	{
+		ProgressSnapshot rows = new(null, [], []) { Contracts = [new ContractRow(TestHelpers.SteamId, "2026-10-17", "headshots", 3, false)] };
+		LiveState live = NewState();
+		DefaultHttpContext good = IngestContext("Bearer dev", JsonSerializer.Serialize(Batch() with { Progress = [rows] }, LiveJson.Options));
+		IResult accepted = await Endpoints.IngestAsync(good, new SiteOptions { Token = "dev" }, live, new Broadcaster(), new FeatIndex()).ConfigureAwait(false);
+		Assert.AreEqual(StatusCodes.Status204NoContent, StatusOf(accepted));
+
+		string body = JsonSerializer.Serialize(Batch() with { Progress = [rows] }, LiveJson.Options).Replace("\"contracts\":[{", "\"contracts\":[null,{", StringComparison.Ordinal);
+		DefaultHttpContext bad = IngestContext("Bearer dev", body);
+		IResult rejected = await Endpoints.IngestAsync(bad, new SiteOptions { Token = "dev" }, NewState(), new Broadcaster(), new FeatIndex()).ConfigureAwait(false);
+		Assert.AreEqual(StatusCodes.Status400BadRequest, StatusOf(rejected));
+	}
+
+	[TestMethod]
 	public async Task Ingest_OversizedBody_Returns413()
 	{
 		DefaultHttpContext context = IngestContext("Bearer dev", "{}");

@@ -7,6 +7,8 @@ using ktsu.CounterStrikeProgression.Core.Contracts;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Rotation;
+using ktsu.CounterStrikeProgression.Core.SkillShots;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 using ktsu.CounterStrikeProgression.Site.Live;
@@ -337,5 +339,131 @@ public sealed class ContractTests
 		PlayerProgress merged = ProgressMerge.Merge(stored, newer);
 		Assert.AreEqual(9, merged.Contracts[("2026-10-17", "headshots")].Count);
 		Assert.IsTrue(merged.Contracts[("2026-10-17", "headshots")].Completed);
+	}
+
+	[TestMethod]
+	[DataRow("weekly_kills", (int)SignalKind.Kill, false, null)]
+	[DataRow("weekly_headshots", (int)SignalKind.Kill, true, null)]
+	[DataRow("weekly_skill_shots", (int)SignalKind.SkillShot, false, "wallbang")]
+	[DataRow("weekly_tiers", (int)SignalKind.Tier, false, null)]
+	[DataRow("weekly_levels", (int)SignalKind.WeaponLevel, false, null)]
+	public void WeeklyContractsCountTheirSignal(string id, int signal, bool headshot, string? skillShot)
+	{
+		SignalKind kind = (SignalKind)signal;
+		ContractDefinition contract = ContractCatalog.Find(id)!;
+		SkillShotDefinition? shot = skillShot is null ? null : SkillShotCatalog.All.Single(s => s.Id.WeakString == skillShot);
+		Assert.IsTrue(contract.Counts(new ContractSignal(kind, TestHelpers.Weapon("ak47"), headshot, shot)));
+		Assert.IsFalse(contract.Counts(new ContractSignal(SignalKind.Assist, TestHelpers.Weapon("ak47"))));
+	}
+
+	[TestMethod]
+	public void TheEpicWeeklyCountsOnlyEpicSkillShots()
+	{
+		ContractDefinition contract = ContractCatalog.Find("weekly_epic")!;
+		SkillShotDefinition epic = SkillShotCatalog.All.First(s => s.Rarity == Rarity.Epic);
+		SkillShotDefinition common = SkillShotCatalog.All.First(s => s.Rarity == Rarity.Common);
+		Assert.IsTrue(contract.Counts(new ContractSignal(SignalKind.SkillShot, SkillShot: epic)));
+		Assert.IsFalse(contract.Counts(new ContractSignal(SignalKind.SkillShot, SkillShot: common)));
+	}
+
+	[TestMethod]
+	public void EveryWeekDrawsAWeeklyFromThePool()
+	{
+		ProgressionSettings settings = new();
+		HashSet<string> weeklies = [.. Enumerable.Range(0, 52).Select(w => ContractCatalog.Active(Saturday.AddDays(7 * w), settings)[^1].Definition.Id)];
+		Assert.IsGreaterThan(1, weeklies.Count);
+		Assert.IsTrue(weeklies.All(id => ContractCatalog.Weekly.Any(c => c.Id == id)));
+	}
+
+	[TestMethod]
+	[DataRow(2026, 10, 17, "2026-W42", 2026, 10, 12)]
+	[DataRow(2027, 1, 1, "2026-W53", 2026, 12, 28)]
+	[DataRow(2026, 10, 19, "2026-W43", 2026, 10, 19)]
+	public void WeeksAreIsoWeeksStartingMonday(int year, int month, int day, string key, int startYear, int startMonth, int startDay)
+	{
+		DateOnly date = new(year, month, day);
+		Assert.AreEqual(key, DailyRotation.WeekKey(date));
+		Assert.AreEqual(new DateOnly(startYear, startMonth, startDay), DailyRotation.WeekStart(date));
+	}
+
+	[TestMethod]
+	public void TheFeaturedClassIsOneOfTheGunClassesAndNamed()
+	{
+		HashSet<WeaponClass> featured = [.. Enumerable.Range(0, 60).Select(d => DailyRotation.FeaturedClass(Saturday.AddDays(d)))];
+		Assert.IsGreaterThan(1, featured.Count);
+		Assert.IsTrue(featured.All(c => DailyRotation.FeaturedClasses.Contains(c)));
+		foreach (WeaponClass weaponClass in Enum.GetValues<WeaponClass>())
+		{
+			Assert.IsFalse(string.IsNullOrEmpty(DailyRotation.ClassName(weaponClass)));
+		}
+	}
+
+	[TestMethod]
+	public void TheFeaturedClassEarnsMoreWeaponXp()
+	{
+		ManualTime time = new();
+		ProgressionEngine engine = TestHelpers.Engine(s => s.FeaturedWeaponMultiplier = 2, time);
+		WeaponClass featured = engine.FeaturedClass!.Value;
+		WeaponInfo boosted = WeaponCatalog.All.First(w => w.Class == featured);
+		WeaponInfo plain = WeaponCatalog.All.First(w => w.IsGun && w.Class != featured);
+		PlayerProgress player = TestHelpers.Player();
+
+		engine.ApplyCombat(player, TestHelpers.Hit(boosted.Key.WeakString));
+		engine.ApplyCombat(player, TestHelpers.Hit(plain.Key.WeakString));
+
+		Assert.AreEqual(2 * player.Weapons[plain.Key].Xp, player.Weapons[boosted.Key].Xp);
+		Assert.IsNull(TestHelpers.Engine(time: time).FeaturedClass);
+	}
+
+	[TestMethod]
+	public void GrantAddsAndRemovesRankXp()
+	{
+		ManualTime time = new();
+		ProgressionEngine engine = TestHelpers.Engine(time: time);
+		PlayerProgress player = TestHelpers.Player();
+
+		engine.Grant(player, 20_000);
+		Assert.AreEqual(20_000, player.RankXp);
+		Assert.AreEqual(0, player.Day(engine.Today).Xp);
+
+		engine.Grant(player, -30_000);
+		Assert.AreEqual(0, player.RankXp);
+		Assert.AreEqual(0, player.Rank);
+		Assert.AreEqual(0, player.Day(engine.Today).RankXp);
+	}
+
+	[TestMethod]
+	public void DaysOtherThanTodayAreDroppedOnceSaved()
+	{
+		ManualTime time = new();
+		ProgressionEngine engine = TestHelpers.Engine(time: time);
+		PlayerProgress player = TestHelpers.Player();
+		DateOnly yesterday = engine.Today;
+		engine.ApplyCombat(player, TestHelpers.Kill("ak47"));
+		player.Day(yesterday).IsDirty = false;
+
+		time.Advance(TimeSpan.FromDays(1));
+		engine.ApplyCombat(player, TestHelpers.Kill("ak47"));
+
+		Assert.IsFalse(player.Days.ContainsKey(yesterday));
+		Assert.AreEqual(1, player.Day(engine.Today).Kills);
+	}
+
+	[TestMethod]
+	[DataRow(2026, 10, 17, 3, "Oct–Dec 2026", 2026, 7, 1)]
+	[DataRow(2026, 2, 3, 1, "Feb 2026", 2026, 1, 1)]
+	[DataRow(2026, 5, 9, 5, "Apr–Jun 2026", 2026, 1, 1)]
+	public void SeasonsSplitTheYear(int year, int month, int day, int months, string name, int previousYear, int previousMonth, int previousDay)
+	{
+		Season season = Season.For(new DateOnly(year, month, day), months);
+		Assert.AreEqual(name, season.Name);
+		Assert.AreEqual(new DateOnly(previousYear, previousMonth, previousDay), season.Previous(months).Start);
+	}
+
+	[TestMethod]
+	public void SteamIdComesFromAnyRow()
+	{
+		Assert.AreEqual(TestHelpers.SteamId, ProgressMerge.SteamIdOf(new ProgressSnapshot(null, [], [new ChallengeRow(TestHelpers.SteamId, "ak47", "kills", 1, 0)])));
+		Assert.IsNull(ProgressMerge.SteamIdOf(new ProgressSnapshot(null, [], [])));
 	}
 }
