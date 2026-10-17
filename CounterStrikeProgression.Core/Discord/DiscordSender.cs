@@ -41,7 +41,6 @@ internal sealed class DiscordSender : IDisposable
 	private readonly TimeProvider time;
 	private readonly HttpClient client;
 	private readonly Channel<string> queue;
-	[SuppressMessage("Usage", "CA2213:Disposable fields should be disposed", Justification = "The source has no timer, and the reader may still touch it after Dispose, where a disposed source would throw.")]
 	private readonly CancellationTokenSource shutdown = new();
 	private readonly CancellationToken stopping;
 	private DateTimeOffset? lastFailureReport;
@@ -102,10 +101,15 @@ internal sealed class DiscordSender : IDisposable
 	/// <summary>
 	/// Stops the sender and releases its resources. Lines still queued are dropped.
 	/// </summary>
+	/// <remarks>
+	/// The source is cancelled before it is disposed, so the reader only ever sees a cancelled token, which it can
+	/// still read after disposal.
+	/// </remarks>
 	public void Dispose()
 	{
 		queue.Writer.TryComplete();
 		shutdown.Cancel();
+		shutdown.Dispose();
 		client.Dispose();
 	}
 
@@ -165,7 +169,8 @@ internal sealed class DiscordSender : IDisposable
 	private async Task PostAsync(string content)
 	{
 		WebhookMessage message = new(content, username, new AllowedMentions([]));
-		for (int attempt = 1; ; attempt++)
+		int attempt = 1;
+		while (true)
 		{
 			using HttpResponseMessage response = await client.PostAsJsonAsync(webhook, message, JsonOptions, stopping).ConfigureAwait(false);
 			if ((response.StatusCode != HttpStatusCode.TooManyRequests) || (attempt >= MaxAttempts))
@@ -174,6 +179,7 @@ internal sealed class DiscordSender : IDisposable
 				return;
 			}
 
+			attempt++;
 			await Task.Delay(RetryWait(response), time, stopping).ConfigureAwait(false);
 		}
 	}
@@ -191,7 +197,7 @@ internal sealed class DiscordSender : IDisposable
 			wait = TimeSpan.FromSeconds(seconds);
 		}
 
-		return wait < TimeSpan.Zero ? TimeSpan.Zero : (wait > LongestRetryWait ? LongestRetryWait : wait);
+		return TimeSpan.FromTicks(Math.Clamp(wait.Ticks, 0, LongestRetryWait.Ticks));
 	}
 
 	[SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "A faulty failure callback must not stop the reader loop.")]
