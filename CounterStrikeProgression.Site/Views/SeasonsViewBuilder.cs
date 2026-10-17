@@ -86,21 +86,10 @@ internal static class SeasonsViewBuilder
 		{
 			foreach (ulong steamId in entries.Keys.Union(overlayIds ?? []).ToList())
 			{
-				ProgressSnapshot? live = overlay(steamId);
-				long liveXp = LiveSeasonXp(live, season.Start);
-				if (liveXp <= 0)
+				if (overlay(steamId) is { } live && LiveSeasonXp(live, season.Start) is var liveXp and > 0)
 				{
-					continue;
+					entries[steamId] = WithLive(entries.GetValueOrDefault(steamId), steamId, live.Player, liveXp);
 				}
-
-				entries[steamId] = entries.TryGetValue(steamId, out SeasonStanding? entry)
-					? entry with
-					{
-						Name = string.IsNullOrEmpty(live?.Player?.Name) ? entry.Name : live.Player.Name,
-						Rank = Math.Max(entry.Rank, live?.Player?.Rank ?? 0),
-						Xp = Math.Max(entry.Xp, liveXp),
-					}
-					: new(steamId, live?.Player?.Name ?? string.Empty, live?.Player?.Rank ?? 0, liveXp);
 			}
 		}
 
@@ -160,6 +149,26 @@ internal static class SeasonsViewBuilder
 		return new(current.Name, xp, xp > 0 ? place : null, players, badges);
 	}
 
-	private static long LiveSeasonXp(ProgressSnapshot? live, DateOnly start) =>
-		live?.Seasons.Where(s => DateOnly.FromDateTime(s.Start) == start).Select(s => s.Xp).DefaultIfEmpty(0).Max() ?? 0;
+	private static long LiveSeasonXp(ProgressSnapshot live, DateOnly start) =>
+		live.Seasons.Where(s => DateOnly.FromDateTime(s.Start) == start).Select(s => s.Xp).DefaultIfEmpty(0).Max();
+
+	private static SeasonStanding WithLive(SeasonStanding? stored, ulong steamId, PlayerRow? player, long liveXp)
+	{
+		if (stored is null)
+		{
+			return new(steamId, player?.Name ?? string.Empty, player?.Rank ?? 0, liveXp);
+		}
+
+		if (player is null)
+		{
+			return stored with { Xp = Math.Max(stored.Xp, liveXp) };
+		}
+
+		return stored with
+		{
+			Name = string.IsNullOrEmpty(player.Name) ? stored.Name : player.Name,
+			Rank = Math.Max(stored.Rank, player.Rank),
+			Xp = Math.Max(stored.Xp, liveXp),
+		};
+	}
 }

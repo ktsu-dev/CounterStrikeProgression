@@ -96,6 +96,25 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		ON DUPLICATE KEY UPDATE xp = VALUES(xp);
 		""";
 
+	private const string SelectLatestSeason =
+		"SELECT steam_id AS SteamId, season_start AS Start, xp AS Xp FROM csp_seasons WHERE steam_id = @steamId ORDER BY season_start DESC LIMIT 1";
+
+	private const string SelectSeasonStandings = """
+		SELECT s.steam_id AS SteamId, p.name AS Name, p.rank_index AS `Rank`, s.xp AS Xp
+		FROM csp_seasons s JOIN csp_players p ON p.steam_id = s.steam_id
+		WHERE s.season_start = @start AND s.xp > 0
+		ORDER BY s.xp DESC, s.steam_id ASC LIMIT @count
+		""";
+
+	private const string SelectSeasonResults = """
+		SELECT s.season_start AS Start, s.xp AS Xp,
+			(SELECT COUNT(*) FROM csp_seasons o WHERE o.season_start = s.season_start AND o.xp > s.xp) + 1 AS Place,
+			(SELECT COUNT(*) FROM csp_seasons o WHERE o.season_start = s.season_start AND o.xp > 0) AS Players
+		FROM csp_seasons s
+		WHERE s.steam_id = @steamId AND s.xp > 0
+		ORDER BY s.season_start DESC
+		""";
+
 	private readonly string connectionString = ConnectionStringFor(settings);
 
 	/// <summary>
@@ -161,7 +180,7 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 
 		SeasonRow? season = await connection.QueryFirstOrDefaultAsync<SeasonRow>(new CommandDefinition(
-			"SELECT steam_id AS SteamId, season_start AS Start, xp AS Xp FROM csp_seasons WHERE steam_id = @steamId ORDER BY season_start DESC LIMIT 1",
+			SelectLatestSeason,
 			parameters,
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 
@@ -235,12 +254,7 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
 		IEnumerable<SeasonStanding> standings = await connection.QueryAsync<SeasonStanding>(new CommandDefinition(
-			"""
-			SELECT s.steam_id AS SteamId, p.name AS Name, p.rank_index AS `Rank`, s.xp AS Xp
-			FROM csp_seasons s JOIN csp_players p ON p.steam_id = s.steam_id
-			WHERE s.season_start = @start AND s.xp > 0
-			ORDER BY s.xp DESC, s.steam_id ASC LIMIT @count
-			""",
+			SelectSeasonStandings,
 			new { start = start.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc), count },
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 		return [.. standings];
@@ -252,14 +266,7 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
 		IEnumerable<SeasonResult> results = await connection.QueryAsync<SeasonResult>(new CommandDefinition(
-			"""
-			SELECT s.season_start AS Start, s.xp AS Xp,
-				(SELECT COUNT(*) FROM csp_seasons o WHERE o.season_start = s.season_start AND o.xp > s.xp) + 1 AS Place,
-				(SELECT COUNT(*) FROM csp_seasons o WHERE o.season_start = s.season_start AND o.xp > 0) AS Players
-			FROM csp_seasons s
-			WHERE s.steam_id = @steamId AND s.xp > 0
-			ORDER BY s.season_start DESC
-			""",
+			SelectSeasonResults,
 			new { steamId },
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 		return [.. results];

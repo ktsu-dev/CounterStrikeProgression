@@ -2,6 +2,7 @@
 
 namespace ktsu.CounterStrikeProgression.Test;
 
+using System.Data.Common;
 using System.Globalization;
 using System.Text.Json;
 using ktsu.CounterStrikeProgression.Core;
@@ -278,6 +279,98 @@ public sealed class SeasonTests
 		Assert.AreEqual(new SeasonBadge("Jul–Sep 2026", July, 2, 2, 900, false), view.Badges[1]);
 	}
 
+	[TestMethod]
+	public void SeasonBoard_AddsLiveOnlyPlayersAndIgnoresLiveRowsForPastSeasons()
+	{
+		ProgressionSettings settings = new();
+		Season october = Season.For(October, 3);
+		Season july = Season.For(July, 3);
+		ulong fresh = TestHelpers.SteamId;
+		ulong nameless = TestHelpers.SteamId + 1;
+		ulong stored = TestHelpers.SteamId + 2;
+		Dictionary<ulong, ProgressSnapshot> live = new()
+		{
+			[fresh] = new(new PlayerRow(fresh, "Fresh", 500, 3, Midnight(October), Midnight(October)), [], []) { Seasons = [new SeasonRow(fresh, Midnight(October), 500)] },
+			[nameless] = new(null, [], []) { Seasons = [new SeasonRow(nameless, Midnight(October), 20)] },
+			[stored] = new(null, [], []) { Seasons = [new SeasonRow(stored, Midnight(October), 90)] },
+		};
+		IReadOnlyList<SeasonStanding> rows = [new SeasonStanding(stored, "Stored", 2, 60)];
+
+		SeasonView now = SeasonsViewBuilder.Build(october, october, settings, rows, id => live.GetValueOrDefault(id), id => id == fresh, live.Keys);
+		Assert.AreEqual("Fresh,Stored,", string.Join(',', now.Rows.Select(r => r.Name)));
+		Assert.AreEqual(90, now.Rows[1].Xp);
+		Assert.AreEqual("Stored", now.Rows[1].Name);
+		Assert.IsTrue(now.Rows[0].Online);
+
+		SeasonView past = SeasonsViewBuilder.Build(july, october, settings, rows, id => live.GetValueOrDefault(id), _ => false, live.Keys);
+		Assert.HasCount(1, past.Rows);
+		Assert.AreEqual(60, past.Rows[0].Xp);
+	}
+
+	[TestMethod]
+	public void PlayerBadges_FallBackToTheStoredPlaceAndSkipPlayersWithNoSeasonXp()
+	{
+		ProgressionSettings settings = new();
+		Season october = Season.For(October, 3);
+		SeasonView board = SeasonsViewBuilder.Build(october, october, settings, [], _ => null, _ => false);
+
+		PlayerSeasonsView offBoard = SeasonsViewBuilder.BuildPlayer(1, 40, board, [new SeasonResult(Midnight(October), 40, 600, 700)], settings);
+		Assert.AreEqual(600L, offBoard.Place);
+		Assert.AreEqual(700, offBoard.Players);
+
+		PlayerSeasonsView idle = SeasonsViewBuilder.BuildPlayer(1, 0, board, [new SeasonResult(Midnight(July), 10, 4, 9)], settings);
+		Assert.IsNull(idle.Place);
+		Assert.IsEmpty(idle.Badges);
+	}
+
+	[TestMethod]
+	public void MergeIgnoresALiveRowForAnOlderSeasonAndFindsTheSteamIdOnSeasonRows()
+	{
+		PlayerProgress stored = TestHelpers.Player();
+		stored.SeasonStart = October;
+		stored.SeasonXp = 70;
+		ProgressSnapshot older = new(null, [], []) { Seasons = [new SeasonRow(TestHelpers.SteamId, Midnight(July), 900)] };
+		ProgressSnapshot same = new(null, [], []) { Seasons = [new SeasonRow(TestHelpers.SteamId, Midnight(October), 50)] };
+
+		PlayerProgress merged = ProgressMerge.Merge(stored, older);
+		Assert.AreEqual(October, merged.SeasonStart);
+		Assert.AreEqual(70, merged.SeasonXp);
+		Assert.AreEqual(70, ProgressMerge.Merge(stored, same).SeasonXp);
+		Assert.AreEqual(TestHelpers.SteamId, ProgressMerge.SteamIdOf(older));
+		Assert.AreEqual(October, ProgressMerge.Merge(null, same).SeasonStart);
+	}
+
+	[TestMethod]
+	public async Task ProgressReader_CachesSeasonAnswers()
+	{
+		InMemoryProgressionStore store = new();
+		ManualTime time = new();
+		using ProgressReader reader = new(store, time);
+
+		Assert.IsEmpty(await reader.SeasonStandingsAsync(October).ConfigureAwait(false));
+		Assert.IsEmpty(await reader.SeasonResultsAsync(1).ConfigureAwait(false));
+		await SaveAsync(store, 1, "One", October, 40).ConfigureAwait(false);
+		Assert.IsEmpty(await reader.SeasonStandingsAsync(October).ConfigureAwait(false));
+
+		time.Advance(TimeSpan.FromSeconds(11));
+		Assert.HasCount(1, await reader.SeasonStandingsAsync(October).ConfigureAwait(false));
+		Assert.HasCount(1, await reader.SeasonResultsAsync(1).ConfigureAwait(false));
+	}
+
+	[TestMethod]
+	public async Task SeasonEndpoints_Return503WhenTheDatabaseFails()
+	{
+		using ProgressReader reader = new(new FailingStore());
+		ManualTime time = new();
+		LiveState live = NewState(time);
+
+		Assert.AreEqual(StatusCodes.Status503ServiceUnavailable, StatusOf(await Endpoints.SeasonsAsync(null, reader, live, time, CancellationToken.None).ConfigureAwait(false)));
+		Assert.AreEqual(StatusCodes.Status503ServiceUnavailable, StatusOf(await Endpoints.PlayerSeasonsAsync(TestHelpers.SteamId.ToString(CultureInfo.InvariantCulture), reader, live, time, CancellationToken.None).ConfigureAwait(false)));
+		Assert.IsInstanceOfType<NotFound>(await Endpoints.PlayerSeasonsAsync("nope", reader, live, time, CancellationToken.None).ConfigureAwait(false));
+	}
+
+	private static int StatusOf(IResult result) => ((IStatusCodeHttpResult)result).StatusCode ?? 0;
+
 	private static DateTime Midnight(DateOnly day) => day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
 
 	private static LiveBatch Batch(IReadOnlyList<ProgressSnapshot> progress) =>
@@ -291,5 +384,40 @@ public sealed class SeasonTests
 		DateTime seen = Midnight(season);
 		ProgressSnapshot rows = new(new PlayerRow(steamId, name, xp, 0, seen, seen), [], []) { Seasons = [new SeasonRow(steamId, seen, xp)] };
 		await store.SaveAsync(rows, TestContext.CancellationToken).ConfigureAwait(false);
+	}
+
+	private sealed class FailingStore : IProgressionStore
+	{
+		public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+		public Task<PlayerProgress?> LoadAsync(ulong steamId, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task SaveAsync(ProgressSnapshot snapshot, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task<IReadOnlyList<LeaderboardEntry>> TopAsync(int count, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task<IReadOnlyList<RankingEntry>> RankingsAsync(int count, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task<IReadOnlyList<SeasonStanding>> SeasonStandingsAsync(DateOnly start, int count, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task<IReadOnlyList<SeasonResult>> SeasonResultsAsync(ulong steamId, CancellationToken cancellationToken) => throw new DatabaseDown();
+	}
+
+	private sealed class DatabaseDown : DbException
+	{
+		public DatabaseDown()
+			: base("The database is down.")
+		{
+		}
+
+		public DatabaseDown(string message)
+			: base(message)
+		{
+		}
+
+		public DatabaseDown(string message, Exception innerException)
+			: base(message, innerException)
+		{
+		}
 	}
 }
