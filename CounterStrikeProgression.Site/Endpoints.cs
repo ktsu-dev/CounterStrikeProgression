@@ -35,7 +35,7 @@ internal static class Endpoints
 	public const int IngestPort = 8081;
 
 	/// <summary>The largest batch the ingest endpoint reads, in bytes.</summary>
-	public const long IngestBodyLimit = 1024 * 1024;
+	public const long IngestBodyLimit = 4 * 1024 * 1024;
 
 	/// <summary>The ingest route.</summary>
 	public const string IngestRoute = "/api/ingest";

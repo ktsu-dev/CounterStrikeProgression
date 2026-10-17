@@ -369,6 +369,19 @@ public sealed class SiteEndpointTests
 	}
 
 	[TestMethod]
+	public async Task Ingest_ThreeMebibyteBody_IsAccepted()
+	{
+		LiveState live = NewState();
+		string body = JsonSerializer.Serialize(Batch(), LiveJson.Options) + new string(' ', 3 * 1024 * 1024);
+		DefaultHttpContext context = IngestContext("Bearer dev", body);
+
+		IResult result = await Endpoints.IngestAsync(context, new SiteOptions { Token = "dev" }, live, new Broadcaster()).ConfigureAwait(false);
+
+		Assert.AreEqual(StatusCodes.Status204NoContent, StatusOf(result));
+		Assert.AreEqual("de_inferno", live.Snapshot?.Map);
+	}
+
+	[TestMethod]
 	public async Task Ingest_ValidBatch_AppliesAndPublishes()
 	{
 		LiveState live = NewState();
