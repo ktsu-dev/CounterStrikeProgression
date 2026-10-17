@@ -203,6 +203,37 @@ internal static class Endpoints
 	}
 
 	/// <summary>
+	/// Gets the leaderboards: each weapon by level, each skill shot by count, the most feats, and the rarest skill shots.
+	/// </summary>
+	/// <param name="boards">Every ranked player's tally.</param>
+	/// <param name="reader">Reads the stored progress of the players on the server.</param>
+	/// <param name="live">The live state.</param>
+	/// <param name="cancellationToken">Stops waiting when the request is aborted.</param>
+	/// <returns>The boards.</returns>
+	public static async Task<IResult> LeaderboardsAsync(BoardIndex boards, ProgressReader reader, LiveState live, CancellationToken cancellationToken)
+	{
+		Ensure.NotNull(boards);
+		await boards.RefreshPlayingAsync(reader, live, cancellationToken).ConfigureAwait(false);
+		return TypedResults.Ok(LeaderboardViewBuilder.Build(boards.All, boards.Updated));
+	}
+
+	/// <summary>
+	/// Gets the skill shot guide: every skill shot, what it asks for, the weapons that can earn it, and how many players have.
+	/// </summary>
+	/// <param name="boards">Every ranked player's tally.</param>
+	/// <param name="reader">Reads the stored progress of the players on the server.</param>
+	/// <param name="live">The live state.</param>
+	/// <param name="cancellationToken">Stops waiting when the request is aborted.</param>
+	/// <returns>The guide.</returns>
+	public static async Task<IResult> SkillShotsAsync(BoardIndex boards, ProgressReader reader, LiveState live, CancellationToken cancellationToken)
+	{
+		Ensure.NotNull(boards);
+		Ensure.NotNull(live);
+		await boards.RefreshPlayingAsync(reader, live, cancellationToken).ConfigureAwait(false);
+		return TypedResults.Ok(SkillShotGuideBuilder.Build(boards.All, live.Settings, boards.Updated));
+	}
+
+	/// <summary>
 	/// Opens the live event stream.
 	/// </summary>
 	/// <param name="live">The live state.</param>
