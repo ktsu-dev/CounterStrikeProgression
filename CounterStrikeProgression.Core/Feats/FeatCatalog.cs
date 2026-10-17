@@ -73,7 +73,7 @@ internal sealed class FeatCatalog(ProgressionSettings settings)
 		HashSet<string> skillShotsEarned = new(StringComparer.Ordinal);
 		int bestEpicTier = 0;
 		int bestChickenTier = 0;
-		(long Done, long Total) bestLadder = (0, 1);
+		(long Done, long Total) bestLadder = (0, 0);
 		foreach ((WeaponInfo info, WeaponProgress progress) in weapons)
 		{
 			IReadOnlyList<ChallengeDefinition> ladder = challenges.For(info);
@@ -106,10 +106,15 @@ internal sealed class FeatCatalog(ProgressionSettings settings)
 				}
 			}
 
-			if ((ladder.Count > 0) && ((double)finished / ladder.Count > (double)bestLadder.Done / bestLadder.Total))
+			if ((ladder.Count > 0) && ((bestLadder.Total == 0) || ((double)finished / ladder.Count > (double)bestLadder.Done / bestLadder.Total)))
 			{
 				bestLadder = (finished, ladder.Count);
 			}
+		}
+
+		if (bestLadder.Total == 0)
+		{
+			bestLadder = (0, challenges.For(WeaponCatalog.All[0]).Count);
 		}
 
 		int rank = Math.Max(player.Rank, ranks.RankFor(player.RankXp));

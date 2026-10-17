@@ -440,4 +440,40 @@ public sealed class SiteViewTests
 
 	private static FeedEntry Tier(string title, string? weapon) =>
 		new(Seen, TestHelpers.SteamId, "Tester", FeedKind.TierCompleted, title, weapon, 100);
+
+	[TestMethod]
+	public void Ladder_ListsEveryStepInOrder_WithPlayerCounts()
+	{
+		ProgressionSettings settings = Settings();
+		RankLadder ladder = new(settings.FirstRankXp, settings.RankGrowth);
+		List<RankingEntry> stored =
+		[
+			new(76561198000000001, "A", 0, 0, Seen),
+			new(76561198000000002, "B", 10, 0, Seen),
+			new(76561198000000003, "C", ladder.ThresholdFor(7), 0, Seen),
+		];
+		IReadOnlyList<RankRow> rows = RanksViewBuilder.Build(stored, _ => null, _ => false, settings);
+
+		IReadOnlyList<LadderStep> steps = LadderViewBuilder.Build(rows, settings);
+
+		Assert.HasCount(RankLadder.Names.Count, steps);
+		Assert.AreEqual(2, steps[0].Players);
+		Assert.AreEqual(1, steps[7].Players);
+		Assert.AreEqual(3, steps.Sum(s => s.Players));
+		Assert.AreEqual("Silver Elite · III", steps[7].Name);
+		Assert.AreEqual("Silver Elite", steps[7].RankName);
+		Assert.AreEqual(3, steps[7].Stage);
+		Assert.AreEqual(ladder.ThresholdFor(7), steps[7].MinXp);
+	}
+
+	[TestMethod]
+	public void FeedLines_CarryTheirChallengeId_ForTheIcon()
+	{
+		ProgressionSettings settings = Settings();
+
+		Assert.AreEqual("wallbang", FeedCaptions.For(new FeedEntry(Seen, 1, "P", FeedKind.SkillShot, "Wallbang", "AK-47", 25), settings).ChallengeId);
+		Assert.AreEqual("chicken_nugget", FeedCaptions.For(Tier("Nugget II", "AK-47"), settings).ChallengeId);
+		Assert.AreEqual(ChallengeDefinition.ChickensId, FeedCaptions.For(Tier("Chickens I", "AK-47"), settings).ChallengeId);
+		Assert.IsNull(FeedCaptions.For(new FeedEntry(Seen, 1, "P", FeedKind.RankUp, "Rank up: Silver · II", null, 0), settings).ChallengeId);
+	}
 }

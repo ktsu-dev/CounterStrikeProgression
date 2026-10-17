@@ -231,6 +231,26 @@
 		],
 	};
 
+	// A challenge's icon, drawn in the text color. The markup comes from icons.js, which the site ships itself.
+	function challengeIcon(id) {
+		const markup = (window.CHALLENGE_ICONS ?? {})[id];
+		if (!markup) {
+			return null;
+		}
+		const svg = svgNode("svg", {
+			viewBox: "0 0 24 24",
+			class: "challenge-icon",
+			fill: "none",
+			stroke: "currentColor",
+			"stroke-width": 2,
+			"stroke-linecap": "round",
+			"stroke-linejoin": "round",
+			"aria-hidden": "true",
+		});
+		svg.innerHTML = markup;
+		return svg;
+	}
+
 	// An earned feat is gold, a locked one grey.
 	function featIcon(id, earned, title) {
 		const color = earned ? "#f2c94c" : "#4a515b";
@@ -418,6 +438,10 @@
 			if (id) {
 				what.append(featIcon(id, true), " ");
 			}
+		}
+		const icon = entry.challengeId ? challengeIcon(entry.challengeId) : null;
+		if (icon) {
+			what.append(icon, " ");
 		}
 		if (showPlayer) {
 			what.append(playerLink(entry.steamId, entry.playerName), " · ");
@@ -673,7 +697,13 @@
 		const card = el("div", suggestion.isNew ? "suggestion new" : "suggestion");
 		const head = el("div", "head");
 		const tier = ROMAN[suggestion.nextTier] ?? suggestion.nextTier;
-		head.append(el("b", null, `${suggestion.challengeName} ${tier}`), el("span", "xp", `+${formatXp(suggestion.xp)}`));
+		const title = el("b");
+		const icon = challengeIcon(suggestion.challengeId);
+		if (icon) {
+			title.append(icon, " ");
+		}
+		title.append(`${suggestion.challengeName} ${tier}`);
+		head.append(title, el("span", "xp", `+${formatXp(suggestion.xp)}`));
 		const weapon = el("div", "muted", suggestion.isNew ? `Try something new · ${suggestion.weaponName}` : suggestion.weaponName);
 		card.append(head, weapon);
 		if (suggestion.description) {
@@ -704,6 +734,10 @@
 
 		const head = el("div", "head");
 		const title = el("span", "title");
+		const icon = challengeIcon(challenge.id);
+		if (icon) {
+			title.append(icon, " ");
+		}
 		title.append(el("b", null, challenge.name));
 		if (challenge.rarity) {
 			title.append(el("span", `rarity ${String(challenge.rarity).toLowerCase()}`, challenge.rarity));
@@ -1036,7 +1070,59 @@
 		load();
 	}
 
-	const pages = { live: initLive, ranks: initRanks, player: initPlayer };
+	function initLadder(root) {
+		const top = el("div", "top");
+		const body = el("div");
+		const panel = el("div", "panel ladder");
+		panel.append(top, body);
+		root.replaceChildren(panel);
+
+		function render(steps) {
+			const total = steps.reduce((sum, step) => sum + (Number(step.players) || 0), 0);
+			const most = Math.max(1, ...steps.map((step) => Number(step.players) || 0));
+			const title = el("span");
+			title.append(el("b", null, "Ladder"));
+			top.replaceChildren(title, el("span", null, `${total} ${total === 1 ? "player" : "players"}`));
+			const rows = steps.map((step) => {
+				const tr = el("tr", step.stage === 1 ? "rank-start" : null);
+				if (Number(step.players) > 0) {
+					tr.classList.add("populated");
+				}
+				const count = cell("ladder-count");
+				count.append(bar(Number(step.players) / most, "count"), el("span", null, step.players));
+				tr.append(
+					cell(null, rankBadge(step.rank, step.name)),
+					cell("num", formatXp(step.minXp)),
+					count,
+				);
+				return tr;
+			});
+			body.replaceChildren(table([["Rank"], ["XP needed", "num"], ["Players"]], rows));
+		}
+
+		async function load() {
+			try {
+				render(await getJson("/api/ladder"));
+			} catch {
+				body.replaceChildren(message("The ladder can't be loaded right now."));
+			}
+		}
+
+		const refetch = throttle(load, REFETCH_EVERY_MS);
+		on("progress", (changed) => {
+			if (Array.isArray(changed) && changed.length > 0) {
+				refetch();
+			}
+		});
+		onStatus(({ reconnected }) => {
+			if (reconnected) {
+				refetch();
+			}
+		});
+		load();
+	}
+
+	const pages = { live: initLive, ranks: initRanks, player: initPlayer, ladder: initLadder };
 
 	document.addEventListener("DOMContentLoaded", () => {
 		const root = document.getElementById("app");

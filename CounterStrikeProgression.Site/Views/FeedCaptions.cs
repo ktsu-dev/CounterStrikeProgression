@@ -4,6 +4,7 @@ namespace ktsu.CounterStrikeProgression.Site.Views;
 
 using System.Globalization;
 using ktsu.CounterStrikeProgression.Core;
+using ktsu.CounterStrikeProgression.Core.Challenges;
 using ktsu.CounterStrikeProgression.Core.Feats;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Panel;
@@ -55,7 +56,30 @@ internal static class FeedCaptions
 			_ => null,
 		};
 
-		return new(entry.At, entry.SteamId, entry.PlayerName, entry.Kind, entry.Title, entry.Weapon, entry.Xp, caption);
+		string? challengeId = entry.Kind switch
+		{
+			FeedKind.SkillShot => SkillShotsByName.GetValueOrDefault(entry.Title)?.Id.WeakString,
+			FeedKind.TierCompleted => TierChallengeId(entry.Title),
+			_ => null,
+		};
+
+		return new(entry.At, entry.SteamId, entry.PlayerName, entry.Kind, entry.Title, entry.Weapon, entry.Xp, caption, challengeId);
+	}
+
+	private static string? TierChallengeId(string title)
+	{
+		int space = title.LastIndexOf(' ');
+		string name = space > 0 ? title[..space] : title;
+		return SkillShotsByName.TryGetValue(name, out SkillShotDefinition? skillShot)
+			? skillShot.Id.WeakString
+			: name switch
+			{
+				"Kills" => ChallengeDefinition.KillsId,
+				"Headshots" => ChallengeDefinition.HeadshotsId,
+				"Hits" => ChallengeDefinition.HitsId,
+				"Chickens" => ChallengeDefinition.ChickensId,
+				_ => null,
+			};
 	}
 
 	private static string? TierCaption(FeedEntry entry, ProgressionSettings settings)

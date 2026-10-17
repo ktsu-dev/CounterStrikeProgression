@@ -101,7 +101,8 @@ internal sealed record FeatView(string Id, string Name, string Description, bool
 /// <param name="Weapon">The weapon's display name, if one was involved.</param>
 /// <param name="Xp">The rank XP the moment paid.</param>
 /// <param name="Caption">How the moment was earned, such as a skill shot's description, or <see langword="null"/> when the title says it all.</param>
-internal sealed record FeedItem(DateTime At, ulong SteamId, string PlayerName, FeedKind Kind, string Title, string? Weapon, long Xp, string? Caption);
+/// <param name="ChallengeId">The id of the skill shot or challenge the line is about, for its icon, or <see langword="null"/> for other lines.</param>
+internal sealed record FeedItem(DateTime At, ulong SteamId, string PlayerName, FeedKind Kind, string Title, string? Weapon, long Xp, string? Caption, string? ChallengeId);
 
 /// <summary>One suggested next challenge on a player's page.</summary>
 /// <param name="WeaponKey">The weapon key.</param>
@@ -127,6 +128,15 @@ internal sealed record SuggestionView(
 	double Progress,
 	int Xp,
 	bool IsNew);
+
+/// <summary>One step of the rank ladder, with how many players stand on it.</summary>
+/// <param name="Rank">The rank index.</param>
+/// <param name="Name">The step's full name, such as <c>Gold Nova · III</c>.</param>
+/// <param name="RankName">The rank the step belongs to, such as <c>Gold Nova</c>.</param>
+/// <param name="Stage">The stage within the rank, from 1.</param>
+/// <param name="MinXp">The rank XP that reaches the step.</param>
+/// <param name="Players">How many players stand on the step now.</param>
+internal sealed record LadderStep(int Rank, string Name, string RankName, int Stage, long MinXp, int Players);
 
 /// <summary>One row of the server ranks page.</summary>
 /// <param name="Position">The place on the ranks, from 1.</param>
