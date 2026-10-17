@@ -6,6 +6,7 @@ using System.Data.Common;
 using System.Globalization;
 using System.Text.Json;
 using ktsu.CounterStrikeProgression.Core;
+using ktsu.CounterStrikeProgression.Core.Admin;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
@@ -143,6 +144,22 @@ public sealed class SeasonTests
 	}
 
 	[TestMethod]
+	public async Task ResetClearsTheSeasons()
+	{
+		InMemoryProgressionStore store = new();
+		await SaveAsync(store, 1, "One", July, 900).ConfigureAwait(false);
+		await SaveAsync(store, 1, "One", October, 40).ConfigureAwait(false);
+		PlayerProgress player = (await store.LoadAsync(1, TestContext.CancellationToken).ConfigureAwait(false))!;
+
+		new AdminCorrection(CorrectionKind.Reset).Apply(player, new ProgressionEngine(new ProgressionSettings(), new ManualTime()).Ranks);
+		await store.ResetAsync(ProgressSnapshot.ToRow(player), TestContext.CancellationToken).ConfigureAwait(false);
+
+		Assert.IsNull(player.SeasonStart);
+		Assert.AreEqual(0, player.SeasonXp);
+		Assert.IsEmpty(await store.SeasonResultsAsync(1, TestContext.CancellationToken).ConfigureAwait(false));
+	}
+
+	[TestMethod]
 	public async Task StandingsAndResultsRankBySeasonXp()
 	{
 		InMemoryProgressionStore store = new();
@@ -227,7 +244,7 @@ public sealed class SeasonTests
 		LiveState live = NewState(time);
 		live.Apply(Batch([new(null, [], []) { Seasons = [new SeasonRow(TestHelpers.SteamId, Midnight(October), 400)] }]));
 
-		IResult result = await Endpoints.SeasonsAsync(null, reader, live, time, CancellationToken.None).ConfigureAwait(false);
+		IResult result = await SeasonEndpoints.SeasonsAsync(null, reader, live, time, CancellationToken.None).ConfigureAwait(false);
 
 		SeasonView view = Assert.IsInstanceOfType<Ok<SeasonView>>(result).Value!;
 		Assert.IsTrue(view.Current);
@@ -245,11 +262,11 @@ public sealed class SeasonTests
 		ManualTime time = new();
 		LiveState live = NewState(time);
 
-		Assert.IsInstanceOfType<NotFound>(await Endpoints.SeasonsAsync("2026-08-01", reader, live, time, CancellationToken.None).ConfigureAwait(false));
-		Assert.IsInstanceOfType<NotFound>(await Endpoints.SeasonsAsync("2027-01-01", reader, live, time, CancellationToken.None).ConfigureAwait(false));
-		Assert.IsInstanceOfType<NotFound>(await Endpoints.SeasonsAsync("july", reader, live, time, CancellationToken.None).ConfigureAwait(false));
+		Assert.IsInstanceOfType<NotFound>(await SeasonEndpoints.SeasonsAsync("2026-08-01", reader, live, time, CancellationToken.None).ConfigureAwait(false));
+		Assert.IsInstanceOfType<NotFound>(await SeasonEndpoints.SeasonsAsync("2027-01-01", reader, live, time, CancellationToken.None).ConfigureAwait(false));
+		Assert.IsInstanceOfType<NotFound>(await SeasonEndpoints.SeasonsAsync("july", reader, live, time, CancellationToken.None).ConfigureAwait(false));
 
-		SeasonView july = Assert.IsInstanceOfType<Ok<SeasonView>>(await Endpoints.SeasonsAsync("2026-07-01", reader, live, time, CancellationToken.None).ConfigureAwait(false)).Value!;
+		SeasonView july = Assert.IsInstanceOfType<Ok<SeasonView>>(await SeasonEndpoints.SeasonsAsync("2026-07-01", reader, live, time, CancellationToken.None).ConfigureAwait(false)).Value!;
 		Assert.IsFalse(july.Current);
 		Assert.AreEqual(October, july.Next);
 	}
@@ -269,7 +286,7 @@ public sealed class SeasonTests
 		using ProgressReader reader = new(store);
 		ManualTime time = new();
 
-		IResult result = await Endpoints.PlayerSeasonsAsync(me.ToString(CultureInfo.InvariantCulture), reader, NewState(time), time, CancellationToken.None).ConfigureAwait(false);
+		IResult result = await SeasonEndpoints.PlayerSeasonsAsync(me.ToString(CultureInfo.InvariantCulture), reader, NewState(time), time, CancellationToken.None).ConfigureAwait(false);
 
 		PlayerSeasonsView view = Assert.IsInstanceOfType<Ok<PlayerSeasonsView>>(result).Value!;
 		Assert.AreEqual("Oct–Dec 2026", view.Season);
@@ -365,9 +382,9 @@ public sealed class SeasonTests
 		ManualTime time = new();
 		LiveState live = NewState(time);
 
-		Assert.AreEqual(StatusCodes.Status503ServiceUnavailable, StatusOf(await Endpoints.SeasonsAsync(null, reader, live, time, CancellationToken.None).ConfigureAwait(false)));
-		Assert.AreEqual(StatusCodes.Status503ServiceUnavailable, StatusOf(await Endpoints.PlayerSeasonsAsync(TestHelpers.SteamId.ToString(CultureInfo.InvariantCulture), reader, live, time, CancellationToken.None).ConfigureAwait(false)));
-		Assert.IsInstanceOfType<NotFound>(await Endpoints.PlayerSeasonsAsync("nope", reader, live, time, CancellationToken.None).ConfigureAwait(false));
+		Assert.AreEqual(StatusCodes.Status503ServiceUnavailable, StatusOf(await SeasonEndpoints.SeasonsAsync(null, reader, live, time, CancellationToken.None).ConfigureAwait(false)));
+		Assert.AreEqual(StatusCodes.Status503ServiceUnavailable, StatusOf(await SeasonEndpoints.PlayerSeasonsAsync(TestHelpers.SteamId.ToString(CultureInfo.InvariantCulture), reader, live, time, CancellationToken.None).ConfigureAwait(false)));
+		Assert.IsInstanceOfType<NotFound>(await SeasonEndpoints.PlayerSeasonsAsync("nope", reader, live, time, CancellationToken.None).ConfigureAwait(false));
 	}
 
 	private static int StatusOf(IResult result) => ((IStatusCodeHttpResult)result).StatusCode ?? 0;
@@ -394,6 +411,8 @@ public sealed class SeasonTests
 		public Task<PlayerProgress?> LoadAsync(ulong steamId, CancellationToken cancellationToken) => throw new DatabaseDown();
 
 		public Task SaveAsync(ProgressSnapshot snapshot, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task ResetAsync(PlayerRow player, CancellationToken cancellationToken) => throw new DatabaseDown();
 
 		public Task<IReadOnlyList<LeaderboardEntry>> TopAsync(int count, CancellationToken cancellationToken) => throw new DatabaseDown();
 

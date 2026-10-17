@@ -32,6 +32,7 @@ internal sealed class SiteReporter : IDisposable
 	private readonly ProgressChangeTracker tracker = new();
 	private readonly List<FeedEntry> pendingFeed = [];
 	private readonly List<MapRecap> pendingRecaps = [];
+	private readonly List<ulong> pendingCorrected = [];
 	private ConVar? gameType;
 	private ConVar? gameMode;
 	private int batchesSinceReset;
@@ -146,6 +147,20 @@ internal sealed class SiteReporter : IDisposable
 	public void Forget(ulong steamId) => tracker.Forget(steamId);
 
 	/// <summary>
+	/// Tells the site that an admin corrected a player, so it drops the live rows it holds for them, and sends
+	/// all of their rows again with the next batch.
+	/// </summary>
+	/// <param name="steamId">The player's 64-bit Steam ID.</param>
+	public void Corrected(ulong steamId)
+	{
+		tracker.Forget(steamId);
+		if (!pendingCorrected.Contains(steamId))
+		{
+			pendingCorrected.Add(steamId);
+		}
+	}
+
+	/// <summary>
 	/// Stops the sender. Batches still queued are dropped.
 	/// </summary>
 	public void Dispose() => sender.Dispose();
@@ -185,7 +200,10 @@ internal sealed class SiteReporter : IDisposable
 		MapRecap[] recaps = [.. pendingRecaps];
 		pendingRecaps.Clear();
 
-		sender.TryEnqueue(new LiveBatch(snapshot, feed, progress, pluginConfig.Progression, recaps));
+		ulong[] corrected = [.. pendingCorrected];
+		pendingCorrected.Clear();
+
+		sender.TryEnqueue(new LiveBatch(snapshot, feed, progress, pluginConfig.Progression, recaps, corrected));
 	}
 
 	private List<LivePlayer> ReadPlayers()

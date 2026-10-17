@@ -52,4 +52,8 @@ internal sealed record ServerSnapshot(DateTime SentAt, string Map, string GameMo
 /// <param name="Progress">The progress rows that changed since the last batch.</param>
 /// <param name="Settings">The plugin's settings, so the site can show the same XP values.</param>
 /// <param name="Recaps">The map recaps finished since the last batch, or <see langword="null"/> from a plugin that sends none.</param>
-internal sealed record LiveBatch(ServerSnapshot Snapshot, IReadOnlyList<FeedEntry> Feed, IReadOnlyList<ProgressSnapshot> Progress, ProgressionSettings Settings, IReadOnlyList<MapRecap>? Recaps = null);
+/// <param name="Corrected">
+/// The players an admin corrected since the last batch. Their progress may have gone down, so the site drops
+/// the live rows it holds for them before taking this batch's, which carries all of their rows again.
+/// </param>
+internal sealed record LiveBatch(ServerSnapshot Snapshot, IReadOnlyList<FeedEntry> Feed, IReadOnlyList<ProgressSnapshot> Progress, ProgressionSettings Settings, IReadOnlyList<MapRecap>? Recaps = null, IReadOnlyList<ulong>? Corrected = null);

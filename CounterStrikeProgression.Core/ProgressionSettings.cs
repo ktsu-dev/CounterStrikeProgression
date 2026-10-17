@@ -167,6 +167,13 @@ public sealed class ProgressionSettings
 	/// <summary>Gets or sets the level interval announced to the whole server. Levels in between are told to the player only.</summary>
 	public int AnnounceWeaponLevelEvery { get; set; } = 5;
 
+	/// <summary>
+	/// Gets or sets how much more weapon XP and ladder progress the day's featured weapon class earns. Ladder counts
+	/// step by this rounded to a whole number. Rank XP isn't multiplied, though the faster levels and tiers pay their
+	/// bonuses sooner. 1 turns the featured weapon off.
+	/// </summary>
+	public double FeaturedWeaponMultiplier { get; set; } = 2;
+
 	/// <summary>Gets or sets how long each season lasts, in months. Seasons start on 1 January and every this many months after.</summary>
 	public int SeasonMonths { get; set; } = 3;
 }

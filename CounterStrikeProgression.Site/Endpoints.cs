@@ -25,7 +25,8 @@ using Microsoft.Extensions.Hosting;
 /// <param name="Snapshot">The latest server snapshot, or <see langword="null"/> before the first batch.</param>
 /// <param name="Feed">The feed, newest first.</param>
 /// <param name="Feats">The ids of the feats each player on the server has earned, keyed by Steam ID.</param>
-internal sealed record LiveView(bool Online, ServerSnapshot? Snapshot, IReadOnlyList<FeedItem> Feed, IReadOnlyDictionary<string, IReadOnlyList<string>> Feats);
+/// <param name="Featured">Today's featured weapon class, or <see langword="null"/> when the plugin turned it off.</param>
+internal sealed record LiveView(bool Online, ServerSnapshot? Snapshot, IReadOnlyList<FeedItem> Feed, IReadOnlyDictionary<string, IReadOnlyList<string>> Feats, FeaturedDay? Featured);
 
 /// <summary>
 /// The site's route handlers.
@@ -92,11 +93,13 @@ internal static class Endpoints
 	/// </summary>
 	/// <param name="live">The live state.</param>
 	/// <param name="feats">The feats each player has earned.</param>
-	/// <returns>The online flag, the snapshot, the feed, and the feats of the players on the server.</returns>
-	public static IResult Live(LiveState live, FeatIndex feats)
+	/// <param name="time">The clock that decides the day.</param>
+	/// <returns>The online flag, the snapshot, the feed, the feats of the players on the server, and the featured weapon.</returns>
+	public static IResult Live(LiveState live, FeatIndex feats, TimeProvider time)
 	{
 		Ensure.NotNull(live);
 		Ensure.NotNull(feats);
+		Ensure.NotNull(time);
 
 		ServerSnapshot? snapshot = live.Snapshot;
 		Dictionary<string, IReadOnlyList<string>> earned = [];
@@ -108,7 +111,8 @@ internal static class Endpoints
 			}
 		}
 
-		return TypedResults.Ok(new LiveView(live.IsOnline, snapshot, FeedCaptions.For(live.Feed, live.Settings), earned));
+		ProgressionSettings settings = live.Settings;
+		return TypedResults.Ok(new LiveView(live.IsOnline, snapshot, FeedCaptions.For(live.Feed, settings), earned, FeaturedWeapon.Describe(settings, DailyRotation.Day(time.GetUtcNow().UtcDateTime))));
 	}
 
 	/// <summary>
@@ -205,96 +209,34 @@ internal static class Endpoints
 	}
 
 	/// <summary>
-	/// Gets one season's standings, with the live rows laid over the current season.
+	/// Gets the leaderboards: each weapon by level, each skill shot by count, the most feats, and the rarest skill shots.
 	/// </summary>
-	/// <param name="start">The season's first day as <c>yyyy-MM-dd</c>, or empty for the current season.</param>
-	/// <param name="reader">Reads the stored standings.</param>
+	/// <param name="boards">Every ranked player's tally.</param>
+	/// <param name="reader">Reads the stored progress of the players on the server.</param>
 	/// <param name="live">The live state.</param>
-	/// <param name="time">The clock that decides the current season.</param>
 	/// <param name="cancellationToken">Stops waiting when the request is aborted.</param>
-	/// <returns>The season, 404 for a day that doesn't start a season or a season not yet begun, or 503 when the database can't be read.</returns>
-	public static async Task<IResult> SeasonsAsync(string? start, ProgressReader reader, LiveState live, TimeProvider time, CancellationToken cancellationToken)
+	/// <returns>The boards.</returns>
+	public static async Task<IResult> LeaderboardsAsync(BoardIndex boards, ProgressReader reader, LiveState live, CancellationToken cancellationToken)
 	{
-		Ensure.NotNull(reader);
-		Ensure.NotNull(live);
-		Ensure.NotNull(time);
-
-		ProgressionSettings settings = live.Settings;
-		Season current = CurrentSeason(time, settings);
-		Season season = current;
-		if (!string.IsNullOrEmpty(start))
-		{
-			if (!DateOnly.TryParseExact(start, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly day))
-			{
-				return TypedResults.NotFound();
-			}
-
-			season = Season.For(day, settings.SeasonMonths);
-			if ((season.Start != day) || (season.Start > current.Start))
-			{
-				return TypedResults.NotFound();
-			}
-		}
-
-		IReadOnlyList<SeasonStanding> stored;
-		try
-		{
-			stored = await reader.SeasonStandingsAsync(season.Start, cancellationToken).ConfigureAwait(false);
-		}
-		catch (DbException)
-		{
-			return TypedResults.StatusCode(StatusCodes.Status503ServiceUnavailable);
-		}
-
-		return TypedResults.Ok(SeasonsViewBuilder.Build(season, current, settings, stored, live.Overlay, live.IsPlaying, live.OverlayIds));
+		Ensure.NotNull(boards);
+		await boards.RefreshPlayingAsync(reader, live, cancellationToken).ConfigureAwait(false);
+		return TypedResults.Ok(LeaderboardViewBuilder.Build(boards.All, boards.Updated));
 	}
 
 	/// <summary>
-	/// Gets a player's season badges: this season's place, and every top 3 finish before it.
+	/// Gets the skill shot guide: every skill shot, what it asks for, the weapons that can earn it, and how many players have.
 	/// </summary>
-	/// <param name="id">The SteamID64 from the URL.</param>
-	/// <param name="reader">Reads the stored progress.</param>
+	/// <param name="boards">Every ranked player's tally.</param>
+	/// <param name="reader">Reads the stored progress of the players on the server.</param>
 	/// <param name="live">The live state.</param>
-	/// <param name="time">The clock that decides the current season.</param>
 	/// <param name="cancellationToken">Stops waiting when the request is aborted.</param>
-	/// <returns>The badges, 404 for a bad id, or 503 when the database can't be read.</returns>
-	public static async Task<IResult> PlayerSeasonsAsync(string id, ProgressReader reader, LiveState live, TimeProvider time, CancellationToken cancellationToken)
+	/// <returns>The guide.</returns>
+	public static async Task<IResult> SkillShotsAsync(BoardIndex boards, ProgressReader reader, LiveState live, CancellationToken cancellationToken)
 	{
-		Ensure.NotNull(reader);
+		Ensure.NotNull(boards);
 		Ensure.NotNull(live);
-		Ensure.NotNull(time);
-
-		if (!ProgressReader.TryParseSteamId(id, out ulong steamId))
-		{
-			return TypedResults.NotFound();
-		}
-
-		ProgressionSettings settings = live.Settings;
-		Season current = CurrentSeason(time, settings);
-		IReadOnlyList<SeasonStanding> standings;
-		IReadOnlyList<SeasonResult> results;
-		PlayerProgress? stored;
-		try
-		{
-			standings = await reader.SeasonStandingsAsync(current.Start, cancellationToken).ConfigureAwait(false);
-			results = await reader.SeasonResultsAsync(steamId, cancellationToken).ConfigureAwait(false);
-			stored = await reader.PlayerAsync(steamId, cancellationToken).ConfigureAwait(false);
-		}
-		catch (DbException)
-		{
-			return TypedResults.StatusCode(StatusCodes.Status503ServiceUnavailable);
-		}
-
-		ProgressSnapshot? overlay = live.Overlay(steamId);
-		long seasonXp = 0;
-		if ((stored is not null) || (ProgressMerge.SteamIdOf(overlay) is not null))
-		{
-			PlayerProgress merged = ProgressMerge.Merge(stored, overlay);
-			seasonXp = merged.SeasonStart == current.Start ? merged.SeasonXp : 0;
-		}
-
-		SeasonView board = SeasonsViewBuilder.Build(current, current, settings, standings, live.Overlay, live.IsPlaying, live.OverlayIds);
-		return TypedResults.Ok(SeasonsViewBuilder.BuildPlayer(steamId, seasonXp, board, results, settings));
+		await boards.RefreshPlayingAsync(reader, live, cancellationToken).ConfigureAwait(false);
+		return TypedResults.Ok(SkillShotGuideBuilder.Build(boards.All, live.Settings, boards.Updated));
 	}
 
 	/// <summary>
@@ -384,9 +326,6 @@ internal static class Endpoints
 			broadcaster.Publish("progress", steamIds);
 		}
 	}
-
-	private static Season CurrentSeason(TimeProvider time, ProgressionSettings settings) =>
-		Season.For(DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime), settings.SeasonMonths);
 
 	private static bool IsComplete([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] LiveBatch? batch) =>
 		batch is { Snapshot.Players: { } players, Feed: { } feed, Progress: { } progress, Settings: not null }
