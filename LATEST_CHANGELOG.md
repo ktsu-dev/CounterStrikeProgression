@@ -1,6 +1,7 @@
-## v1.1.1 (patch)
+## v1.1.2 (patch)
 
-Changes since v1.1.0:
+Changes since v1.1.1:
 
-- [patch] Leave HUD XP floaties where the crosshair was (matt-edmondson)
+- Add the progression site design (matt-edmondson)
+- [patch] Draw XP floaties in the world at a fixed size (matt-edmondson)
 
