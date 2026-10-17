@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using ktsu.CounterStrikeProgression.Core.Floaties;
+using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Tracking;
 using ktsu.CounterStrikeProgression.Panel;
@@ -30,6 +31,9 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 
 	/// <summary>Gets the connected players.</summary>
 	public SessionManager Sessions { get; } = sessions;
+
+	/// <summary>Gets the text behind the welcome line and the chat commands.</summary>
+	public ChatReports Reports { get; } = new(engine);
 
 	/// <summary>Gets the progress panels.</summary>
 	public PanelPresenter Panel { get; } = panel;

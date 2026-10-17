@@ -54,6 +54,9 @@ internal sealed class PlayerSession(int slot, ulong steamId)
 	/// <summary>Gets or sets when the player may next ask for the leaderboard.</summary>
 	public double NextLeaderboardAllowed { get; set; } = double.NegativeInfinity;
 
+	/// <summary>Gets or sets a value indicating whether the player has had the welcome line.</summary>
+	public bool Welcomed { get; set; }
+
 	/// <summary>Gets or sets whether the player was scoped on the last tick.</summary>
 	public bool WasScoped { get; set; }
 

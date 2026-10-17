@@ -9,6 +9,7 @@ using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Storage;
+using ktsu.CounterStrikeProgression.Core.Weapons;
 using ktsu.CounterStrikeProgression.Site;
 using ktsu.CounterStrikeProgression.Site.Data;
 using ktsu.CounterStrikeProgression.Site.Live;
@@ -493,6 +494,8 @@ public sealed class SiteEndpointTests
 		public Task SaveAsync(ProgressSnapshot snapshot, CancellationToken cancellationToken) => Task.CompletedTask;
 
 		public Task<IReadOnlyList<LeaderboardEntry>> TopAsync(int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<LeaderboardEntry>>([]);
+
+		public Task<IReadOnlyList<WeaponLeaderboardEntry>> TopByWeaponAsync(WeaponKey weapon, int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<WeaponLeaderboardEntry>>([]);
 
 		public Task<IReadOnlyList<RankingEntry>> RankingsAsync(int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<RankingEntry>>([]);
 

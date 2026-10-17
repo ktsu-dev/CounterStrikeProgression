@@ -47,6 +47,13 @@ With no database host set, progress is kept in memory and lost when the server r
 |---|---|
 | `!rank`, `!xp`, `!progress` | Open or close the progress panel |
 | `!top` | Print the 10 players with the most rank XP |
+| `!top <weapon>` | Print the 10 players with the most XP with one weapon, such as `!top ak` or `!top awp` |
+| `!next` | Print your three challenges closest to their next tier |
+| `!feats` | Print every feat, with the ones you've earned and how close you are to the rest |
+| `!stats [name]` | Print your rank, XP, kills, headshot share, best weapon, and feats, or a connected player's |
+| `!site` | Print the link to your page on the progression site |
+
+When a player first spawns, they get a welcome line with their rank, a link to their page on the site (when `Site.PublicUrl` is set), and the commands. `"WelcomeMessage": false` turns it off.
 
 While the panel is open, W and S scroll, A and D move between the overview and each weapon, and R closes it. It also closes when you take damage or die.
 
@@ -103,6 +110,7 @@ Settings left out keep their defaults.
 {
   "Site": {
     "Url": "http://cs2-progression-site.cs2.svc.cluster.local:8081/api/ingest",
+    "PublicUrl": "https://cs2-progression.example.com",
     "Token": "change-me",
     "IntervalSeconds": 2,
     "QueueLimit": 20,
@@ -112,6 +120,7 @@ Settings left out keep their defaults.
 ```
 
 - **`Url`:** the site's ingest endpoint. A URL that isn't absolute http or https is logged and ignored.
+- **`PublicUrl`:** the address players reach the site at, which the welcome line, `!site`, and `!stats` link to. Empty, the default, shows no link.
 - **`Token`:** the shared token the site checks on every batch.
 - **`IntervalSeconds`:** the seconds between batches. Values under 1 count as 1.
 - **`QueueLimit`:** how many batches wait to send. When the site is slow or down, the oldest is dropped, so the game never waits on it.

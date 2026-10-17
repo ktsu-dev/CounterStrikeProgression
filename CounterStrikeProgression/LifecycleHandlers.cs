@@ -6,6 +6,7 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using ktsu.CounterStrikeProgression.Core.Events;
+using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
 
 /// <summary>
@@ -84,7 +85,28 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 		session.Combat.Reset();
 		session.WasScoped = false;
 		session.LastWeaponIndex = 0;
+		Welcome(player, session);
 		return HookResult.Continue;
+	}
+
+	// On the first spawn rather than on connect, because chat sent while the player is still loading in is
+	// easy to miss, and their progress may not have loaded yet. A load that finishes later waits for the next spawn.
+	private void Welcome(CCSPlayerController player, PlayerSession session)
+	{
+		if (session.Welcomed || !services.Config.WelcomeMessage || (session.Progress is not PlayerProgress progress))
+		{
+			return;
+		}
+
+		session.Welcomed = true;
+		string prefix = $" {ChatColors.Gold}{services.Config.ChatPrefix}{ChatColors.Default}";
+		player.PrintToChat($"{prefix} {services.Reports.Welcome(player.PlayerName, progress)}");
+		if (ChatReports.PlayerPage(services.Config.Site.PublicUrl, session.SteamId) is string page)
+		{
+			player.PrintToChat($"{prefix} Your progress page: {ChatColors.LightBlue}{page}");
+		}
+
+		player.PrintToChat($"{prefix} Type {ChatColors.Yellow}!rank{ChatColors.Default} for your panel. More: {ChatColors.Yellow}!next !top !feats !stats !site");
 	}
 
 	private HookResult OnPlayerTeam(EventPlayerTeam @event, GameEventInfo info)
