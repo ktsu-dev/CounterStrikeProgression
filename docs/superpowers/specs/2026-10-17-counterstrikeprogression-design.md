@@ -210,7 +210,9 @@ The overview shows rank, an XP bar, totals, and the weapons closest to their nex
 ### Commands
 
 - `!rank` (also `!xp`, `!progress`): opens or closes the panel.
-- `!top`: prints the top 10 by rank XP to chat.
+- `!top`: prints the top 10 by rank XP to chat. `!top <weapon>` prints the top 10 by XP with that weapon.
+- `!next`, `!feats`, `!stats [name]`, and `!site`: the closest tiers, the feats, a one-line summary of a connected player, and the link to the player's page on the site.
+- A welcome line on the first spawn, with the player's rank and a link to their page when `Site.PublicUrl` is set.
 - `css_csp_status` (root admin only): storage and session diagnostics.
 
 ### Storage

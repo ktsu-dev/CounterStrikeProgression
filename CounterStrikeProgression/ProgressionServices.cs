@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using ktsu.CounterStrikeProgression.Core.Floaties;
+using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Tracking;
 using ktsu.CounterStrikeProgression.Panel;
@@ -31,11 +32,17 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	/// <summary>Gets the connected players.</summary>
 	public SessionManager Sessions { get; } = sessions;
 
+	/// <summary>Gets the text behind the welcome line and the chat commands.</summary>
+	public ChatReports Reports { get; } = new(engine);
+
 	/// <summary>Gets the progress panels.</summary>
 	public PanelPresenter Panel { get; } = panel;
 
 	/// <summary>Gets the floating "+XP" text.</summary>
 	public XpFloaties Floaties { get; } = new(config.Floaties);
+
+	/// <summary>Gets the rank clan tags and chat prefixes.</summary>
+	public RankTags RankTags { get; } = new(config.RankTags, sessions);
 
 	/// <summary>Gets the round's kills.</summary>
 	public RoundTracker Round { get; } = new(config.Progression);
@@ -69,10 +76,37 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 		}
 
 		session.MapXp += result.XpEarned;
+		session.Recap.Add(result);
 		Site?.Record(session, player.PlayerName ?? string.Empty, result);
 		PanelPresenter.Invalidate(session);
 		Floaties.Show(player, result, floatieKey, at);
 		announcer.Announce(player, session, result);
+	}
+
+	/// <summary>
+	/// Ends a player's map recap, sends it to the site, and tells them about it. A session that earned
+	/// nothing just starts over.
+	/// </summary>
+	/// <param name="session">The player's session.</param>
+	/// <param name="player">The player, or <see langword="null"/> when their controller is already gone.</param>
+	/// <param name="map">The map played.</param>
+	/// <param name="announce">Whether to tell the player in chat.</param>
+	public void FinishRecap(PlayerSession session, CCSPlayerController? player, string map, bool announce)
+	{
+		Ensure.NotNull(session);
+		CCSPlayerController? valid = player is { IsValid: true } ? player : null;
+		CSMatchStats_t? stats = valid?.ActionTrackingServices?.MatchStats;
+		string name = valid?.PlayerName ?? session.Progress?.Name ?? string.Empty;
+		if (session.Recap.TryFinish(session.SteamId, name, map, stats?.Kills ?? 0, stats?.Deaths ?? 0, DateTime.UtcNow) is not { } recap)
+		{
+			return;
+		}
+
+		Site?.Record(recap);
+		if (announce && (valid is not null))
+		{
+			announcer.AnnounceRecap(valid, recap);
+		}
 	}
 
 	/// <summary>

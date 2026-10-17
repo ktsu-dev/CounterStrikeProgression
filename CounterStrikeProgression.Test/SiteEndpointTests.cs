@@ -9,6 +9,7 @@ using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Storage;
+using ktsu.CounterStrikeProgression.Core.Weapons;
 using ktsu.CounterStrikeProgression.Site;
 using ktsu.CounterStrikeProgression.Site.Data;
 using ktsu.CounterStrikeProgression.Site.Live;
@@ -347,6 +348,7 @@ public sealed class SiteEndpointTests
 	[DataRow("{}")]
 	[DataRow("{\"snapshot\":{\"sentAt\":\"2026-10-17T12:00:00Z\",\"map\":\"x\",\"gameMode\":\"y\",\"maxPlayers\":1,\"players\":null},\"feed\":[],\"progress\":[],\"settings\":{}}")]
 	[DataRow("{\"snapshot\":{\"sentAt\":\"2026-10-17T12:00:00Z\",\"map\":\"x\",\"gameMode\":\"y\",\"maxPlayers\":1,\"players\":[null]},\"feed\":[],\"progress\":[],\"settings\":{}}")]
+	[DataRow("{\"snapshot\":{\"sentAt\":\"2026-10-17T12:00:00Z\",\"map\":\"x\",\"gameMode\":\"y\",\"maxPlayers\":1,\"players\":[]},\"feed\":[],\"progress\":[],\"settings\":{},\"recaps\":[{\"steamId\":1,\"playerName\":\"a\"}]}")]
 	public async Task Ingest_BadBody_Returns400(string body)
 	{
 		LiveState live = NewState();
@@ -494,6 +496,8 @@ public sealed class SiteEndpointTests
 		public Task SaveAsync(ProgressSnapshot snapshot, CancellationToken cancellationToken) => Task.CompletedTask;
 
 		public Task<IReadOnlyList<LeaderboardEntry>> TopAsync(int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<LeaderboardEntry>>([]);
+
+		public Task<IReadOnlyList<WeaponLeaderboardEntry>> TopByWeaponAsync(WeaponKey weapon, int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<WeaponLeaderboardEntry>>([]);
 
 		public Task<IReadOnlyList<RankingEntry>> RankingsAsync(int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<RankingEntry>>([]);
 

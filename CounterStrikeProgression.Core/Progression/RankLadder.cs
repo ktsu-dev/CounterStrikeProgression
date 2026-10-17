@@ -30,7 +30,26 @@ internal sealed class RankLadder
 		"Global Elite",
 	];
 
-	// Declared before Names, because static initializers run in order.
+	/// <summary>
+	/// The short form of each of <see cref="RankNames"/>, in the same order, such as <c>GN</c> for Gold Nova.
+	/// </summary>
+	public static IReadOnlyList<string> RankAbbreviations { get; } =
+	[
+		"S",
+		"SE",
+		"SEM",
+		"GN",
+		"GNM",
+		"MG",
+		"MGE",
+		"DMG",
+		"LE",
+		"LEM",
+		"SMFC",
+		"GE",
+	];
+
+	// Declared before Names and Tags, because static initializers run in order.
 	private static readonly string[] StageNumerals = ["I", "II", "III", "IV", "V"];
 
 	/// <summary>
@@ -38,6 +57,13 @@ internal sealed class RankLadder
 	/// </summary>
 	public static IReadOnlyList<string> Names { get; } =
 		[.. RankNames.SelectMany(name => StageNumerals.Select(stage => $"{name} · {stage}"))];
+
+	/// <summary>
+	/// The short tag for every stage, lowest first, such as <c>[GN III]</c>, for the scoreboard clan tag and
+	/// before chat messages. Indexed the same as <see cref="Names"/>.
+	/// </summary>
+	public static IReadOnlyList<string> Tags { get; } =
+		[.. RankAbbreviations.SelectMany(name => StageNumerals.Select(stage => $"[{name} {stage}]"))];
 
 	private readonly long[] thresholds;
 
@@ -63,6 +89,13 @@ internal sealed class RankLadder
 	/// Gets the index of the highest rank.
 	/// </summary>
 	public static int TopRank => Names.Count - 1;
+
+	/// <summary>
+	/// Gets the short tag for a rank, such as <c>[GN III]</c>.
+	/// </summary>
+	/// <param name="rank">The rank index, clamped to the ladder.</param>
+	/// <returns>The tag.</returns>
+	public static string TagFor(int rank) => Tags[Math.Clamp(rank, 0, TopRank)];
 
 	/// <summary>
 	/// Gets the total XP needed to reach a rank.

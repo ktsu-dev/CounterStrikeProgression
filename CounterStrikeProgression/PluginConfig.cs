@@ -167,6 +167,14 @@ public sealed class SiteSettings
 	[SuppressMessage("Design", "CA1056:URI-like properties should not be strings", Justification = "The config file holds the URL as text, and an empty value means no site. SiteReporter parses and validates it.")]
 	public string Url { get; set; } = "";
 
+	/// <summary>
+	/// Gets or sets the site's public address, such as <c>https://cs2.example.com</c>, which the join message and
+	/// <c>!site</c> link to. It is separate from <see cref="Url"/>, which is usually an address inside the
+	/// cluster. With an empty address, the default, no link is shown.
+	/// </summary>
+	[SuppressMessage("Design", "CA1056:URI-like properties should not be strings", Justification = "The config file holds the URL as text, and an empty value means no link. ChatReports parses and validates it.")]
+	public string PublicUrl { get; set; } = "";
+
 	/// <summary>Gets or sets the shared token the site expects as a bearer token.</summary>
 	public string Token { get; set; } = "";
 
@@ -181,6 +189,18 @@ public sealed class SiteSettings
 	/// repairs the site after a dropped batch or a restart. 0 turns full resends off.
 	/// </summary>
 	public int FullResendEvery { get; set; } = 15;
+}
+
+/// <summary>
+/// Where each player's rank, such as <c>[GN III]</c>, is shown to everyone else.
+/// </summary>
+public sealed class RankTagSettings
+{
+	/// <summary>Gets or sets a value indicating whether the rank replaces the player's clan tag on the scoreboard.</summary>
+	public bool ClanTag { get; set; } = true;
+
+	/// <summary>Gets or sets a value indicating whether the rank appears before the player's name in chat.</summary>
+	public bool ChatPrefix { get; set; } = true;
 }
 
 /// <summary>
@@ -203,12 +223,21 @@ public sealed class PluginConfig : BasePluginConfig
 	/// <summary>Gets or sets the progression site. With an empty URL, nothing is sent.</summary>
 	public SiteSettings Site { get; set; } = new();
 
+	/// <summary>Gets or sets where each player's rank is shown to everyone else.</summary>
+	public RankTagSettings RankTags { get; set; } = new();
+
 	/// <summary>Gets or sets how often, in seconds, changed progress is saved.</summary>
 	public float SaveIntervalSeconds { get; set; } = 60;
 
 	/// <summary>Gets or sets the chat prefix on every message.</summary>
 	public string ChatPrefix { get; set; } = "[Progression]";
 
+	/// <summary>Gets or sets a value indicating whether players get a welcome line, with a link to their page on the site, when they first spawn.</summary>
+	public bool WelcomeMessage { get; set; } = true;
+
 	/// <summary>Gets or sets a value indicating whether common skill shots are announced to the player who earned them.</summary>
 	public bool AnnounceCommonSkillShots { get; set; }
+
+	/// <summary>Gets or sets a value indicating whether each player gets a one-line recap of what they earned when the map ends.</summary>
+	public bool AnnounceMapRecap { get; set; } = true;
 }

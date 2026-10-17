@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Core.Storage;
 using System.Runtime.CompilerServices;
 using Dapper;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Weapons;
 using MySqlConnector;
 
 /// <summary>
@@ -189,6 +190,19 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		IEnumerable<LeaderboardEntry> top = await connection.QueryAsync<LeaderboardEntry>(new CommandDefinition(
 			"SELECT name AS Name, rank_xp AS RankXp, rank_index AS `Rank` FROM csp_players ORDER BY rank_xp DESC LIMIT @count",
 			new { count },
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+		return [.. top];
+	}
+
+	/// <inheritdoc/>
+	public async Task<IReadOnlyList<WeaponLeaderboardEntry>> TopByWeaponAsync(WeaponKey weapon, int count, CancellationToken cancellationToken)
+	{
+		Ensure.NotNull(weapon);
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		IEnumerable<WeaponLeaderboardEntry> top = await connection.QueryAsync<WeaponLeaderboardEntry>(new CommandDefinition(
+			"SELECT p.name AS Name, w.xp AS Xp, w.level AS Level FROM csp_weapons w JOIN csp_players p ON p.steam_id = w.steam_id WHERE w.weapon = @weapon AND w.xp > 0 ORDER BY w.xp DESC, w.steam_id ASC LIMIT @count",
+			new { weapon = weapon.WeakString, count },
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 		return [.. top];
 	}

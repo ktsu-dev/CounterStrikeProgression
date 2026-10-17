@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression;
 using CounterStrikeSharp.API;
 using ktsu.CounterStrikeProgression.Core.Events;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.Tracking;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
@@ -30,6 +31,9 @@ internal sealed class PlayerSession(int slot, ulong steamId)
 	/// <summary>Gets or sets the rank XP the player has earned this map.</summary>
 	public double MapXp { get; set; }
 
+	/// <summary>Gets what the player has earned this map, for the recap at map end or when they leave.</summary>
+	public RecapTracker Recap { get; } = new(DateTime.UtcNow);
+
 	/// <summary>Gets the player's movement, scope, reload, and aim history.</summary>
 	public PlayerCombatTracker Combat { get; } = new();
 
@@ -54,6 +58,9 @@ internal sealed class PlayerSession(int slot, ulong steamId)
 	/// <summary>Gets or sets when the player may next ask for the leaderboard.</summary>
 	public double NextLeaderboardAllowed { get; set; } = double.NegativeInfinity;
 
+	/// <summary>Gets or sets a value indicating whether the player has had the welcome line.</summary>
+	public bool Welcomed { get; set; }
+
 	/// <summary>Gets or sets whether the player was scoped on the last tick.</summary>
 	public bool WasScoped { get; set; }
 
@@ -62,6 +69,9 @@ internal sealed class PlayerSession(int slot, ulong steamId)
 
 	/// <summary>Gets or sets when the player was last told about a skill shot, to keep chat readable.</summary>
 	public double LastSkillShotMessage { get; set; } = double.NegativeInfinity;
+
+	/// <summary>Gets or sets the rank last set as the player's clan tag, or -1 to set it again.</summary>
+	public int ClanTagRank { get; set; } = -1;
 
 	/// <summary>Gets the player's panel state.</summary>
 	public PanelState Panel { get; } = new();

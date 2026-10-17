@@ -94,7 +94,7 @@ internal sealed class PanelBuilder(ProgressionEngine engine)
 			PanelLine.Heading("Closest tiers"),
 		]);
 
-		lines.AddRange(ClosestTiers(player));
+		lines.AddRange(ClosestTiers(player, ClosestTiersShown));
 		return new PanelPage(RankLadder.Names[rank], "Overview", engine.Ranks.ProgressToNext(player.RankXp), progressLabel, lines);
 	}
 
@@ -156,8 +156,15 @@ internal sealed class PanelBuilder(ProgressionEngine engine)
 		return new(label, detail, count > 0 ? LineState.InProgress : LineState.NotStarted);
 	}
 
-	private IEnumerable<PanelLine> ClosestTiers(PlayerProgress player)
+	/// <summary>
+	/// Gets the challenges closest to their next tier, as a share of the way from the last tier to the next.
+	/// </summary>
+	/// <param name="player">The player's progress.</param>
+	/// <param name="count">How many to return.</param>
+	/// <returns>The lines, closest first.</returns>
+	public IEnumerable<PanelLine> ClosestTiers(PlayerProgress player, int count)
 	{
+		Ensure.NotNull(player);
 		List<(double Fraction, PanelLine Line)> candidates = [];
 		foreach (WeaponProgress progress in player.Weapons.Values)
 		{
@@ -183,6 +190,6 @@ internal sealed class PanelBuilder(ProgressionEngine engine)
 			}
 		}
 
-		return candidates.OrderByDescending(c => c.Fraction).Take(ClosestTiersShown).Select(c => c.Line);
+		return candidates.OrderByDescending(c => c.Fraction).Take(count).Select(c => c.Line);
 	}
 }
