@@ -99,8 +99,9 @@ internal static class Endpoints
 	/// </summary>
 	/// <param name="reader">Reads the stored rankings.</param>
 	/// <param name="live">The live state.</param>
+	/// <param name="cancellationToken">Stops waiting when the request is aborted.</param>
 	/// <returns>The rows, or 503 when the database can't be read.</returns>
-	public static async Task<IResult> RanksAsync(ProgressReader reader, LiveState live)
+	public static async Task<IResult> RanksAsync(ProgressReader reader, LiveState live, CancellationToken cancellationToken)
 	{
 		Ensure.NotNull(reader);
 		Ensure.NotNull(live);
@@ -108,7 +109,7 @@ internal static class Endpoints
 		IReadOnlyList<RankingEntry> stored;
 		try
 		{
-			stored = await reader.RankingsAsync().ConfigureAwait(false);
+			stored = await reader.RankingsAsync(cancellationToken).ConfigureAwait(false);
 		}
 		catch (DbException)
 		{
@@ -124,8 +125,9 @@ internal static class Endpoints
 	/// <param name="id">The SteamID64 from the URL.</param>
 	/// <param name="reader">Reads the stored progress.</param>
 	/// <param name="live">The live state.</param>
+	/// <param name="cancellationToken">Stops waiting when the request is aborted.</param>
 	/// <returns>The player, 404 for a bad or unknown id, or 503 when the database can't be read.</returns>
-	public static async Task<IResult> PlayerAsync(string id, ProgressReader reader, LiveState live)
+	public static async Task<IResult> PlayerAsync(string id, ProgressReader reader, LiveState live, CancellationToken cancellationToken)
 	{
 		Ensure.NotNull(reader);
 		Ensure.NotNull(live);
@@ -138,7 +140,7 @@ internal static class Endpoints
 		PlayerProgress? stored;
 		try
 		{
-			stored = await reader.PlayerAsync(steamId).ConfigureAwait(false);
+			stored = await reader.PlayerAsync(steamId, cancellationToken).ConfigureAwait(false);
 		}
 		catch (DbException)
 		{

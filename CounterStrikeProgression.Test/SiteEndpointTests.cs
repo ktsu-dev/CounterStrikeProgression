@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading.Channels;
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Live;
+using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Site;
 using ktsu.CounterStrikeProgression.Site.Data;
@@ -184,9 +185,9 @@ public sealed class SiteEndpointTests
 	[TestMethod]
 	public async Task PlayerEndpoint_UnknownId_Returns404()
 	{
-		ProgressReader reader = new(new InMemoryProgressionStore());
+		using ProgressReader reader = new(new InMemoryProgressionStore());
 
-		IResult result = await Endpoints.PlayerAsync("76561197993183173", reader, NewState()).ConfigureAwait(false);
+		IResult result = await Endpoints.PlayerAsync("76561197993183173", reader, NewState(), CancellationToken.None).ConfigureAwait(false);
 
 		Assert.IsInstanceOfType<NotFound>(result);
 	}
@@ -194,9 +195,9 @@ public sealed class SiteEndpointTests
 	[TestMethod]
 	public async Task PlayerEndpoint_BadId_Returns404()
 	{
-		ProgressReader reader = new(new InMemoryProgressionStore());
+		using ProgressReader reader = new(new InMemoryProgressionStore());
 
-		IResult result = await Endpoints.PlayerAsync("not-a-steam-id", reader, NewState()).ConfigureAwait(false);
+		IResult result = await Endpoints.PlayerAsync("not-a-steam-id", reader, NewState(), CancellationToken.None).ConfigureAwait(false);
 
 		Assert.IsInstanceOfType<NotFound>(result);
 	}
@@ -206,9 +207,9 @@ public sealed class SiteEndpointTests
 	{
 		InMemoryProgressionStore store = new();
 		await store.SaveAsync(ProgressSnapshot.CaptureAll(TestHelpers.Player()), CancellationToken.None).ConfigureAwait(false);
-		ProgressReader reader = new(store);
+		using ProgressReader reader = new(store);
 
-		IResult result = await Endpoints.PlayerAsync(TestHelpers.SteamId.ToString(System.Globalization.CultureInfo.InvariantCulture), reader, NewState()).ConfigureAwait(false);
+		IResult result = await Endpoints.PlayerAsync(TestHelpers.SteamId.ToString(System.Globalization.CultureInfo.InvariantCulture), reader, NewState(), CancellationToken.None).ConfigureAwait(false);
 
 		Ok<PlayerView> ok = Assert.IsInstanceOfType<Ok<PlayerView>>(result);
 		Assert.AreEqual("Tester", ok.Value?.Name);
@@ -221,7 +222,9 @@ public sealed class SiteEndpointTests
 		ProgressSnapshot rows = new(new PlayerRow(TestHelpers.SteamId, "Fresh", 50, 0, Start, Start), [], []);
 		live.Apply(Batch() with { Progress = [rows] });
 
-		IResult result = await Endpoints.RanksAsync(new ProgressReader(new InMemoryProgressionStore()), live).ConfigureAwait(false);
+		using ProgressReader reader = new(new InMemoryProgressionStore());
+
+		IResult result = await Endpoints.RanksAsync(reader, live, CancellationToken.None).ConfigureAwait(false);
 
 		Ok<IReadOnlyList<RankRow>> ok = Assert.IsInstanceOfType<Ok<IReadOnlyList<RankRow>>>(result);
 		Assert.HasCount(1, ok.Value!);
@@ -233,7 +236,7 @@ public sealed class SiteEndpointTests
 	{
 		InMemoryProgressionStore store = new();
 		ManualTime time = new();
-		ProgressReader reader = new(store, time);
+		using ProgressReader reader = new(store, time);
 
 		Assert.IsEmpty(await reader.RankingsAsync().ConfigureAwait(false));
 		Assert.IsNull(await reader.PlayerAsync(TestHelpers.SteamId).ConfigureAwait(false));
@@ -246,6 +249,59 @@ public sealed class SiteEndpointTests
 		time.Advance(TimeSpan.FromSeconds(2));
 		Assert.HasCount(1, await reader.RankingsAsync().ConfigureAwait(false));
 		Assert.IsNotNull(await reader.PlayerAsync(TestHelpers.SteamId).ConfigureAwait(false));
+	}
+
+	[TestMethod]
+	public async Task ProgressReader_RunsAtMostFourQueriesAtOnce()
+	{
+		using BlockingStore store = new();
+		using ProgressReader reader = new(store);
+
+		Task<PlayerProgress?>[] loads = [.. Enumerable.Range(0, 10).Select(i => reader.PlayerAsync(ProgressReader.MinSteamId + (ulong)i))];
+		for (int i = 0; i < ProgressReader.MaxConcurrentQueries; i++)
+		{
+			Assert.IsTrue(await store.Entered.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false));
+		}
+
+		Assert.IsFalse(await store.Entered.WaitAsync(TimeSpan.FromMilliseconds(200)).ConfigureAwait(false));
+		Assert.AreEqual(ProgressReader.MaxConcurrentQueries, store.Running);
+
+		store.Release.SetResult();
+		await Task.WhenAll(loads).ConfigureAwait(false);
+
+		Assert.AreEqual(10, store.Calls);
+		Assert.AreEqual(ProgressReader.MaxConcurrentQueries, store.MaxRunning);
+	}
+
+	[TestMethod]
+	public async Task ProgressReader_ConcurrentMissesForOneId_QueryOnce()
+	{
+		using BlockingStore store = new();
+		using ProgressReader reader = new(store);
+
+		Task<PlayerProgress?> first = reader.PlayerAsync(TestHelpers.SteamId);
+		Task<PlayerProgress?> second = reader.PlayerAsync(TestHelpers.SteamId);
+		Assert.IsTrue(await store.Entered.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false));
+
+		store.Release.SetResult();
+		await Task.WhenAll(first, second).ConfigureAwait(false);
+
+		Assert.AreEqual(1, store.Calls);
+	}
+
+	[TestMethod]
+	public async Task ProgressReader_CancelledCallerStopsWaiting()
+	{
+		using BlockingStore store = new();
+		using ProgressReader reader = new(store);
+		using CancellationTokenSource cancel = new();
+
+		Task<PlayerProgress?> load = reader.PlayerAsync(TestHelpers.SteamId, cancel.Token);
+		Assert.IsTrue(await store.Entered.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false));
+		await cancel.CancelAsync().ConfigureAwait(false);
+
+		await Assert.ThrowsAsync<OperationCanceledException>(() => load).ConfigureAwait(false);
+		store.Release.SetResult();
 	}
 
 	[TestMethod]
@@ -377,5 +433,56 @@ public sealed class SiteEndpointTests
 		Assert.IsTrue(reader.TryRead(out string? offline));
 		Assert.AreEqual("event: online\ndata: false\n\n", offline);
 		Assert.IsFalse(reader.TryRead(out _));
+	}
+
+	/// <summary>A store whose loads wait until the test releases them, and that counts how many run at once.</summary>
+	private sealed class BlockingStore : IProgressionStore, IDisposable
+	{
+		private int running;
+		private int maxRunning;
+		private int calls;
+
+		public SemaphoreSlim Entered { get; } = new(0);
+
+		public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+		public int Running => Volatile.Read(ref running);
+
+		public int MaxRunning => Volatile.Read(ref maxRunning);
+
+		public int Calls => Volatile.Read(ref calls);
+
+		public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+		public async Task<PlayerProgress?> LoadAsync(ulong steamId, CancellationToken cancellationToken)
+		{
+			Interlocked.Increment(ref calls);
+			int now = Interlocked.Increment(ref running);
+			int seen;
+			do
+			{
+				seen = Volatile.Read(ref maxRunning);
+			}
+			while (now > seen && Interlocked.CompareExchange(ref maxRunning, now, seen) != seen);
+
+			Entered.Release();
+			try
+			{
+				await Release.Task.ConfigureAwait(false);
+				return null;
+			}
+			finally
+			{
+				Interlocked.Decrement(ref running);
+			}
+		}
+
+		public Task SaveAsync(ProgressSnapshot snapshot, CancellationToken cancellationToken) => Task.CompletedTask;
+
+		public Task<IReadOnlyList<LeaderboardEntry>> TopAsync(int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<LeaderboardEntry>>([]);
+
+		public Task<IReadOnlyList<RankingEntry>> RankingsAsync(int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<RankingEntry>>([]);
+
+		public void Dispose() => Entered.Dispose();
 	}
 }
