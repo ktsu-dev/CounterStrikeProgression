@@ -279,6 +279,10 @@
 		}
 
 		function renderBoard() {
+			if (!serverOnline) {
+				board.replaceChildren(message("The server is offline."));
+				return;
+			}
 			if (!snapshot || snapshot.players.length === 0) {
 				board.replaceChildren(message(snapshot ? "Nobody is playing." : "Waiting for the server."));
 				return;
@@ -308,7 +312,8 @@
 			const li = el("li", GOLD_KINDS.has(entry.kind) ? "gold" : null);
 			const what = el("span", "what");
 			what.append(playerLink(entry.steamId, entry.playerName), ` · ${entry.title}`);
-			if (entry.weapon) {
+			// A weapon level-up's title already names the weapon.
+			if (entry.weapon && entry.kind !== "WeaponLevelUp") {
 				what.append(` · ${entry.weapon}`);
 			}
 			const side = el("span", "side");
@@ -330,6 +335,26 @@
 			feedList.replaceChildren(...feed.map(feedItem));
 		}
 
+		function atTime(entry) {
+			const time = new Date(entry.at).getTime();
+			return Number.isFinite(time) ? time : 0;
+		}
+
+		// Keeps entries that arrived over the stream while the page loaded, so none is lost to the fetch.
+		function mergeFeed(fetched) {
+			const seen = new Set();
+			const merged = [];
+			for (const entry of [...fetched, ...feed]) {
+				const key = feedKey(entry);
+				if (!seen.has(key)) {
+					seen.add(key);
+					merged.push(entry);
+				}
+			}
+			merged.sort((a, b) => atTime(b) - atTime(a));
+			return merged.slice(0, FEED_LIMIT);
+		}
+
 		function addFeed(entry) {
 			const key = feedKey(entry);
 			if (feed.some((existing) => feedKey(existing) === key)) {
@@ -345,7 +370,7 @@
 				const live = await getJson("/api/live");
 				serverOnline = Boolean(live.online);
 				snapshot = live.snapshot ?? null;
-				feed = Array.isArray(live.feed) ? live.feed.slice(0, FEED_LIMIT) : [];
+				feed = mergeFeed(Array.isArray(live.feed) ? live.feed : []);
 			} catch {
 				serverOnline = false;
 			}
@@ -363,6 +388,7 @@
 		on("online", (data) => {
 			serverOnline = data === true;
 			renderTop();
+			renderBoard();
 		});
 		onStatus(({ reconnected }) => {
 			if (reconnected) {
@@ -385,6 +411,9 @@
 
 		let ids = new Set();
 		let onlineIds = new Set();
+		// Players on the server but not on the page that already caused a refetch. A player with no progress yet
+		// stays off the page, so this stops every snapshot from refetching for them.
+		const sought = new Set();
 
 		function render(rows) {
 			const count = el("span", null, `${rows.length} ${rows.length === 1 ? "player" : "players"}`);
@@ -421,14 +450,18 @@
 
 		const refetch = throttle(load, REFETCH_EVERY_MS);
 		on("progress", (changed) => {
-			if (Array.isArray(changed) && changed.some((id) => ids.has(String(id)))) {
+			if (Array.isArray(changed) && changed.length > 0) {
 				refetch();
 			}
 		});
 		on("snapshot", (snapshot) => {
-			const present = new Set(snapshot.players.filter((p) => !p.isBot).map((p) => String(p.steamId)));
+			const present = new Set(snapshot.players.filter((p) => !p.isBot).map((p) => String(p.steamId)).filter((id) => id !== "0"));
 			const joinedOrLeft = [...ids].some((id) => present.has(id) !== onlineIds.has(id));
-			if (joinedOrLeft) {
+			const unseen = [...present].filter((id) => !ids.has(id) && !sought.has(id));
+			for (const id of unseen) {
+				sought.add(id);
+			}
+			if (joinedOrLeft || unseen.length > 0) {
 				refetch();
 			}
 		});
