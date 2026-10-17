@@ -55,6 +55,64 @@ internal sealed class ChatReports(ProgressionEngine engine)
 	}
 
 	/// <summary>
+	/// Builds the lines a player gets on joining: the welcome, a link to their page when the site has a public
+	/// address, and the commands.
+	/// </summary>
+	/// <param name="name">The player's name.</param>
+	/// <param name="player">The player's progress.</param>
+	/// <param name="siteUrl">The site's public address, or empty for none.</param>
+	/// <returns>The lines.</returns>
+	public IReadOnlyList<string> WelcomeLines(string name, PlayerProgress player, string? siteUrl)
+	{
+		Ensure.NotNull(player);
+		List<string> lines = [Welcome(name, player)];
+		if (PlayerPage(siteUrl, player.SteamId) is string page)
+		{
+			lines.Add($"Your progress page: {page}");
+		}
+
+		lines.Add("Type !rank for your panel. More: !next !top !feats !stats !site");
+		return lines;
+	}
+
+	/// <summary>
+	/// Builds <c>!stats &lt;name&gt;</c>: finds a player by exact name, then by part of a name, ignoring case.
+	/// </summary>
+	/// <param name="players">The players to search, with their names.</param>
+	/// <param name="query">What was typed.</param>
+	/// <param name="siteUrl">The site's public address, or empty for none.</param>
+	/// <returns>The stats line and a link to their page, or a line saying why no single player matched.</returns>
+	public IReadOnlyList<string> StatsFor(IEnumerable<(string Name, PlayerProgress Progress)> players, string query, string? siteUrl)
+	{
+		Ensure.NotNull(players);
+		Ensure.NotNull(query);
+		List<(string Name, PlayerProgress Progress)> all = [.. players];
+		List<(string Name, PlayerProgress Progress)> matches = [.. all.Where(p => string.Equals(p.Name, query, StringComparison.OrdinalIgnoreCase))];
+		if (matches.Count == 0)
+		{
+			matches = [.. all.Where(p => p.Name.Contains(query, StringComparison.OrdinalIgnoreCase))];
+		}
+
+		switch (matches.Count)
+		{
+			case 0:
+				return [$"No connected player's name contains \"{query}\"."];
+
+			case 1:
+				List<string> lines = [Stats(matches[0].Name, matches[0].Progress)];
+				if (PlayerPage(siteUrl, matches[0].Progress.SteamId) is string page)
+				{
+					lines.Add(page);
+				}
+
+				return lines;
+
+			default:
+				return [$"Several players match: {string.Join(", ", matches.Take(5).Select(m => m.Name))}. Type more of the name."];
+		}
+	}
+
+	/// <summary>
 	/// Builds <c>!next</c>: the challenges closest to their next tier.
 	/// </summary>
 	/// <param name="player">The player's progress.</param>

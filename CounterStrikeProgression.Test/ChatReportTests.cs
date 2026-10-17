@@ -140,4 +140,42 @@ public sealed class ChatReportTests
 		Assert.AreEqual("P2", top[1].Name);
 		Assert.StartsWith("1. P3 level ", new ChatReports(engine).WeaponLeader(1, top[0]));
 	}
+
+	[TestMethod]
+	public void WelcomeLinesLinkThePageOnlyWithASite()
+	{
+		ChatReports reports = new(TestHelpers.Engine());
+		PlayerProgress player = TestHelpers.Player();
+
+		IReadOnlyList<string> withSite = reports.WelcomeLines("Tester", player, "https://cs2.example.com");
+		Assert.HasCount(3, withSite);
+		Assert.AreEqual($"Your progress page: https://cs2.example.com/players/{TestHelpers.SteamId}", withSite[1]);
+		Assert.StartsWith("Type !rank", withSite[2]);
+
+		Assert.HasCount(2, reports.WelcomeLines("Tester", player, ""));
+	}
+
+	[TestMethod]
+	public void StatsForFindsOnePlayerByName()
+	{
+		ChatReports reports = new(TestHelpers.Engine());
+		(string, PlayerProgress)[] online =
+		[
+			("Alice", new PlayerProgress(1)),
+			("Alicia", new PlayerProgress(2)),
+			("Bob", new PlayerProgress(3)),
+		];
+
+		IReadOnlyList<string> exact = reports.StatsFor(online, "alice", "https://cs2.example.com");
+		Assert.HasCount(2, exact);
+		Assert.StartsWith("Alice: ", exact[0]);
+		Assert.AreEqual("https://cs2.example.com/players/1", exact[1]);
+
+		IReadOnlyList<string> partial = reports.StatsFor(online, "ob", "");
+		Assert.HasCount(1, partial);
+		Assert.StartsWith("Bob: ", partial[0]);
+
+		Assert.AreEqual("Several players match: Alice, Alicia. Type more of the name.", reports.StatsFor(online, "ali", "")[0]);
+		Assert.AreEqual("No connected player's name contains \"zed\".", reports.StatsFor(online, "zed", "")[0]);
+	}
 }

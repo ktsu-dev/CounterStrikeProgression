@@ -167,39 +167,14 @@ internal sealed class PlayerCommands(ProgressionServices services, string module
 		}
 
 		// Only connected players, whose progress is already in memory, so a lookup never waits on the database.
-		List<(CCSPlayerController Player, PlayerProgress Progress)> online =
-		[
-			.. Utilities.GetPlayers()
-				.Select(other => (Player: other, services.Sessions.Get(other)?.Progress))
-				.Where(o => o.Progress is not null)
-				.Select(o => (o.Player, o.Progress!)),
-		];
+		IEnumerable<(string Name, PlayerProgress Progress)> online = Utilities.GetPlayers()
+			.Select(other => (other.PlayerName, services.Sessions.Get(other)?.Progress))
+			.Where(o => o.Progress is not null)
+			.Select(o => (o.PlayerName, o.Progress!));
 
-		List<(CCSPlayerController Player, PlayerProgress Progress)> matches =
-			[.. online.Where(o => string.Equals(o.Player.PlayerName, query, StringComparison.OrdinalIgnoreCase))];
-		if (matches.Count == 0)
+		foreach (string line in services.Reports.StatsFor(online, query, services.Config.Site.PublicUrl))
 		{
-			matches = [.. online.Where(o => o.Player.PlayerName.Contains(query, StringComparison.OrdinalIgnoreCase))];
-		}
-
-		switch (matches.Count)
-		{
-			case 0:
-				Reply(player!, $"No connected player's name contains \"{query}\".");
-				break;
-
-			case 1:
-				Reply(player!, services.Reports.Stats(matches[0].Player.PlayerName, matches[0].Progress));
-				if (ChatReports.PlayerPage(services.Config.Site.PublicUrl, matches[0].Progress.SteamId) is string page)
-				{
-					player!.PrintToChat($" {ChatColors.LightBlue}{page}");
-				}
-
-				break;
-
-			default:
-				Reply(player!, $"Several players match: {string.Join(", ", matches.Take(5).Select(m => m.Player.PlayerName))}. Type more of the name.");
-				break;
+			Reply(player!, line);
 		}
 	}
 

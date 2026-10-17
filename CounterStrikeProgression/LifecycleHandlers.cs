@@ -6,7 +6,6 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using ktsu.CounterStrikeProgression.Core.Events;
-using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
 
 /// <summary>
@@ -99,14 +98,10 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 		}
 
 		session.Welcomed = true;
-		string prefix = $" {ChatColors.Gold}{services.Config.ChatPrefix}{ChatColors.Default}";
-		player.PrintToChat($"{prefix} {services.Reports.Welcome(player.PlayerName, progress)}");
-		if (ChatReports.PlayerPage(services.Config.Site.PublicUrl, session.SteamId) is string page)
+		foreach (string line in services.Reports.WelcomeLines(player.PlayerName, progress, services.Config.Site.PublicUrl))
 		{
-			player.PrintToChat($"{prefix} Your progress page: {ChatColors.LightBlue}{page}");
+			player.PrintToChat($" {ChatColors.Gold}{services.Config.ChatPrefix}{ChatColors.Default} {line}");
 		}
-
-		player.PrintToChat($"{prefix} Type {ChatColors.Yellow}!rank{ChatColors.Default} for your panel. More: {ChatColors.Yellow}!next !top !feats !stats !site");
 	}
 
 	private HookResult OnPlayerTeam(EventPlayerTeam @event, GameEventInfo info)
