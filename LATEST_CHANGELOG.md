@@ -1,11 +1,11 @@
-## v1.8.0 (minor)
+## v1.9.0 (minor)
 
-Changes since v1.7.0:
+Changes since v1.8.0:
 
-- Merge main into claude/player-page-tabs-a6cz6a (Claude)
-- Keep the player feed beside the tabs (Claude)
-- Pick the player tab renderer with a switch (Claude)
-- Look up the player tab renderer in a Map (Claude)
-- [minor] Split the player page into tabs and rework weapon challenges (Claude)
-- [minor] Add a ladder page with player counts and an icon for every challenge (matt-edmondson)
+- Move the empty-recap check into Core and cover the recap edge cases (Claude)
+- Move the welcome and !stats lookup into Core, with tests (Claude)
+- Add a map recap in chat and a last session on the player page [minor] (Claude)
+- Filter connected players with LINQ in !stats (Claude)
+- Add a join message and more chat commands [minor] (Claude)
+- Show rank as the clan tag and a chat prefix [minor] (Claude)
 
