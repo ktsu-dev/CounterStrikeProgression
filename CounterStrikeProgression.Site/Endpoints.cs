@@ -197,7 +197,7 @@ internal static class Endpoints
 		}
 
 		PlayerProgress merged = ProgressMerge.Merge(stored, overlay);
-		PlayerView view = PlayerViewBuilder.Build(merged, live.Settings, live.IsPlaying(steamId), live.PlayerFeed(steamId));
+		PlayerView view = PlayerViewBuilder.Build(merged, live.Settings, live.IsPlaying(steamId), live.PlayerFeed(steamId), live.LastSession(steamId));
 		feats.Set(steamId, view.Feats.Where(f => f.Earned).Select(f => FeatCatalog.All.First(d => d.Id == f.Id)));
 		return TypedResults.Ok(view);
 	}
@@ -297,5 +297,6 @@ internal static class Endpoints
 		&& progress.All(p => p is { Weapons: { } weapons, Challenges: { } challenges, Contracts: { } contracts }
 			&& weapons.All(w => w is not null)
 			&& challenges.All(c => c is not null)
-			&& contracts.All(c => c is { Period: not null, Contract: not null }));
+			&& contracts.All(c => c is { Period: not null, Contract: not null }))
+		&& (batch.Recaps?.All(r => r is { PlayerName: not null, Map: not null }) ?? true);
 }

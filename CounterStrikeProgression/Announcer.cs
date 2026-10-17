@@ -7,7 +7,9 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using ktsu.CounterStrikeProgression.Core.Contracts;
+using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
 
 /// <summary>
@@ -45,7 +47,7 @@ internal sealed class Announcer(PluginConfig config)
 					break;
 
 				case NoticeKind.TierCompleted:
-					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} finished {ChatColors.Yellow}{notice.Weapon?.DisplayName} {notice.ChallengeName} {Core.Panel.PanelBuilder.Numeral(notice.Value)}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
+					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} finished {ChatColors.Yellow}{notice.Weapon?.DisplayName} {notice.ChallengeName} {PanelBuilder.Numeral(notice.Value)}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
 					break;
 
 				case NoticeKind.WeaponLevelUp when notice.Broadcast:
@@ -79,6 +81,22 @@ internal sealed class Announcer(PluginConfig config)
 		{
 			session.LastSkillShotMessage = now;
 			player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.LightPurple}{string.Join(", ", skillShots)}{ChatColors.Default} +{Xp(skillShotXp)} XP");
+		}
+	}
+
+	/// <summary>
+	/// Tells a player what they earned this map, when the config allows it.
+	/// </summary>
+	/// <param name="player">The player.</param>
+	/// <param name="recap">Their recap.</param>
+	public void AnnounceRecap(CCSPlayerController player, MapRecap recap)
+	{
+		Ensure.NotNull(player);
+		Ensure.NotNull(recap);
+
+		if (config.AnnounceMapRecap)
+		{
+			player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {PanelFormatter.ToRecapChat(recap)}");
 		}
 	}
 

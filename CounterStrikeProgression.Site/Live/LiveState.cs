@@ -4,13 +4,14 @@ namespace ktsu.CounterStrikeProgression.Site.Live;
 
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Live;
+using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using Microsoft.Extensions.Logging;
 
 /// <summary>What one applied batch changed.</summary>
 /// <param name="SnapshotChanged">Whether the server snapshot was replaced.</param>
 /// <param name="NewFeed">The feed entries the batch added.</param>
-/// <param name="ChangedPlayers">The Steam IDs whose progress rows the batch carried.</param>
+/// <param name="ChangedPlayers">The Steam IDs whose progress rows or map recaps the batch carried.</param>
 internal sealed record LiveChanges(bool SnapshotChanged, IReadOnlyList<FeedEntry> NewFeed, IReadOnlyList<ulong> ChangedPlayers);
 
 /// <summary>
@@ -28,6 +29,7 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 	private readonly Dictionary<ulong, ProgressSnapshot> overlays = [];
 	private List<FeedEntry> entries = [.. feed.Load().Take(options.FeedLength)];
 	private readonly Dictionary<ulong, List<FeedEntry>> playerFeeds = LoadPlayerFeeds(feed, options);
+	private readonly Dictionary<ulong, MapRecap> recaps = LoadRecaps(feed, options);
 	private ServerSnapshot? snapshot;
 	private DateTimeOffset lastBatchAt;
 	private bool feedSaveFailing;
@@ -81,6 +83,19 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 		}
 	}
 
+	/// <summary>
+	/// Gets a player's last map recap.
+	/// </summary>
+	/// <param name="steamId">The 64-bit Steam ID.</param>
+	/// <returns>The newest recap, or <see langword="null"/> when none arrived.</returns>
+	public MapRecap? LastSession(ulong steamId)
+	{
+		lock (gate)
+		{
+			return recaps.GetValueOrDefault(steamId);
+		}
+	}
+
 	/// <summary>Gets the Steam IDs that have live progress rows.</summary>
 	public IReadOnlyList<ulong> OverlayIds
 	{
@@ -123,7 +138,16 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 				SaveFeed(AddToPlayerFeeds(batch.Feed));
 			}
 
-			return new(snapshotChanged, batch.Feed, MergeProgress(batch.Progress));
+			List<ulong> changed = MergeProgress(batch.Progress);
+			foreach (ulong steamId in AddRecaps(batch.Recaps ?? []))
+			{
+				if (!changed.Contains(steamId))
+				{
+					changed.Add(steamId);
+				}
+			}
+
+			return new(snapshotChanged, batch.Feed, changed);
 		}
 	}
 
@@ -171,6 +195,72 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 		}
 
 		return changed;
+	}
+
+	private static Dictionary<ulong, MapRecap> LoadRecaps(FeedStore feed, SiteOptions options) =>
+		feed.LoadRecaps()
+			.Where(r => r is not null && (r.SteamId != 0))
+			.GroupBy(r => r.SteamId)
+			.Select(g => g.MaxBy(r => r.EndedAt)!)
+			.OrderByDescending(r => r.EndedAt)
+			.Take(options.PlayerFeedPlayers)
+			.ToDictionary(r => r.SteamId);
+
+	/// <summary>
+	/// Keeps each player's newest recap, and drops the oldest once more than <see cref="SiteOptions.PlayerFeedPlayers"/> have one.
+	/// </summary>
+	/// <returns>The players whose last session changed.</returns>
+	private List<ulong> AddRecaps(IReadOnlyList<MapRecap> added)
+	{
+		List<ulong> changed = [];
+		foreach (MapRecap recap in added.Where(r => r.SteamId != 0).OrderBy(r => r.EndedAt))
+		{
+			// A batch the plugin sends again after a timeout carries a recap this state already has.
+			if (recaps.TryGetValue(recap.SteamId, out MapRecap? existing) && (existing.EndedAt >= recap.EndedAt))
+			{
+				continue;
+			}
+
+			recaps[recap.SteamId] = recap;
+			if (!changed.Contains(recap.SteamId))
+			{
+				changed.Add(recap.SteamId);
+			}
+		}
+
+		if (changed.Count == 0)
+		{
+			return changed;
+		}
+
+		if (recaps.Count > options.PlayerFeedPlayers)
+		{
+			foreach (MapRecap oldest in recaps.Values.OrderBy(r => r.EndedAt).Take(recaps.Count - options.PlayerFeedPlayers).ToList())
+			{
+				recaps.Remove(oldest.SteamId);
+				changed.Remove(oldest.SteamId);
+			}
+		}
+
+		SaveRecaps();
+		return changed;
+	}
+
+	private void SaveRecaps()
+	{
+		try
+		{
+			feed.SaveRecaps([.. recaps.Values]);
+		}
+		catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+		{
+			// Like the feed, the recaps stay in memory, and the warning goes out once per failure streak.
+			if (!feedSaveFailing)
+			{
+				feedSaveFailing = true;
+				LogFeedSaveFailed(logger, ex, feed.RecapsPath);
+			}
+		}
 	}
 
 	private static Dictionary<ulong, List<FeedEntry>> LoadPlayerFeeds(FeedStore feed, SiteOptions options) =>

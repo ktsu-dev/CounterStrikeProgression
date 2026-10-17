@@ -9,6 +9,7 @@ using ktsu.CounterStrikeProgression.Core.Contracts;
 using ktsu.CounterStrikeProgression.Core.Feats;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.Rotation;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
 using ktsu.CounterStrikeProgression.Core.Weapons;
@@ -26,9 +27,10 @@ internal static class PlayerViewBuilder
 	/// <param name="settings">The plugin's settings.</param>
 	/// <param name="online">Whether the player is on the server now.</param>
 	/// <param name="feed">The player's feed, newest first. Omitted, the page shows none.</param>
+	/// <param name="lastSession">The player's last map recap. Omitted, the page shows none.</param>
 	/// <param name="now">The moment that decides which contracts are running, in UTC, or the current time when omitted.</param>
 	/// <returns>The page model.</returns>
-	public static PlayerView Build(PlayerProgress merged, ProgressionSettings settings, bool online, IReadOnlyList<FeedEntry>? feed = null, DateTime? now = null)
+	public static PlayerView Build(PlayerProgress merged, ProgressionSettings settings, bool online, IReadOnlyList<FeedEntry>? feed = null, MapRecap? lastSession = null, DateTime? now = null)
 	{
 		Ensure.NotNull(merged);
 		Ensure.NotNull(settings);
@@ -67,6 +69,7 @@ internal static class PlayerViewBuilder
 			ChallengeSuggester.Suggest(merged, settings, catalog),
 			[.. new FeatCatalog(settings).Measure(merged).Select(m => new FeatView(m.Feat.Id, m.Feat.Name, m.Feat.Description, m.Progress.IsEarned, Math.Min(m.Progress.Current, m.Progress.Target), m.Progress.Target))],
 			FeedCaptions.For(feed ?? [], settings),
+			lastSession is null ? null : BuildSession(lastSession),
 			Contracts(merged, settings, now ?? DateTime.UtcNow));
 	}
 
@@ -87,6 +90,9 @@ internal static class PlayerViewBuilder
 			return new ContractView(c.Definition.Id, c.Definition.Description, c.Definition.Period, count, c.Definition.Target, completed, c.Xp, c.EndsAt);
 		}),
 	];
+
+	private static SessionView BuildSession(MapRecap recap) =>
+		new(recap.Map, recap.StartedAt, recap.EndedAt, recap.Xp, recap.Kills, recap.Deaths, recap.SkillShots, recap.Levels, recap.Tiers, recap.RankUps, recap.Feats, recap.Best);
 
 	private static WeaponView BuildWeapon(WeaponProgress weapon, WeaponLevelCurve curve, ChallengeCatalog catalog)
 	{
