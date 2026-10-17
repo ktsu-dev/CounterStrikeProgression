@@ -196,7 +196,7 @@ public sealed class HistoryTests
 			return;
 		}
 
-		string[] parts = target.Split(':', '/');
+		string[] parts = target.Replace('/', ':').Split(':', StringSplitOptions.None);
 		DatabaseSettings settings = new() { Host = parts[0], Port = int.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture), Database = parts[2], User = parts[3], Password = parts[4] };
 		MySqlProgressionStore store = new(settings);
 		await store.InitializeAsync(TestContext.CancellationToken).ConfigureAwait(false);
