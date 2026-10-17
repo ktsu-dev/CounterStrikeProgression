@@ -421,50 +421,64 @@ td.name {
 	border-bottom-color: var(--orange);
 }
 
-.weapons-layout {
+.player-grid {
 	display: grid;
-	grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
-	gap: 16px;
-	padding: 12px;
+	grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+	border-top: 1px solid var(--line);
 	align-items: start;
 }
 
-button.link {
-	background: none;
-	border: 0;
-	padding: 0;
-	color: inherit;
+.player-tabs {
+	min-width: 0;
+	border-right: 1px solid var(--line);
+}
+
+.player-feed {
+	min-width: 0;
+	padding: 12px;
+	position: sticky;
+	top: 0;
+	max-height: 100vh;
+	overflow-y: auto;
+}
+
+.weapon-picks {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-bottom: 12px;
+}
+
+.weapon-pick {
+	display: inline-flex;
+	gap: 6px;
+	align-items: baseline;
+	background: var(--bg);
+	border: 1px solid var(--line);
+	color: var(--text);
 	font: inherit;
-	text-align: left;
-	cursor: pointer;
-	max-width: 100%;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-tr.selectable {
+	font-size: 12px;
+	padding: 3px 8px;
 	cursor: pointer;
 }
 
-tr.selectable:hover td {
-	background: var(--bg);
+.weapon-pick .level {
+	color: var(--muted);
+	font-size: 11px;
 }
 
-tr.selected td {
-	background: var(--bg);
+.weapon-pick:hover,
+.weapon-pick:focus-visible {
+	border-color: var(--muted);
 }
 
-tr.selected td:first-child {
-	box-shadow: inset 3px 0 0 var(--orange);
-}
-
-tr.selected button.link {
+.weapon-pick.selected {
+	border-color: var(--orange);
 	color: var(--orange);
 }
 
 .weapon-detail {
 	min-width: 0;
-	scroll-margin-top: 12px;
 }
 
 .weapon-head {
@@ -619,8 +633,18 @@ tr.selected button.link {
 }
 
 @media (max-width: 900px) {
-	.weapons-layout {
+	.player-grid {
 		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.player-tabs {
+		border-right: 0;
+		border-bottom: 1px solid var(--line);
+	}
+
+	.player-feed {
+		position: static;
+		max-height: none;
 	}
 }
 
@@ -658,10 +682,6 @@ tr.selected button.link {
 
 	.tab {
 		padding: 8px;
-	}
-
-	.weapons-layout {
-		padding: 12px 8px;
 	}
 
 	.weapon-stats {

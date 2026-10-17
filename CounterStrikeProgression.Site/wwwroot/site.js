@@ -791,7 +791,6 @@
 		["next", "Next up"],
 		["weapons", "Weapons"],
 		["feats", "Feats"],
-		["feed", "Feed"],
 	];
 
 	function initPlayer(root) {
@@ -842,41 +841,22 @@
 				weaponKey = weapons[0].key;
 			}
 			const selected = weapons.find((weapon) => weapon.key === weaponKey);
-			const layout = el("div", "weapons-layout");
-			const detail = weaponDetail(selected);
-
-			const rows = weapons.map((weapon) => {
-				const tr = el("tr", weapon.key === weaponKey ? "selectable selected" : "selectable");
-				const pick = el("button", "link", weapon.displayName);
+			const picks = el("div", "weapon-picks");
+			for (const weapon of weapons) {
+				const pick = el("button", weapon.key === weaponKey ? "weapon-pick selected" : "weapon-pick");
 				pick.type = "button";
 				pick.setAttribute("aria-pressed", weapon.key === weaponKey ? "true" : "false");
+				pick.append(el("span", null, weapon.displayName), el("span", "level", weapon.level));
+				const { done, total } = tiersDone(weapon);
+				pick.title = `Level ${weapon.level} · ${formatXp(weapon.kills)} kills · ${done}/${total} tiers`;
 				pick.addEventListener("click", () => {
 					weaponKey = weapon.key;
 					render(last);
-					const shown = panel.querySelector(".weapon-detail");
-					if (shown && window.matchMedia("(max-width: 900px)").matches) {
-						shown.scrollIntoView({ behavior: "smooth", block: "start" });
-					}
 				});
-				tr.addEventListener("click", (event) => {
-					if (event.target !== pick) {
-						pick.click();
-					}
-				});
-				const levelCell = cell("num");
-				levelCell.append(el("span", null, weapon.level), bar(weapon.level >= weapon.maxLevel ? 1 : weapon.levelProgress, "small"));
-				const { done, total } = tiersDone(weapon);
-				tr.append(
-					cell("name", pick),
-					levelCell,
-					cell("num", formatXp(weapon.kills)),
-					cell("num", total > 0 ? `${done}/${total}` : "—"),
-				);
-				return tr;
-			});
-			const list = el("div", "weapon-list");
-			list.append(table([["Weapon"], ["Lvl", "num"], ["Kills", "num"], ["Tiers", "num"]], rows));
-			layout.append(list, detail);
+				picks.append(pick);
+			}
+			const layout = el("div", "pad");
+			layout.append(picks, weaponDetail(selected));
 			return layout;
 		}
 
@@ -904,14 +884,14 @@
 
 		function renderFeed(player) {
 			const feed = Array.isArray(player.feed) ? player.feed : [];
-			const box = el("div", "pad");
+			const box = el("section", "player-feed");
 			const feedList = el("ul", "feed");
 			if (feed.length === 0) {
 				feedList.append(el("li", null, "Nothing yet. Skill shots, rank ups, and tiers show up here as they happen."));
 			} else {
 				feedList.append(...feed.map((entry) => feedItem(entry, false)));
 			}
-			box.append(feedList);
+			box.append(el("h2", "section-title", "XP feed"), feedList);
 			return box;
 		}
 
@@ -921,8 +901,6 @@
 					return renderWeapons(player);
 				case "feats":
 					return renderFeats(player);
-				case "feed":
-					return renderFeed(player);
 				default:
 					return renderNext(player);
 			}
@@ -1006,7 +984,12 @@
 			body.setAttribute("aria-labelledby", `tab-${tab}`);
 			body.append(renderTab(player));
 
-			panel.replaceChildren(head, summary, tabBar(player), body);
+			const tabs = el("div", "player-tabs");
+			tabs.append(tabBar(player), body);
+			const grid = el("div", "player-grid");
+			grid.append(tabs, renderFeed(player));
+
+			panel.replaceChildren(head, summary, grid);
 		}
 
 		async function load() {
