@@ -120,13 +120,13 @@ public sealed class FloatieSettings
 	/// Gets or sets how much bigger a floatie is drawn per unit of distance, so far ones stay readable. The size
 	/// is set once, when the floatie appears, and it keeps that size in the world as the player moves.
 	/// </summary>
-	public double SizePerUnitOfDistance { get; set; } = 0.00022;
+	public double SizePerUnitOfDistance { get; set; } = 0.00033;
 
 	/// <summary>Gets or sets the smallest world units per pixel, for floaties close by.</summary>
-	public double MinWorldUnitsPerPixel { get; set; } = 0.025;
+	public double MinWorldUnitsPerPixel { get; set; } = 0.0375;
 
 	/// <summary>Gets or sets the largest world units per pixel, for floaties far away.</summary>
-	public double MaxWorldUnitsPerPixel { get; set; } = 0.6;
+	public double MaxWorldUnitsPerPixel { get; set; } = 0.9;
 
 	/// <summary>
 	/// Gets or sets how far from the player's eyes floaties are drawn, in units. A floatie lands in the same spot
