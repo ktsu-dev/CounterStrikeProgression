@@ -86,6 +86,29 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 	}
 
 	/// <summary>
+	/// Copies every row of a player, whether or not it changed. The dirty flags that saving relies on stay as they are.
+	/// </summary>
+	/// <param name="progress">The player's progress.</param>
+	/// <returns>All of the player's rows.</returns>
+	public static ProgressSnapshot CaptureAll(PlayerProgress progress)
+	{
+		Ensure.NotNull(progress);
+
+		List<WeaponRow> weapons = [];
+		List<ChallengeRow> challenges = [];
+		foreach (WeaponProgress weapon in progress.Weapons.Values)
+		{
+			weapons.Add(new(progress.SteamId, weapon.Weapon.WeakString, weapon.Xp, weapon.Level, weapon.Kills, weapon.Headshots, weapon.Hits, weapon.Shots));
+			foreach ((string id, ChallengeProgress challenge) in weapon.Challenges)
+			{
+				challenges.Add(new(progress.SteamId, weapon.Weapon.WeakString, id, challenge.Count, challenge.TierReached));
+			}
+		}
+
+		return new(ToRow(progress), weapons, challenges);
+	}
+
+	/// <summary>
 	/// Makes a player row from progress, whether or not it changed.
 	/// </summary>
 	/// <param name="progress">The player's progress.</param>
