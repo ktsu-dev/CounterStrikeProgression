@@ -7,6 +7,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net.Sockets;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using ktsu.CounterStrikeProgression.Core.Admin;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using Microsoft.Extensions.Logging;
@@ -211,13 +212,13 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 		if (progress is not null)
 		{
 			CorrectionOutcome outcome = correction.Apply(progress, ranks);
-			ProgressSnapshot snapshot = ProgressSnapshot.Capture(progress);
+			ProgressSnapshot rows = ProgressSnapshot.Capture(progress);
 			Chain(steamId, async () =>
 			{
-				bool written = await WriteAsync(steamId, correction, snapshot).ConfigureAwait(false);
+				bool written = await SaveWithRetriesAsync(steamId, () => correction.WriteAsync(Store, rows, CancellationToken.None)).ConfigureAwait(false);
 				if (!written)
 				{
-					await Server.NextFrameAsync(() => snapshot.Restore(progress)).ConfigureAwait(false);
+					await Server.NextFrameAsync(() => rows.Restore(progress)).ConfigureAwait(false);
 				}
 
 				await Server.NextFrameAsync(() => done(written ? outcome : null)).ConfigureAwait(false);
@@ -230,10 +231,10 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 			CorrectionOutcome? outcome = null;
 			try
 			{
-				if (await Store.LoadAsync(steamId, CancellationToken.None).ConfigureAwait(false) is PlayerProgress stored)
+				if (await correction.ApplyToStoredAsync(Store, steamId, ranks, CancellationToken.None).ConfigureAwait(false) is (CorrectionOutcome applied, ProgressSnapshot rows)
+					&& await SaveWithRetriesAsync(steamId, () => correction.WriteAsync(Store, rows, CancellationToken.None)).ConfigureAwait(false))
 				{
-					CorrectionOutcome applied = correction.Apply(stored, ranks);
-					outcome = await WriteAsync(steamId, correction, ProgressSnapshot.Capture(stored)).ConfigureAwait(false) ? applied : null;
+					outcome = applied;
 				}
 			}
 			catch (Exception exception) when (IsStorageFailure(exception))
@@ -331,11 +332,6 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 			TaskContinuationOptions.ExecuteSynchronously,
 			TaskScheduler.Default);
 	}
-
-	private Task<bool> WriteAsync(ulong steamId, AdminCorrection correction, ProgressSnapshot snapshot) =>
-		correction.Kind == CorrectionKind.Reset
-			? SaveWithRetriesAsync(steamId, () => Store.ResetAsync(snapshot.Player!, CancellationToken.None))
-			: SaveWithRetriesAsync(steamId, () => Store.SaveAsync(snapshot, CancellationToken.None));
 
 	[SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "A save runs unobserved on the thread pool, so anything it throws must be logged here or it vanishes.")]
 	private async Task<bool> SaveWithRetriesAsync(ulong steamId, Func<Task> write)
