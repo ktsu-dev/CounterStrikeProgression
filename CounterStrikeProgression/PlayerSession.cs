@@ -27,6 +27,9 @@ internal sealed class PlayerSession(int slot, ulong steamId)
 	/// <summary>Gets or sets the player's progress, which is <see langword="null"/> until it has loaded.</summary>
 	public PlayerProgress? Progress { get; set; }
 
+	/// <summary>Gets or sets the rank XP the player has earned this map.</summary>
+	public double MapXp { get; set; }
+
 	/// <summary>Gets the player's movement, scope, reload, and aim history.</summary>
 	public PlayerCombatTracker Combat { get; } = new();
 

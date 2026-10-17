@@ -93,6 +93,30 @@ Settings left out keep their defaults.
 
 `Panel` sets the draw mode (`Auto`, `WorldText`, `CenterHtml`, or `Chat`), how many lines each mode shows, and the side panel's font size, scale, color, and offsets. The default placement suits a 16:9 display. CS2 has no client-predicted anchor for world text, so the side panel trails slightly behind fast turns.
 
+### Progression site
+
+`Site` sends the server's live state to the progression site: the map and mode, the scoreboard, the feed of skill shots, rank-ups, level-ups, and finished tiers, and each player's changed progress. With an empty `Url`, the default, the plugin sends nothing.
+
+```json
+{
+  "Site": {
+    "Url": "http://cs2-progression-site.cs2.svc.cluster.local:8081/api/ingest",
+    "Token": "change-me",
+    "IntervalSeconds": 2,
+    "QueueLimit": 20,
+    "FullResendEvery": 15
+  }
+}
+```
+
+- **`Url`:** the site's ingest endpoint. A URL that isn't absolute http or https is logged and ignored.
+- **`Token`:** the shared token the site checks on every batch.
+- **`IntervalSeconds`:** the seconds between batches. Values under 1 count as 1.
+- **`QueueLimit`:** how many batches wait to send. When the site is slow or down, the oldest is dropped, so the game never waits on it.
+- **`FullResendEvery`:** how many batches pass between full resends of every connected player's progress, which repairs the site after a dropped batch or a restart. 0 turns it off.
+
+Sending runs on the thread pool with a 3 second timeout, and a failure is logged at most once a minute.
+
 ## API Reference
 
 ### Skill shots

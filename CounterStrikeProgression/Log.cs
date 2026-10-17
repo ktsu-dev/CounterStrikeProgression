@@ -32,4 +32,10 @@ internal static partial class Log
 
 	[LoggerMessage(EventId = 8, Level = LogLevel.Error, Message = "Handling {Event} failed")]
 	public static partial void EventFailed(ILogger logger, string @event, Exception exception);
+
+	[LoggerMessage(EventId = 9, Level = LogLevel.Warning, Message = "Sending live data to the progression site failed")]
+	public static partial void SiteFailed(ILogger logger, Exception exception);
+
+	[LoggerMessage(EventId = 10, Level = LogLevel.Error, Message = "The progression site URL {Url} isn't an absolute http or https URL, so nothing is sent to the site")]
+	public static partial void SiteUrlInvalid(ILogger logger, string url);
 }

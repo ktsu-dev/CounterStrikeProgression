@@ -8,6 +8,7 @@ using ktsu.CounterStrikeProgression.Core.Floaties;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Tracking;
 using ktsu.CounterStrikeProgression.Panel;
+using ktsu.CounterStrikeProgression.Site;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
@@ -42,8 +43,12 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	/// <summary>Gets where failures are reported.</summary>
 	public ILogger Logger { get; } = logger;
 
+	/// <summary>Gets the progression site reporter, which is <see langword="null"/> when no site is configured.</summary>
+	public SiteReporter? Site { get; } = SiteReporter.Create(config, sessions, logger);
+
 	/// <summary>
-	/// Refreshes a player's panel, shows a floatie, and announces what they earned.
+	/// Refreshes a player's panel, shows a floatie, announces what they earned, and adds it to this map's XP
+	/// and the site's feed.
 	/// </summary>
 	/// <param name="player">The player.</param>
 	/// <param name="session">The player's session.</param>
@@ -58,6 +63,8 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 			return;
 		}
 
+		session.MapXp += result.XpEarned;
+		Site?.Record(session, player.PlayerName ?? string.Empty, result);
 		PanelPresenter.Invalidate(session);
 		Floaties.Show(player, result, floatieKey, at);
 		announcer.Announce(player, session, result);
