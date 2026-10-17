@@ -1,0 +1,318 @@
+:root {
+	--bg: #0d0f12;
+	--panel: #15181d;
+	--line: #262b33;
+	--text: #d8dde3;
+	--muted: #8a939e;
+	--orange: #f2a33a;
+	--gold: #f2c94c;
+	--gold-bg: #1f1a0e;
+	--gold-chip: #3a2c10;
+	--green: #4cd17a;
+	--red: #e5534b;
+	color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	-webkit-text-size-adjust: 100%;
+}
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font-family: Consolas, "Cascadia Mono", "DejaVu Sans Mono", Menlo, monospace;
+	font-size: 14px;
+	line-height: 1.45;
+	overflow-wrap: anywhere;
+}
+
+a {
+	color: var(--text);
+	text-decoration: underline dotted;
+	text-underline-offset: 3px;
+}
+
+a:hover,
+a:focus-visible {
+	color: var(--orange);
+}
+
+.nav {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px 18px;
+	padding: 10px 16px;
+	border-bottom: 1px solid var(--line);
+	text-transform: uppercase;
+	letter-spacing: 1px;
+	font-size: 12px;
+}
+
+.nav a {
+	color: var(--muted);
+	text-decoration: none;
+}
+
+.nav a:hover,
+.nav a:focus-visible,
+.nav a[aria-current="page"] {
+	color: var(--orange);
+}
+
+.nav .server {
+	margin-left: auto;
+	color: var(--text);
+}
+
+main {
+	max-width: 1200px;
+	margin: 0 auto;
+	padding: 16px;
+}
+
+.panel {
+	background: var(--panel);
+	margin-bottom: 16px;
+}
+
+.top {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	gap: 4px 16px;
+	background: var(--panel);
+	border-bottom: 2px solid var(--orange);
+	padding: 8px 12px;
+	letter-spacing: 1px;
+	text-transform: uppercase;
+}
+
+.top b {
+	color: var(--orange);
+	font-weight: bold;
+}
+
+.top.offline {
+	border-bottom-color: var(--red);
+}
+
+.top.offline b {
+	color: var(--red);
+}
+
+.pad {
+	padding: 12px;
+}
+
+.muted {
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.online {
+	color: var(--green);
+}
+
+.message {
+	padding: 24px 12px;
+	color: var(--muted);
+	text-align: center;
+}
+
+.table-wrap {
+	width: 100%;
+	overflow-x: auto;
+}
+
+table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+th,
+td {
+	padding: 6px 10px;
+	text-align: left;
+	vertical-align: middle;
+}
+
+th {
+	color: var(--muted);
+	font-weight: normal;
+	text-transform: uppercase;
+	font-size: 11px;
+	border-bottom: 1px solid var(--line);
+	white-space: nowrap;
+}
+
+td {
+	border-bottom: 1px solid var(--bg);
+}
+
+th.num,
+td.num {
+	text-align: right;
+	white-space: nowrap;
+}
+
+td.name {
+	max-width: 16em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.rank {
+	display: inline-block;
+	background: var(--line);
+	color: var(--orange);
+	padding: 0 6px;
+	font-size: 11px;
+	white-space: nowrap;
+}
+
+.rank.bot {
+	color: var(--muted);
+}
+
+.live-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+	gap: 16px;
+	padding: 12px;
+}
+
+.live-grid > * {
+	min-width: 0;
+}
+
+.section-title {
+	margin: 0 0 6px;
+	color: var(--muted);
+	font-size: 11px;
+	font-weight: normal;
+	text-transform: uppercase;
+	letter-spacing: 1px;
+}
+
+.feed {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.feed li {
+	display: flex;
+	gap: 10px;
+	justify-content: space-between;
+	align-items: baseline;
+	background: var(--bg);
+	border-left: 3px solid var(--orange);
+	padding: 6px 10px;
+	margin-bottom: 4px;
+}
+
+.feed li.gold {
+	border-left-color: var(--gold);
+	background: var(--gold-bg);
+}
+
+.feed .what {
+	min-width: 0;
+}
+
+.feed .side {
+	flex: none;
+	text-align: right;
+	white-space: nowrap;
+}
+
+.feed .xp {
+	color: var(--gold);
+}
+
+.feed .when {
+	display: block;
+	color: var(--muted);
+	font-size: 11px;
+}
+
+.big {
+	font-size: 22px;
+	color: var(--gold);
+}
+
+.bar {
+	height: 6px;
+	background: var(--line);
+	margin: 6px 0 4px;
+}
+
+.bar i {
+	display: block;
+	height: 100%;
+	background: var(--orange);
+}
+
+.bar.small {
+	display: inline-block;
+	width: 48px;
+	height: 4px;
+	margin: 0 0 0 8px;
+	vertical-align: middle;
+}
+
+.player-head {
+	align-items: baseline;
+}
+
+.player-head .name {
+	color: var(--orange);
+	font-weight: bold;
+	text-transform: none;
+}
+
+.tiers {
+	margin-bottom: 10px;
+}
+
+.tiers span {
+	display: inline-block;
+	background: var(--line);
+	padding: 1px 6px;
+	margin: 2px 4px 2px 0;
+	font-size: 11px;
+}
+
+.tiers span.done {
+	background: var(--gold-chip);
+	color: var(--gold);
+}
+
+@media (max-width: 700px) {
+	main {
+		padding: 12px 0;
+	}
+
+	.live-grid {
+		grid-template-columns: minmax(0, 1fr);
+		padding: 12px 8px;
+	}
+
+	th,
+	td {
+		padding: 6px;
+	}
+
+	td.name {
+		max-width: 9em;
+	}
+}

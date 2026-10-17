@@ -23,6 +23,11 @@
     <ContainerPort Include="8081" Type="tcp" />
   </ItemGroup>
 
+  <!-- Microsoft.NET.Sdk doesn't treat wwwroot as content the way the Web SDK does, so the pages are copied explicitly. -->
+  <ItemGroup>
+    <Content Include="wwwroot\**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\CounterStrikeProgression.Core\CounterStrikeProgression.Core.csproj" />
