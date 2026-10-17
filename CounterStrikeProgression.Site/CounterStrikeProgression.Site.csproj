@@ -9,6 +9,8 @@
     <!-- The site sees Core's internals, so Core's embedded polyfills would clash with this project's own copies. -->
     <PolyUseEmbeddedAttribute>true</PolyUseEmbeddedAttribute>
     <IsPackable>false</IsPackable>
+    <!-- ktsu.Sdk reads PROJECT_URL.url whole, and the SDK rejects that shortcut text when it builds the OCI image url label. -->
+    <PackageProjectUrl>https://github.com/ktsu-dev/CounterStrikeProgression</PackageProjectUrl>
 
     <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
     <ContainerBaseImage>mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled</ContainerBaseImage>

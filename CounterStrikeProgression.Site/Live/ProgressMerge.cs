@@ -39,10 +39,10 @@ internal static class ProgressMerge
 	}
 
 	/// <summary>
-	/// Combines two snapshots of the same player into one. Rows hold full values, so a row in the newer snapshot replaces the same row in the older one.
+	/// Combines two snapshots of the same player into one. Progress only goes up, so every counter takes the larger value, and a late batch can't pull the overlay back down.
 	/// </summary>
-	/// <param name="older">The earlier snapshot.</param>
-	/// <param name="newer">The later snapshot.</param>
+	/// <param name="older">The snapshot received earlier.</param>
+	/// <param name="newer">The snapshot received later.</param>
 	/// <returns>The combined snapshot.</returns>
 	public static ProgressSnapshot Combine(ProgressSnapshot older, ProgressSnapshot newer)
 	{
@@ -52,16 +52,25 @@ internal static class ProgressMerge
 		Dictionary<string, WeaponRow> weapons = older.Weapons.ToDictionary(w => w.Weapon, StringComparer.Ordinal);
 		foreach (WeaponRow row in newer.Weapons)
 		{
-			weapons[row.Weapon] = row;
+			weapons[row.Weapon] = weapons.TryGetValue(row.Weapon, out WeaponRow? existing) ? LargerWeapon(existing, row) : row;
 		}
 
 		Dictionary<(string Weapon, string Challenge), ChallengeRow> challenges = older.Challenges.ToDictionary(c => (c.Weapon, c.Challenge));
 		foreach (ChallengeRow row in newer.Challenges)
 		{
-			challenges[(row.Weapon, row.Challenge)] = row;
+			challenges[(row.Weapon, row.Challenge)] = challenges.TryGetValue((row.Weapon, row.Challenge), out ChallengeRow? existing)
+				? existing with { Count = Math.Max(existing.Count, row.Count), Tier = Math.Max(existing.Tier, row.Tier) }
+				: row;
 		}
 
-		return new(newer.Player ?? older.Player, [.. weapons.Values], [.. challenges.Values]);
+		PlayerRow? player = (older.Player, newer.Player) switch
+		{
+			(null, var n) => n,
+			(var o, null) => o,
+			(var o, var n) => LargerPlayer(o!, n!),
+		};
+
+		return new(player, [.. weapons.Values], [.. challenges.Values]);
 	}
 
 	/// <summary>
@@ -153,6 +162,25 @@ internal static class ProgressMerge
 			challenge.TierReached = Math.Max(challenge.TierReached, row.Tier);
 		}
 	}
+
+	private static WeaponRow LargerWeapon(WeaponRow a, WeaponRow b) => a with
+	{
+		Xp = Math.Max(a.Xp, b.Xp),
+		Level = Math.Max(a.Level, b.Level),
+		Kills = Math.Max(a.Kills, b.Kills),
+		Headshots = Math.Max(a.Headshots, b.Headshots),
+		Hits = Math.Max(a.Hits, b.Hits),
+		Shots = Math.Max(a.Shots, b.Shots),
+	};
+
+	private static PlayerRow LargerPlayer(PlayerRow older, PlayerRow newer) => older with
+	{
+		Name = older.LastSeen > newer.LastSeen ? older.Name : newer.Name,
+		RankXp = Math.Max(older.RankXp, newer.RankXp),
+		Rank = Math.Max(older.Rank, newer.Rank),
+		FirstSeen = Earlier(older.FirstSeen, newer.FirstSeen),
+		LastSeen = Later(older.LastSeen, newer.LastSeen),
+	};
 
 	private static DateTime Earlier(DateTime a, DateTime b) => a <= b ? a : b;
 

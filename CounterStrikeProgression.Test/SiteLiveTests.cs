@@ -307,4 +307,38 @@ public sealed class SiteLiveTests
 		Assert.HasCount(1, overlay.Challenges);
 		Assert.IsNull(state.Overlay(999));
 	}
+
+	[TestMethod]
+	public void Apply_StaleProgressBatch_DoesNotLowerTheOverlay()
+	{
+		LiveState state = NewState(new ManualTime());
+		ProgressSnapshot newer = new(
+			new PlayerRow(TestHelpers.SteamId, "Newer", 200, 3, Start, Start.AddMinutes(5)),
+			[new WeaponRow(TestHelpers.SteamId, "ak47", 90, 4, 12, 3, 40, 100)],
+			[new ChallengeRow(TestHelpers.SteamId, "ak47", "headshots", 30, 2)]);
+		ProgressSnapshot stale = new(
+			new PlayerRow(TestHelpers.SteamId, "Stale", 150, 2, Start.AddMinutes(-1), Start.AddMinutes(1)),
+			[new WeaponRow(TestHelpers.SteamId, "ak47", 60, 3, 9, 5, 30, 120)],
+			[new ChallengeRow(TestHelpers.SteamId, "ak47", "headshots", 20, 3)]);
+
+		state.Apply(Batch(Server(Start.AddSeconds(10)), progress: [newer]));
+		state.Apply(Batch(Server(Start), progress: [stale]));
+
+		ProgressSnapshot? overlay = state.Overlay(TestHelpers.SteamId);
+		Assert.IsNotNull(overlay);
+		WeaponRow weapon = overlay.Weapons.Single();
+		Assert.AreEqual(90, weapon.Xp);
+		Assert.AreEqual(4, weapon.Level);
+		Assert.AreEqual(12, weapon.Kills);
+		Assert.AreEqual(5, weapon.Headshots);
+		Assert.AreEqual(40, weapon.Hits);
+		Assert.AreEqual(120, weapon.Shots);
+		Assert.AreEqual(30, overlay.Challenges.Single().Count);
+		Assert.AreEqual(3, overlay.Challenges.Single().Tier);
+		Assert.AreEqual(200, overlay.Player?.RankXp);
+		Assert.AreEqual(3, overlay.Player?.Rank);
+		Assert.AreEqual("Newer", overlay.Player?.Name);
+		Assert.AreEqual(Start.AddMinutes(-1), overlay.Player?.FirstSeen);
+		Assert.AreEqual(Start.AddMinutes(5), overlay.Player?.LastSeen);
+	}
 }
