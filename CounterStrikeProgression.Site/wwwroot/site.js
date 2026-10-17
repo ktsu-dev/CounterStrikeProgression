@@ -259,6 +259,9 @@
 		if (entry.weapon && entry.kind !== "WeaponLevelUp") {
 			what.append(` · ${entry.weapon}`);
 		}
+		if (entry.caption) {
+			what.append(el("span", "caption", entry.caption));
+		}
 		const side = el("span", "side");
 		if (Number(entry.xp) > 0) {
 			side.append(el("span", "xp", `+${formatXp(entry.xp)}`));

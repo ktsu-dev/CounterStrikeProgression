@@ -63,7 +63,18 @@ internal sealed record PlayerView(
 	bool Online,
 	IReadOnlyList<WeaponView> Weapons,
 	IReadOnlyList<SuggestionView> Suggestions,
-	IReadOnlyList<FeedEntry> Feed);
+	IReadOnlyList<FeedItem> Feed);
+
+/// <summary>One feed line as the pages show it.</summary>
+/// <param name="At">When it happened, in UTC.</param>
+/// <param name="SteamId">The 64-bit Steam ID of the player who earned it.</param>
+/// <param name="PlayerName">The player's name at the time.</param>
+/// <param name="Kind">What kind of moment it was.</param>
+/// <param name="Title">The text to show, such as a skill shot name.</param>
+/// <param name="Weapon">The weapon's display name, if one was involved.</param>
+/// <param name="Xp">The rank XP the moment paid.</param>
+/// <param name="Caption">How the moment was earned, such as a skill shot's description, or <see langword="null"/> when the title says it all.</param>
+internal sealed record FeedItem(DateTime At, ulong SteamId, string PlayerName, FeedKind Kind, string Title, string? Weapon, long Xp, string? Caption);
 
 /// <summary>One suggested next challenge on a player's page.</summary>
 /// <param name="WeaponKey">The weapon key.</param>

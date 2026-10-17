@@ -229,6 +229,12 @@ td.name {
 	min-width: 0;
 }
 
+.feed .caption {
+	display: block;
+	color: var(--muted);
+	font-size: 12px;
+}
+
 .feed .side {
 	flex: none;
 	text-align: right;

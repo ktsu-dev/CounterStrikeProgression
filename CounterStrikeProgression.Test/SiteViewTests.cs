@@ -357,15 +357,59 @@ public sealed class SiteViewTests
 	}
 
 	[TestMethod]
-	public void Player_FeedIsShownAsGiven()
+	public void Player_FeedIsCaptioned()
 	{
-		FeedEntry entry = new(Seen, TestHelpers.SteamId, "Tester", FeedKind.SkillShot, "Mid-air", "AK-47", 25);
+		FeedEntry entry = new(Seen, TestHelpers.SteamId, "Tester", FeedKind.SkillShot, "Wallbang", "AK-47", 25);
 
 		PlayerView view = PlayerViewBuilder.Build(TestHelpers.Player(), Settings(), online: false, [entry]);
 		string json = JsonSerializer.Serialize(view, SiteJson.Options);
 
-		Assert.AreEqual(entry, Assert.ContainsSingle(view.Feed));
+		FeedItem item = Assert.ContainsSingle(view.Feed);
+		Assert.AreEqual(entry.Title, item.Title);
+		Assert.AreEqual(entry.At, item.At);
+		Assert.AreEqual("Kill through a wall", item.Caption);
 		Assert.Contains($"\"steamId\":\"{TestHelpers.SteamId}\"", json);
 		Assert.Contains("\"kind\":\"SkillShot\"", json);
+		Assert.Contains("\"caption\":\"Kill through a wall\"", json);
 	}
+
+	[TestMethod]
+	public void Caption_SkillTier_DescribesTheShotAndHowManyTimes()
+	{
+		ProgressionSettings settings = Settings();
+		SkillShotDefinition common = SkillShotCatalog.All.First(s => s.Rarity == Rarity.Common);
+		SkillShotDefinition epic = SkillShotCatalog.All.First(s => s.Rarity == Rarity.Epic);
+
+		FeedItem second = FeedCaptions.For(Tier($"{common.Name} II", "AK-47"), settings);
+		FeedItem first = FeedCaptions.For(Tier($"{epic.Name} I", "AK-47"), settings);
+
+		Assert.AreEqual($"{common.Description}, {settings.CommonSkillTiers[1]} times", second.Caption);
+		Assert.AreEqual(settings.EpicSkillTiers[0] == 1 ? $"{epic.Description}, once" : $"{epic.Description}, {settings.EpicSkillTiers[0]} times", first.Caption);
+	}
+
+	[TestMethod]
+	public void Caption_VolumeTier_GivesTheTotalAndWeapon()
+	{
+		ProgressionSettings settings = Settings();
+
+		Assert.AreEqual($"{settings.KillTiers[2]} kills with the AK-47", FeedCaptions.For(Tier("Kills III", "AK-47"), settings).Caption);
+		Assert.AreEqual($"{settings.HeadshotTiers[0]} headshot kills with the AWP", FeedCaptions.For(Tier("Headshots I", "AWP"), settings).Caption);
+		Assert.AreEqual("1,000 hits", FeedCaptions.For(Tier("Hits III", null), new ProgressionSettings { HitTiers = [10, 100, 1000] }).Caption);
+	}
+
+	[TestMethod]
+	public void Caption_TitlesThatSayItAllOrMatchNothing_HaveNone()
+	{
+		ProgressionSettings settings = Settings();
+
+		Assert.IsNull(FeedCaptions.For(new FeedEntry(Seen, 1, "P", FeedKind.RankUp, "Rank up: Gold Nova I", null, 0), settings).Caption);
+		Assert.IsNull(FeedCaptions.For(new FeedEntry(Seen, 1, "P", FeedKind.WeaponLevelUp, "AK-47 level 3", "AK-47", 60), settings).Caption);
+		Assert.IsNull(FeedCaptions.For(new FeedEntry(Seen, 1, "P", FeedKind.SkillShot, "Renamed shot", null, 10), settings).Caption);
+		Assert.IsNull(FeedCaptions.For(Tier("Kills", "AK-47"), settings).Caption);
+		Assert.IsNull(FeedCaptions.For(Tier("Kills IX", "AK-47"), settings).Caption);
+		Assert.IsNull(FeedCaptions.For(Tier("Mystery II", "AK-47"), settings).Caption);
+	}
+
+	private static FeedEntry Tier(string title, string? weapon) =>
+		new(Seen, TestHelpers.SteamId, "Tester", FeedKind.TierCompleted, title, weapon, 100);
 }

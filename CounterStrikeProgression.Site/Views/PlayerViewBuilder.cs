@@ -60,7 +60,7 @@ internal static class PlayerViewBuilder
 			online,
 			weapons,
 			ChallengeSuggester.Suggest(merged, settings, catalog),
-			feed ?? []);
+			FeedCaptions.For(feed ?? [], settings));
 	}
 
 	private static WeaponView BuildWeapon(WeaponProgress weapon, WeaponLevelCurve curve, ChallengeCatalog catalog)

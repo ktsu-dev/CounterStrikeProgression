@@ -21,7 +21,7 @@ using Microsoft.Extensions.Hosting;
 /// <param name="Online">Whether the server sent a batch within the offline window.</param>
 /// <param name="Snapshot">The latest server snapshot, or <see langword="null"/> before the first batch.</param>
 /// <param name="Feed">The feed, newest first.</param>
-internal sealed record LiveView(bool Online, ServerSnapshot? Snapshot, IReadOnlyList<FeedEntry> Feed);
+internal sealed record LiveView(bool Online, ServerSnapshot? Snapshot, IReadOnlyList<FeedItem> Feed);
 
 /// <summary>
 /// The site's route handlers.
@@ -91,7 +91,7 @@ internal static class Endpoints
 	public static IResult Live(LiveState live)
 	{
 		Ensure.NotNull(live);
-		return TypedResults.Ok(new LiveView(live.IsOnline, live.Snapshot, live.Feed));
+		return TypedResults.Ok(new LiveView(live.IsOnline, live.Snapshot, FeedCaptions.For(live.Feed, live.Settings)));
 	}
 
 	/// <summary>
@@ -219,7 +219,12 @@ internal static class Endpoints
 			return TypedResults.BadRequest();
 		}
 
-		LiveChanges changes = live.Apply(batch);
+		Publish(broadcaster, batch, live.Apply(batch));
+		return TypedResults.NoContent();
+	}
+
+	private static void Publish(Broadcaster broadcaster, LiveBatch batch, LiveChanges changes)
+	{
 		if (changes.SnapshotChanged)
 		{
 			broadcaster.Publish("snapshot", batch.Snapshot);
@@ -227,7 +232,7 @@ internal static class Endpoints
 
 		foreach (FeedEntry entry in changes.NewFeed.OrderBy(e => e.At))
 		{
-			broadcaster.Publish("feed", entry);
+			broadcaster.Publish("feed", FeedCaptions.For(entry, batch.Settings));
 		}
 
 		if (changes.ChangedPlayers.Count > 0)
@@ -235,8 +240,6 @@ internal static class Endpoints
 			string[] steamIds = [.. changes.ChangedPlayers.Select(id => id.ToString(CultureInfo.InvariantCulture))];
 			broadcaster.Publish("progress", steamIds);
 		}
-
-		return TypedResults.NoContent();
 	}
 
 	private static bool IsComplete([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] LiveBatch? batch) =>
