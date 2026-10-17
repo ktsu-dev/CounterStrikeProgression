@@ -958,6 +958,44 @@
 			return box;
 		}
 
+		function renderLastSession(session) {
+			const box = el("section", "pad last-session");
+			const minutes = Math.round((new Date(session.endedAt) - new Date(session.startedAt)) / 60000);
+			const details = [session.map, ago(session.endedAt)];
+			if (Number.isFinite(minutes) && minutes > 0) {
+				details.push(minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)}h ${minutes % 60}m`);
+			}
+			const head = el("div", "last-session-head");
+			head.append(el("h2", "section-title", "Last session"), el("span", "muted", details.join(" · ")));
+
+			const stats = el("div", "session-stats");
+			const values = [
+				["XP", `+${formatXp(session.xp)}`],
+				["K/D", `${formatXp(session.kills)}/${formatXp(session.deaths)}`],
+				["Skill shots", formatXp(session.skillShots)],
+				["Levels", formatXp(session.levels)],
+				["Tiers", formatXp(session.tiers)],
+			];
+			if (session.rankUps > 0) {
+				values.push(["Rank ups", formatXp(session.rankUps)]);
+			}
+			if (session.feats > 0) {
+				values.push(["Feats", formatXp(session.feats)]);
+			}
+			for (const [label, value] of values) {
+				const stat = el("div", "stat");
+				stat.append(el("b", null, value), el("span", "muted", label));
+				stats.append(stat);
+			}
+			box.append(head, stats);
+			if (session.best) {
+				const best = el("div", "muted");
+				best.append("Best moment: ", el("b", null, session.best));
+				box.append(best);
+			}
+			return box;
+		}
+
 		function renderTab(player) {
 			switch (tab) {
 				case "weapons":
@@ -1056,7 +1094,11 @@
 			const grid = el("div", "player-grid");
 			grid.append(tabs, renderFeed(player));
 
-			panel.replaceChildren(head, summary, grid);
+			const sections = [head, summary];
+			if (player.lastSession) {
+				sections.push(renderLastSession(player.lastSession));
+			}
+			panel.replaceChildren(...sections, grid);
 		}
 
 		async function load() {
