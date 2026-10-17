@@ -404,7 +404,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		}
 
 		ChallengeProgress progress = weapon.Challenge(challengeId);
-		progress.Count += award.LadderStep;
+		progress.Count++;
 		progress.IsDirty = true;
 
 		int tier = definition.TierFor(progress.Count);
@@ -557,9 +557,6 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 
 		/// <summary>Gets the featured multiplier on weapon XP, or 1 for a weapon that isn't featured.</summary>
 		public double Multiplier { get; } = multiplier;
-
-		/// <summary>Gets how far each ladder moves.</summary>
-		public int LadderStep { get; } = FeaturedWeapon.LadderStep(multiplier);
 
 		public long EventXp { get; set; }
 

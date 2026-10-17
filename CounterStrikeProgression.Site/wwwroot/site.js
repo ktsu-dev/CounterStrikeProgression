@@ -495,7 +495,7 @@
 			}
 			const times = `×${Number(featured.multiplier)}`;
 			const line = el("span");
-			line.append(el("b", null, `Featured today: ${featured.name}`), ` earn ${times} weapon XP and ladder progress`);
+			line.append(el("b", null, `Featured today: ${featured.name}`), ` earn ${times} weapon XP`);
 			const weapons = Array.isArray(featured.weapons) ? featured.weapons.join(", ") : "";
 			featuredBox.replaceChildren(line, el("span", "muted", weapons));
 		}

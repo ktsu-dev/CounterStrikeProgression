@@ -8,13 +8,13 @@ using ktsu.CounterStrikeProgression.Core.Weapons;
 /// <summary>The weapon class featured on one day, as players see it.</summary>
 /// <param name="Day">The UTC day, as <c>yyyy-MM-dd</c>.</param>
 /// <param name="Name">The class's plural name, capitalized, such as <c>SMGs</c>.</param>
-/// <param name="Multiplier">How much more weapon XP and ladder progress it earns.</param>
+/// <param name="Multiplier">How much more weapon XP it earns.</param>
 /// <param name="Weapons">The display names of the weapons in the class.</param>
 internal sealed record FeaturedDay(string Day, string Name, double Multiplier, IReadOnlyList<string> Weapons);
 
 /// <summary>
 /// The day's featured weapon class, which earns <see cref="ProgressionSettings.FeaturedWeaponMultiplier"/> times the
-/// weapon XP and ladder progress. The plugin and the site both work it out from the date and the settings.
+/// weapon XP. The plugin and the site both work it out from the date and the settings.
 /// </summary>
 internal static class FeaturedWeapon
 {
@@ -60,13 +60,6 @@ internal static class FeaturedWeapon
 		string name = DailyRotation.ClassName(weaponClass);
 		return char.ToUpperInvariant(name[0]) + name[1..];
 	}
-
-	/// <summary>
-	/// Gets how many steps one event moves a featured weapon's ladders.
-	/// </summary>
-	/// <param name="multiplier">The featured multiplier.</param>
-	/// <returns>The step, at least 1.</returns>
-	public static int LadderStep(double multiplier) => Math.Max(1, (int)Math.Round(multiplier, MidpointRounding.AwayFromZero));
 
 	/// <summary>
 	/// Writes a multiplier for players, such as <c>×2</c> or <c>×1.5</c>.

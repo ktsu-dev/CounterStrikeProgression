@@ -43,23 +43,22 @@ public sealed class FeaturedWeaponTests
 	}
 
 	[TestMethod]
-	public void TheFeaturedClassMovesItsLaddersTwiceAsFast()
+	public void TheFeaturedClassMovesItsLaddersAtTheUsualPace()
 	{
 		ProgressionEngine engine = FeaturedEngine();
 		WeaponInfo featured = FeaturedWeaponToday();
 		PlayerProgress player = TestHelpers.Player();
 
-		ProgressionResult result = new();
 		for (int i = 0; i < 13; i++)
 		{
-			result = engine.ApplyCombat(player, Kill(featured));
+			engine.ApplyCombat(player, Kill(featured));
 		}
 
 		ChallengeProgress kills = player.Weapons[featured.Key].Challenge(ChallengeDefinition.KillsId);
-		Assert.AreEqual(26, kills.Count);
-		Assert.AreEqual(1, kills.TierReached);
+		Assert.AreEqual(13, kills.Count);
+		Assert.AreEqual(0, kills.TierReached);
 		Assert.AreEqual(13, player.Weapons[featured.Key].Kills);
-		Assert.Contains(n => n.Kind == NoticeKind.TierCompleted, result.Notices);
+		Assert.AreEqual(engine.Settings.KillXp * 2L * 13, player.Weapons[featured.Key].Xp);
 	}
 
 	[TestMethod]
@@ -154,15 +153,6 @@ public sealed class FeaturedWeaponTests
 	{
 		Assert.AreEqual(DailyRotation.Hash("2026-10-17", "featured"), DailyRotation.Hash("2026-10-17", "featured"));
 		Assert.AreNotEqual(DailyRotation.Hash("2026-10-17", "featured"), DailyRotation.Hash("2026-10-17", "contracts"));
-	}
-
-	[TestMethod]
-	public void TheLadderStepRoundsTheMultiplier()
-	{
-		Assert.AreEqual(1, FeaturedWeapon.LadderStep(1));
-		Assert.AreEqual(2, FeaturedWeapon.LadderStep(1.5));
-		Assert.AreEqual(3, FeaturedWeapon.LadderStep(3));
-		Assert.AreEqual(1, FeaturedWeapon.LadderStep(0.5));
 	}
 
 	[TestMethod]

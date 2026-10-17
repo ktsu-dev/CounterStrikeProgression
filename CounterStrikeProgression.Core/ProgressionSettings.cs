@@ -168,9 +168,9 @@ public sealed class ProgressionSettings
 	public int AnnounceWeaponLevelEvery { get; set; } = 5;
 
 	/// <summary>
-	/// Gets or sets how much more weapon XP and ladder progress the day's featured weapon class earns. Ladder counts
-	/// step by this rounded to a whole number. Rank XP isn't multiplied, though the faster levels and tiers pay their
-	/// bonuses sooner. 1 turns the featured weapon off.
+	/// Gets or sets how much more weapon XP the day's featured weapon class earns. Challenge ladders still move one
+	/// step per event, and rank XP isn't multiplied, though the faster weapon levels pay their bonuses sooner. 1 turns
+	/// the featured weapon off.
 	/// </summary>
 	public double FeaturedWeaponMultiplier { get; set; } = 2;
 
