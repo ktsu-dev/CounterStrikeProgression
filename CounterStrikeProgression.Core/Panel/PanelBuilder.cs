@@ -82,8 +82,7 @@ internal sealed class PanelBuilder(ProgressionEngine engine)
 		List<PanelLine> lines = [];
 		if (engine.FeaturedClass is WeaponClass featured)
 		{
-			string name = DailyRotation.ClassName(featured);
-			lines.Add(new($"Featured: {char.ToUpperInvariant(name[0])}{name[1..]}", $"{FeaturedWeapon.Times(engine.Settings.FeaturedWeaponMultiplier)} weapon XP", LineState.InProgress));
+			lines.Add(new($"Featured: {FeaturedWeapon.Title(featured)}", $"{FeaturedWeapon.Times(engine.Settings.FeaturedWeaponMultiplier)} weapon XP", LineState.InProgress));
 		}
 
 		lines.AddRange(

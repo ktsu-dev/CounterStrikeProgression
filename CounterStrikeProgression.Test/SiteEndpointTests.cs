@@ -316,6 +316,7 @@ public sealed class SiteEndpointTests
 		Assert.IsTrue(ok.Value!.Online);
 		Assert.AreEqual("de_inferno", ok.Value.Snapshot?.Map);
 		Assert.HasCount(1, ok.Value.Feed);
+		Assert.AreEqual("2026-10-17", ok.Value.Featured?.Day);
 	}
 
 	[TestMethod]

@@ -94,19 +94,6 @@ main {
 	text-transform: uppercase;
 }
 
-.top b {
-	color: var(--orange);
-	font-weight: bold;
-}
-
-.top.offline {
-	border-bottom-color: var(--red);
-}
-
-.top.offline b {
-	color: var(--red);
-}
-
 .featured {
 	display: flex;
 	flex-wrap: wrap;
@@ -123,6 +110,19 @@ main {
 
 .featured b {
 	color: var(--gold);
+}
+
+.top b {
+	color: var(--orange);
+	font-weight: bold;
+}
+
+.top.offline {
+	border-bottom-color: var(--red);
+}
+
+.top.offline b {
+	color: var(--red);
 }
 
 .pad {

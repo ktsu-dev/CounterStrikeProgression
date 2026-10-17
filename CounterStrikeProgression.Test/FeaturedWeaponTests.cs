@@ -9,7 +9,6 @@ using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Rotation;
 using ktsu.CounterStrikeProgression.Core.Weapons;
-using ktsu.CounterStrikeProgression.Site;
 
 [TestClass]
 public sealed class FeaturedWeaponTests
@@ -193,16 +192,17 @@ public sealed class FeaturedWeaponTests
 	}
 
 	[TestMethod]
-	public void TheSiteDescribesTheFeaturedClass()
+	public void TheDescriptionNamesTheClassAndItsWeapons()
 	{
 		WeaponClass pick = DailyRotation.FeaturedClass(Day);
 
-		FeaturedView? view = Endpoints.Featured(new ProgressionSettings { FeaturedWeaponMultiplier = 2 }, new ManualTime());
+		FeaturedDay? view = FeaturedWeapon.Describe(new ProgressionSettings { FeaturedWeaponMultiplier = 2 }, Day);
 
 		Assert.IsNotNull(view);
 		Assert.AreEqual("2026-10-17", view.Day);
 		Assert.AreEqual(2, view.Multiplier);
 		CollectionAssert.AreEqual(FeaturedWeapon.Weapons(pick).Select(w => w.DisplayName).ToList(), view.Weapons.ToList());
-		Assert.IsNull(Endpoints.Featured(new ProgressionSettings { FeaturedWeaponMultiplier = 1 }, new ManualTime()));
+		Assert.AreEqual(FeaturedWeapon.Title(pick), view.Name);
+		Assert.IsNull(FeaturedWeapon.Describe(new ProgressionSettings { FeaturedWeaponMultiplier = 1 }, Day));
 	}
 }

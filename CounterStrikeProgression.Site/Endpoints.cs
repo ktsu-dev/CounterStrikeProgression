@@ -26,14 +26,7 @@ using Microsoft.Extensions.Hosting;
 /// <param name="Feed">The feed, newest first.</param>
 /// <param name="Feats">The ids of the feats each player on the server has earned, keyed by Steam ID.</param>
 /// <param name="Featured">Today's featured weapon class, or <see langword="null"/> when the plugin turned it off.</param>
-internal sealed record LiveView(bool Online, ServerSnapshot? Snapshot, IReadOnlyList<FeedItem> Feed, IReadOnlyDictionary<string, IReadOnlyList<string>> Feats, FeaturedView? Featured);
-
-/// <summary>The weapon class featured today.</summary>
-/// <param name="Day">The UTC day it's featured, as <c>yyyy-MM-dd</c>, so the page knows when to ask again.</param>
-/// <param name="Name">The class's plural name, such as <c>SMGs</c>.</param>
-/// <param name="Multiplier">How much more weapon XP and ladder progress it earns.</param>
-/// <param name="Weapons">The display names of the weapons in the class.</param>
-internal sealed record FeaturedView(string Day, string Name, double Multiplier, IReadOnlyList<string> Weapons);
+internal sealed record LiveView(bool Online, ServerSnapshot? Snapshot, IReadOnlyList<FeedItem> Feed, IReadOnlyDictionary<string, IReadOnlyList<string>> Feats, FeaturedDay? Featured);
 
 /// <summary>
 /// The site's route handlers.
@@ -119,32 +112,7 @@ internal static class Endpoints
 		}
 
 		ProgressionSettings settings = live.Settings;
-		return TypedResults.Ok(new LiveView(live.IsOnline, snapshot, FeedCaptions.For(live.Feed, settings), earned, Featured(settings, time)));
-	}
-
-	/// <summary>
-	/// Describes the featured weapon class on the clock's current UTC day.
-	/// </summary>
-	/// <param name="settings">The plugin's settings.</param>
-	/// <param name="time">The clock.</param>
-	/// <returns>The featured class, or <see langword="null"/> when the featured weapon is off.</returns>
-	public static FeaturedView? Featured(ProgressionSettings settings, TimeProvider time)
-	{
-		Ensure.NotNull(settings);
-		Ensure.NotNull(time);
-
-		DateOnly day = DailyRotation.Day(time.GetUtcNow().UtcDateTime);
-		if (FeaturedWeapon.On(settings, day) is not { } featured)
-		{
-			return null;
-		}
-
-		string name = DailyRotation.ClassName(featured);
-		return new(
-			DailyRotation.DayKey(day),
-			char.ToUpperInvariant(name[0]) + name[1..],
-			settings.FeaturedWeaponMultiplier,
-			[.. FeaturedWeapon.Weapons(featured).Select(w => w.DisplayName)]);
+		return TypedResults.Ok(new LiveView(live.IsOnline, snapshot, FeedCaptions.For(live.Feed, settings), earned, FeaturedWeapon.Describe(settings, DailyRotation.Day(time.GetUtcNow().UtcDateTime))));
 	}
 
 	/// <summary>
