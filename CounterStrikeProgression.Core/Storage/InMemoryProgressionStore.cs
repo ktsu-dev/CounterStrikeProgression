@@ -16,6 +16,7 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 	private readonly ConcurrentDictionary<(ulong, string), WeaponRow> weapons = new();
 	private readonly ConcurrentDictionary<(ulong, string, string), ChallengeRow> challenges = new();
 	private readonly ConcurrentDictionary<(ulong, string, string), ContractRow> contracts = new();
+	private readonly ConcurrentDictionary<(ulong SteamId, DateOnly Day), long> daily = new();
 	private readonly ConcurrentDictionary<(ulong, DateTime), SeasonRow> seasons = new();
 
 	/// <summary>Gets the number of successful saves, for tests.</summary>
@@ -49,6 +50,7 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 		if (snapshot.Player is not null)
 		{
 			players[snapshot.Player.SteamId] = snapshot.Player;
+			daily[(snapshot.Player.SteamId, DateOnly.FromDateTime(snapshot.Player.LastSeen))] = snapshot.Player.RankXp;
 		}
 
 		foreach (WeaponRow row in snapshot.Weapons)
@@ -100,6 +102,13 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 			seasons.TryRemove(key, out _);
 		}
 
+		foreach ((ulong SteamId, DateOnly Day) key in daily.Keys.Where(k => k.SteamId == player.SteamId).ToList())
+		{
+			daily.TryRemove(key, out _);
+		}
+
+		// A reset starts the player's history again, from the day before, so the XP they keep isn't counted as earned.
+		daily[(player.SteamId, DateOnly.FromDateTime(player.LastSeen).AddDays(-1))] = player.RankXp;
 		players[player.SteamId] = player;
 		return Task.CompletedTask;
 	}
@@ -134,6 +143,32 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 			.Select(p => new RankingEntry(p.SteamId, p.Name, p.RankXp, p.Rank, p.LastSeen))];
 		return Task.FromResult(rankings);
 	}
+
+	/// <inheritdoc/>
+	public Task<IReadOnlyList<DailyXp>> HistoryAsync(ulong steamId, DateOnly from, CancellationToken cancellationToken)
+	{
+		List<DailyXp> rows = RowsOf(steamId);
+		DailyXp? before = rows.LastOrDefault(r => r.Day < from);
+		IReadOnlyList<DailyXp> history = [.. rows.Where(r => r.Day >= from || r == before || r == rows[0])];
+		return Task.FromResult(history);
+	}
+
+	/// <inheritdoc/>
+	public Task<IReadOnlyList<XpGainEntry>> GainsSinceAsync(DateOnly start, int count, CancellationToken cancellationToken)
+	{
+		DateTime since = start.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+		IReadOnlyList<XpGainEntry> gains = [.. players.Values
+			.Where(p => p.LastSeen >= since)
+			.Select(p => new XpGainEntry(p.SteamId, p.Name, p.RankXp, p.Rank, XpHistory.GainedSince(RowsOf(p.SteamId), start, p.FirstSeen, p.RankXp)))
+			.Where(g => g.Gained > 0)
+			.OrderByDescending(g => g.Gained)
+			.ThenBy(g => g.SteamId)
+			.Take(count)];
+		return Task.FromResult(gains);
+	}
+
+	private List<DailyXp> RowsOf(ulong steamId) =>
+		[.. daily.Where(d => d.Key.SteamId == steamId).Select(d => new DailyXp(d.Key.Day, d.Value)).OrderBy(d => d.Day)];
 
 	/// <inheritdoc/>
 	public Task<IReadOnlyList<SeasonStanding>> SeasonStandingsAsync(DateOnly start, int count, CancellationToken cancellationToken)

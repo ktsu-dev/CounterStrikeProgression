@@ -650,8 +650,45 @@
 		const body = el("div");
 		const panel = el("div", "panel");
 		panel.append(top, body);
-		root.replaceChildren(panel);
+		const weekTop = el("div", "top");
+		const weekBody = el("div");
+		const weekPanel = el("div", "panel");
+		weekPanel.append(weekTop, weekBody);
+		root.replaceChildren(weekPanel, panel);
 		top.append(el("b", null, "Ranks"));
+		weekTop.append(el("b", null, "XP this week"));
+
+		function renderWeek(week) {
+			const rows = Array.isArray(week.rows) ? week.rows : [];
+			const title = el("span");
+			title.append(el("b", null, "XP this week"));
+			weekTop.replaceChildren(title, el("span", null, `since ${formatDay(week.start)} UTC`));
+			if (rows.length === 0) {
+				weekBody.replaceChildren(message("Nobody has earned XP this week yet."));
+				return;
+			}
+			const trs = rows.map((row) => {
+				const tr = el("tr");
+				tr.append(
+					cell("num", row.position),
+					cell("name", playerLink(row.steamId, row.name)),
+					cell(null, rankBadge(row.rank, row.rankName)),
+					cell("num", formatXp(row.gained)),
+					cell("num muted", formatXp(row.rankXp)),
+					cell(row.online ? "online" : null, row.online ? "online" : ""),
+				);
+				return tr;
+			});
+			weekBody.replaceChildren(table([["#", "num"], ["Player"], ["Rank"], ["This week", "num"], ["Total", "num"], [""]], trs));
+		}
+
+		async function loadWeek() {
+			try {
+				renderWeek(await getJson("/api/weekly"));
+			} catch {
+				weekBody.replaceChildren(message("This week's XP can't be loaded right now."));
+			}
+		}
 
 		let ids = new Set();
 		let onlineIds = new Set();
@@ -689,6 +726,7 @@
 		}
 
 		async function load() {
+			loadWeek();
 			try {
 				render(await getJson("/api/ranks"));
 			} catch {
@@ -870,6 +908,122 @@
 		return box;
 	}
 
+	const HISTORY_SPANS = [30, 90, 365];
+
+	function formatDay(day) {
+		const value = new Date(`${day}T00:00:00Z`);
+		return Number.isFinite(value.getTime())
+			? value.toLocaleDateString(undefined, { day: "numeric", month: "short", timeZone: "UTC" })
+			: "—";
+	}
+
+	function compactXp(value) {
+		const number = Math.round(Number(value) || 0);
+		const abs = Math.abs(number);
+		if (abs >= 1e6) {
+			return `${(number / 1e6).toFixed(abs >= 1e7 ? 0 : 1)}M`;
+		}
+		if (abs >= 1e4) {
+			return `${Math.round(number / 1e3)}k`;
+		}
+		return formatXp(number);
+	}
+
+	// One single-series chart over the days: bars from zero for a daily amount, or a line for a running total,
+	// whose axis starts near the lowest total so the climb shows. A crosshair and readout follow the pointer.
+	function xpChart(title, points, { value, bars, describe }) {
+		// A narrower drawing on a phone, so the axis text isn't scaled down to nothing.
+		const width = window.innerWidth < 600 ? 360 : 640;
+		const height = window.innerWidth < 600 ? 140 : 150;
+		const left = 52;
+		const right = 8;
+		const top = 8;
+		const bottom = 20;
+		const plotWidth = width - left - right;
+		const plotHeight = height - top - bottom;
+		const values = points.map(value);
+		const high = Math.max(...values, bars ? 1 : 0);
+		let low = bars ? 0 : Math.min(...values);
+		if (!bars && high - low < 1) {
+			low = Math.max(0, high - 1);
+		}
+		const range = Math.max(1, high - low);
+		const step = plotWidth / Math.max(1, points.length);
+		const xAt = (index) => left + (bars ? step * (index + 0.5) : (points.length > 1 ? (plotWidth * index) / (points.length - 1) : plotWidth / 2));
+		const yAt = (amount) => top + plotHeight - ((amount - low) / range) * plotHeight;
+
+		const svg = svgNode("svg", { viewBox: `0 0 ${width} ${height}`, class: "chart", role: "img", "aria-label": title });
+		for (let i = 0; i <= 2; i++) {
+			const amount = low + (range * i) / 2;
+			const y = yAt(amount);
+			svg.append(
+				svgNode("line", { x1: left, x2: width - right, y1: y, y2: y, class: "grid" }),
+				svgNode("text", { x: left - 6, y: y + 4, "text-anchor": "end", class: "axis", textContent: compactXp(amount) }),
+			);
+		}
+		const labelled = points.length > 2 ? [0, Math.floor((points.length - 1) / 2), points.length - 1] : points.map((_, i) => i);
+		for (const index of labelled) {
+			const anchor = index === 0 ? "start" : index === points.length - 1 ? "end" : "middle";
+			const x = points.length === 1 ? xAt(index) : index === 0 ? left : index === points.length - 1 ? width - right : xAt(index);
+			svg.append(svgNode("text", { x, y: height - 4, "text-anchor": anchor, class: "axis", textContent: formatDay(points[index].day) }));
+		}
+
+		if (bars) {
+			const barWidth = Math.max(1, step - 2);
+			points.forEach((point, index) => {
+				const amount = values[index];
+				if (amount <= 0) {
+					return;
+				}
+				const y = yAt(amount);
+				svg.append(svgNode("rect", { x: xAt(index) - barWidth / 2, y, width: barWidth, height: Math.max(1, top + plotHeight - y), rx: Math.min(2, barWidth / 2), class: "mark" }));
+			});
+		} else {
+			const line = points.map((_, index) => `${index === 0 ? "M" : "L"}${xAt(index).toFixed(1)},${yAt(values[index]).toFixed(1)}`).join("");
+			const area = `${line}L${xAt(points.length - 1).toFixed(1)},${top + plotHeight}L${xAt(0).toFixed(1)},${top + plotHeight}Z`;
+			svg.append(svgNode("path", { d: area, class: "area" }), svgNode("path", { d: line, class: "line" }));
+		}
+
+		const guide = svgNode("line", { y1: top, y2: top + plotHeight, class: "guide", visibility: "hidden" });
+		const dot = svgNode("circle", { r: 4, class: "dot", visibility: "hidden" });
+		const hit = svgNode("rect", { x: left, y: top, width: plotWidth, height: plotHeight, class: "hit" });
+		svg.append(guide, dot, hit);
+
+		const readout = el("span", "muted");
+		const idle = describe(null);
+		readout.textContent = idle;
+		function show(index) {
+			const x = xAt(index);
+			guide.setAttribute("x1", x);
+			guide.setAttribute("x2", x);
+			guide.setAttribute("visibility", "visible");
+			dot.setAttribute("cx", x);
+			dot.setAttribute("cy", yAt(values[index]));
+			dot.setAttribute("visibility", "visible");
+			readout.textContent = describe(points[index]);
+		}
+		function hide() {
+			guide.setAttribute("visibility", "hidden");
+			dot.setAttribute("visibility", "hidden");
+			readout.textContent = idle;
+		}
+		hit.addEventListener("pointermove", (event) => {
+			const box = svg.getBoundingClientRect();
+			const x = ((event.clientX - box.left) / box.width) * width;
+			const index = bars
+				? Math.floor((x - left) / step)
+				: Math.round(points.length > 1 ? ((x - left) / plotWidth) * (points.length - 1) : 0);
+			show(Math.min(points.length - 1, Math.max(0, index)));
+		});
+		hit.addEventListener("pointerleave", hide);
+
+		const figure = el("figure", "chart-box");
+		const caption = el("figcaption");
+		caption.append(el("b", null, title), readout);
+		figure.append(caption, svg);
+		return figure;
+	}
+
 	function ordinal(n) {
 		const value = Number(n) || 0;
 		const tens = value % 100;
@@ -902,6 +1056,7 @@
 		["next", "Next up"],
 		["weapons", "Weapons"],
 		["feats", "Feats"],
+		["history", "History"],
 	];
 
 	function initPlayer(root) {
@@ -915,6 +1070,10 @@
 		// The open tab and the weapon picked on the weapons tab, kept across refetches.
 		let tab = null;
 		let weaponKey = null;
+		// The XP graph, fetched when the history tab opens and again as progress arrives while it's open.
+		let history = null;
+		let historySpan = HISTORY_SPANS[0];
+		let historyLoading = false;
 
 		function tabFromHash() {
 			const name = window.location.hash.replace(/^#/, "");
@@ -1015,6 +1174,89 @@
 			return box;
 		}
 
+		async function loadHistory() {
+			if (historyLoading) {
+				return;
+			}
+			historyLoading = true;
+			const span = historySpan;
+			try {
+				const fetched = await getJson(`/api/players/${id}/history?days=${span}`);
+				if (span === historySpan) {
+					history = fetched;
+				}
+			} catch {
+				history = history ?? { failed: true };
+			} finally {
+				historyLoading = false;
+			}
+			if (span !== historySpan) {
+				loadHistory();
+			} else if (last && tab === "history") {
+				render(last);
+			}
+		}
+
+		function renderHistory() {
+			if (history === null) {
+				loadHistory();
+				return message("Loading…");
+			}
+			if (history.failed) {
+				return message("The XP history can't be loaded right now.");
+			}
+			const days = Array.isArray(history.days) ? history.days : [];
+			const box = el("div", "pad");
+
+			const spans = el("div", "spans");
+			for (const span of HISTORY_SPANS) {
+				const pick = el("button", span === historySpan ? "weapon-pick selected" : "weapon-pick", `${span} days`);
+				pick.type = "button";
+				pick.setAttribute("aria-pressed", span === historySpan ? "true" : "false");
+				pick.addEventListener("click", () => {
+					if (span !== historySpan) {
+						historySpan = span;
+						history = null;
+						render(last);
+					}
+				});
+				spans.append(pick);
+			}
+
+			const played = days.filter((day) => Number(day.gained) > 0);
+			const best = played.reduce((top, day) => (top === null || Number(day.gained) > Number(top.gained) ? day : top), null);
+			const stats = el("div", "weapon-stats");
+			for (const [value, label] of [
+				[formatXp(history.today), "XP today"],
+				[formatXp(history.thisWeek), "XP this week"],
+				[best ? formatXp(best.gained) : "—", best ? `best day · ${formatDay(best.day)}` : "best day"],
+				[played.length, played.length === 1 ? "day played" : "days played"],
+			]) {
+				const stat = el("div", "stat");
+				stat.append(el("b", null, value), el("span", "muted", label));
+				stats.append(stat);
+			}
+			box.append(spans, stats);
+
+			if (days.length === 0) {
+				box.append(message("No history yet."));
+				return box;
+			}
+			box.append(
+				xpChart("XP per day", days, {
+					value: (day) => Number(day.gained) || 0,
+					bars: true,
+					describe: (day) => (day ? `${formatDay(day.day)} · ${formatXp(day.gained)} XP` : `${formatXp(days.reduce((sum, d) => sum + (Number(d.gained) || 0), 0))} XP in ${historySpan} days`),
+				}),
+				xpChart("Rank XP", days, {
+					value: (day) => Number(day.rankXp) || 0,
+					bars: false,
+					describe: (day) => (day ? `${formatDay(day.day)} · ${formatXp(day.rankXp)} XP` : `${formatXp(days[days.length - 1].rankXp)} XP now`),
+				}),
+			);
+			return box;
+		}
+
 		function renderLastSession(session) {
 			const box = el("section", "pad last-session");
 			const minutes = Math.round((new Date(session.endedAt) - new Date(session.startedAt)) / 60000);
@@ -1059,6 +1301,8 @@
 					return renderWeapons(player);
 				case "feats":
 					return renderFeats(player);
+				case "history":
+					return renderHistory();
 				default:
 					return renderNext(player);
 			}
@@ -1105,6 +1349,9 @@
 
 		function selectTab(key, updateHash) {
 			tab = key;
+			if (key === "history" && history !== null) {
+				loadHistory();
+			}
 			if (updateHash) {
 				history.replaceState(null, "", `#${key}`);
 			}
@@ -1173,6 +1420,10 @@
 				} else {
 					panel.replaceChildren(message("This player can't be loaded right now."));
 				}
+				return;
+			}
+			if (tab === "history" && history !== null) {
+				loadHistory();
 			}
 		}
 

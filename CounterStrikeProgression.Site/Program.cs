@@ -79,6 +79,8 @@ internal static class Program
 		app.MapGet("/api/leaderboards", Endpoints.LeaderboardsAsync);
 		app.MapGet("/api/skillshots", Endpoints.SkillShotsAsync);
 		app.MapGet("/api/players/{id}", Endpoints.PlayerAsync);
+		app.MapGet("/api/players/{id}/history", HistoryEndpoints.PlayerHistoryAsync);
+		app.MapGet("/api/weekly", HistoryEndpoints.WeeklyAsync);
 		app.MapGet("/api/players/{id}/seasons", SeasonEndpoints.PlayerSeasonsAsync);
 		app.MapGet("/api/seasons", SeasonEndpoints.SeasonsAsync);
 		app.MapGet("/api/stream", Endpoints.Stream);

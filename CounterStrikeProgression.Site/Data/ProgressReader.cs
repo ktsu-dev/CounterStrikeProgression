@@ -14,7 +14,7 @@ using ktsu.CounterStrikeProgression.Core.Storage;
 /// </summary>
 /// <param name="store">The progress store.</param>
 /// <param name="time">The clock, or the system clock when omitted.</param>
-internal sealed class ProgressReader(IProgressionStore store, TimeProvider? time = null) : IDisposable
+internal sealed partial class ProgressReader(IProgressionStore store, TimeProvider? time = null) : IDisposable
 {
 	/// <summary>How many players the ranks page reads.</summary>
 	public const int RankingsCount = 500;
