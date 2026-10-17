@@ -55,6 +55,7 @@ public sealed class ProgressionPlugin : BasePlugin, IPluginConfig<PluginConfig>
 		new CombatHandlers(services).Register(this);
 		new PlayerCommands(services, ModuleName, ModuleVersion).Register(this);
 		new AdminCommands(services).Register(this);
+		services.RankTags.Register(this);
 		AddTimer(Math.Max(10, Config.SaveIntervalSeconds), sessions.SaveAll, TimerFlags.REPEAT);
 		if (services.Site is { } site)
 		{

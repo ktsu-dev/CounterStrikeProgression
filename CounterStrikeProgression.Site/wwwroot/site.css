@@ -458,6 +458,28 @@ td.name {
 	border-bottom-color: var(--orange);
 }
 
+.last-session {
+	border-top: 1px solid var(--line);
+}
+
+.last-session-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0 12px;
+}
+
+.session-stats {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+	gap: 8px;
+	margin: 8px 0;
+}
+
+.last-session b {
+	color: var(--text);
+}
+
 .player-grid {
 	display: grid;
 	grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
