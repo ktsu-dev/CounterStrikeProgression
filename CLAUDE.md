@@ -49,7 +49,7 @@ Nothing goes to NuGet. ktsu.Sdk marks every library packable from its targets, a
 - **`Core/SkillShots/SkillShotCatalog.cs`:** every skill shot, with its rarity, the weapons it applies to, and its detection rule. Ids are stored as challenge ids, so never rename one.
 - **`Core/Weapons/WeaponCatalog.cs`:** every tracked weapon, and the normalization of CS2's weapon names (prefixes, knife skins, grenade aliases, and alternates told apart by definition index).
 - **`Core/Tracking/`:** `RoundTracker` (opening kills, multi-kills, collaterals, trades, clutches), `PlayerCombatTracker` (landing, scope, weapon switch, reload, flick), and `LifeTracker` (per-life accuracy).
-- **`Core/Storage/`:** `ProgressSnapshot` (dirty rows copied on the game thread), `MySqlProgressionStore`, and `InMemoryProgressionStore`.
+- **`Core/Storage/`:** `ProgressSnapshot` (dirty rows copied on the game thread), `MySqlProgressionStore`, and `InMemoryProgressionStore`. Each save also upserts the player's total rank XP for the day into `csp_daily`, and `XpHistory` turns those rows into XP per day and XP since a date (the player page's History tab and the "XP this week" board on Ranks).
 - **`Core/Panel/`:** `PanelBuilder` builds the pages, and `PanelFormatter` renders plain text, center HTML, or chat.
 - **`CounterStrikeProgression/CombatHandlers.cs`:** the combat events that become `CombatEvent` snapshots.
 - **`CounterStrikeProgression/LifecycleHandlers.cs`:** connects, spawns, rounds, the per-tick tracking, and the transmit filter.

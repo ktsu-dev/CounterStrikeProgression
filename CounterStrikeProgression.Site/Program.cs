@@ -73,6 +73,8 @@ internal static class Program
 		app.MapGet("/api/ranks", Endpoints.RanksAsync);
 		app.MapGet("/api/ladder", Endpoints.LadderAsync);
 		app.MapGet("/api/players/{id}", Endpoints.PlayerAsync);
+		app.MapGet("/api/players/{id}/history", Endpoints.PlayerHistoryAsync);
+		app.MapGet("/api/weekly", Endpoints.WeeklyAsync);
 		app.MapGet("/api/stream", Endpoints.Stream);
 		app.MapPost(Endpoints.IngestRoute, Endpoints.IngestAsync);
 	}
