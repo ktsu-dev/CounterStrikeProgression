@@ -132,6 +132,9 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		ORDER BY s.season_start DESC
 		""";
 
+	private const string SelectContracts =
+		"SELECT steam_id AS SteamId, period AS Period, contract AS Contract, count AS `Count`, completed AS Completed FROM csp_contracts WHERE steam_id = @steamId AND period IN (@day, @week)";
+
 	private const string DeletePlayerRows = """
 		DELETE FROM csp_challenges WHERE steam_id = @SteamId;
 		DELETE FROM csp_weapons WHERE steam_id = @SteamId;
@@ -211,7 +214,7 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		// Only the running day and week matter, so older contract rows stay in the table but aren't read.
 		DateOnly today = DailyRotation.Day(DateTime.UtcNow);
 		IEnumerable<ContractRow> contracts = await connection.QueryAsync<ContractRow>(new CommandDefinition(
-			"SELECT steam_id AS SteamId, period AS Period, contract AS Contract, count AS `Count`, completed AS Completed FROM csp_contracts WHERE steam_id = @steamId AND period IN (@day, @week)",
+			SelectContracts,
 			new { steamId, day = DailyRotation.DayKey(today), week = DailyRotation.WeekKey(today) },
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 

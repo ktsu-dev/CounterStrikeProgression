@@ -245,6 +245,36 @@ public sealed class ContractTests
 	}
 
 	[TestMethod]
+	public void TheFeedNamesAWeeklyAndSkipsANoticeWithNoContract()
+	{
+		ActiveContract weekly = ContractCatalog.Active(Saturday, new ProgressionSettings())[^1];
+		ProgressionResult result = new();
+		result.Notices.Add(new ProgressionNotice { Kind = NoticeKind.ContractCompleted, Contract = weekly, Xp = weekly.Xp });
+		result.Notices.Add(new ProgressionNotice { Kind = NoticeKind.ContractCompleted });
+
+		FeedEntry entry = FeedBuilder.From(result, TestHelpers.SteamId, "Player", DateTime.UtcNow).Single();
+
+		Assert.AreEqual($"Weekly contract: {weekly.Definition.Description}", entry.Title);
+	}
+
+	[TestMethod]
+	public void TheOverviewShowsAllContractsDone()
+	{
+		ManualTime time = new();
+		ProgressionEngine engine = TestHelpers.Engine(s => s.ContractsEnabled = true, time);
+		PlayerProgress player = TestHelpers.Player();
+		foreach (ActiveContract contract in engine.ActiveContracts)
+		{
+			player.Contract(contract.PeriodKey, contract.Definition.Id).Completed = true;
+		}
+
+		PanelLine line = new PanelBuilder(engine).Overview(player).Lines.Single(l => l.Label == "Contracts");
+
+		Assert.AreEqual(LineState.Done, line.State);
+		Assert.AreEqual("4 of 4 done", line.Detail);
+	}
+
+	[TestMethod]
 	public void ThePanelListsTodayThenTheWeek()
 	{
 		ManualTime time = new();

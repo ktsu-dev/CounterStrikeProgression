@@ -369,10 +369,15 @@ public sealed class SiteEndpointTests
 		IResult accepted = await Endpoints.IngestAsync(good, new SiteOptions { Token = "dev" }, live, new Broadcaster(), new FeatIndex()).ConfigureAwait(false);
 		Assert.AreEqual(StatusCodes.Status204NoContent, StatusOf(accepted));
 
-		string body = JsonSerializer.Serialize(Batch() with { Progress = [rows] }, LiveJson.Options).Replace("\"contracts\":[{", "\"contracts\":[null,{", StringComparison.Ordinal);
-		DefaultHttpContext bad = IngestContext("Bearer dev", body);
-		IResult rejected = await Endpoints.IngestAsync(bad, new SiteOptions { Token = "dev" }, NewState(), new Broadcaster(), new FeatIndex()).ConfigureAwait(false);
-		Assert.AreEqual(StatusCodes.Status400BadRequest, StatusOf(rejected));
+		string json = JsonSerializer.Serialize(Batch() with { Progress = [rows] }, LiveJson.Options);
+		foreach ((string from, string to) in new[] { ("\"contracts\":[{", "\"contracts\":[null,{"), ("\"period\":\"2026-10-17\"", "\"period\":null"), ("\"contract\":\"headshots\"", "\"contract\":null") })
+		{
+			string body = json.Replace(from, to, StringComparison.Ordinal);
+			Assert.AreNotEqual(json, body);
+			DefaultHttpContext bad = IngestContext("Bearer dev", body);
+			IResult rejected = await Endpoints.IngestAsync(bad, new SiteOptions { Token = "dev" }, NewState(), new Broadcaster(), new FeatIndex()).ConfigureAwait(false);
+			Assert.AreEqual(StatusCodes.Status400BadRequest, StatusOf(rejected), to);
+		}
 	}
 
 	[TestMethod]
