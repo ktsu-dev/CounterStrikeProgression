@@ -17,8 +17,8 @@ using ktsu.CounterStrikeProgression.Core.Weapons;
 /// Rank XP from anything done to a bot is scaled by <see cref="ProgressionSettings.BotXpMultiplier"/>, but
 /// weapon XP and ladder counts aren't, so practice against bots still moves a weapon forward. Tier and
 /// level-up bonuses are paid in full, because they reward the ladder rather than one event. The day's featured
-/// weapon class earns <see cref="ProgressionSettings.FeaturedWeaponMultiplier"/> times the XP for each event, and
-/// contracts count what each event did once it's applied.
+/// weapon class earns <see cref="ProgressionSettings.FeaturedWeaponMultiplier"/> times the weapon XP and ladder
+/// progress, but not the rank XP. Contracts count what each event did once it's applied.
 /// </remarks>
 /// <param name="settings">The XP values and thresholds.</param>
 /// <param name="time">The clock that decides the day, or the system clock when omitted.</param>
@@ -34,7 +34,18 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 	public DateOnly Today => DailyRotation.Day(Time.GetUtcNow().UtcDateTime);
 
 	/// <summary>Gets the weapon class featured today, or <see langword="null"/> when the featured weapon is off.</summary>
-	public WeaponClass? FeaturedClass => Settings.FeaturedWeaponMultiplier > 1 ? DailyRotation.FeaturedClass(Today) : null;
+	public WeaponClass? FeaturedClass => FeaturedWeapon.On(Settings, Today);
+
+	/// <summary>
+	/// Gets whether a weapon is in today's featured class.
+	/// </summary>
+	/// <param name="weapon">The weapon.</param>
+	/// <returns><see langword="true"/> when it earns the featured multiplier.</returns>
+	public bool IsFeatured(WeaponInfo weapon)
+	{
+		Ensure.NotNull(weapon);
+		return weapon.Class == FeaturedClass;
+	}
 
 	/// <summary>Gets the contracts running today.</summary>
 	public IReadOnlyList<ActiveContract> ActiveContracts => ContractCatalog.Active(Today, Settings);
@@ -113,10 +124,6 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		{
 			award.EventXp += Settings.KillXp;
 			weapon.Kills++;
-			result.Kills++;
-			DayProgress day = player.Day(Today);
-			day.Kills++;
-			day.IsDirty = true;
 			result.Signals.Add(new(SignalKind.Kill, combat.Weapon, combat.IsHeadshot));
 			Advance(weapon, award, ChallengeDefinition.KillsId, result);
 			if (combat.IsHeadshot)
@@ -138,7 +145,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		{
 			if (skillShot.AppliesTo(combat.Weapon) && (skillShot.Detect?.Invoke(combat, Settings) == true))
 			{
-				EarnSkillShot(player, weapon, award, skillShot, result);
+				EarnSkillShot(weapon, award, skillShot, result);
 			}
 		}
 
@@ -169,7 +176,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		{
 			if (skillShot.AppliesTo(chicken.Weapon) && (skillShot.Detect?.Invoke(chicken, Settings) == true))
 			{
-				EarnSkillShot(player, progress, award, skillShot, result);
+				EarnSkillShot(progress, award, skillShot, result);
 			}
 		}
 
@@ -278,7 +285,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		SkillShotDefinition flashAssist = SkillShotCatalog.Get(SkillShotCatalog.FlashAssist);
 		if (assist.ByFlash && flashAssist.AppliesTo(assist.Weapon))
 		{
-			EarnSkillShot(player, weapon, award, flashAssist, result);
+			EarnSkillShot(weapon, award, flashAssist, result);
 		}
 
 		Credit(player, weapon, award, result);
@@ -329,7 +336,6 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 			ProgressionNotice notice = new() { Kind = NoticeKind.SkillShot, SkillShot = skillShot, Xp = SkillShotXp(skillShot.Rarity) };
 			result.Notices.Add(notice);
 			result.Signals.Add(new(SignalKind.SkillShot, SkillShot: skillShot));
-			CountSkillShotToday(player);
 			CreditRankXp(player, SkillShotXp(skillShot.Rarity), result);
 			return Settle(player, result);
 		}
@@ -361,25 +367,17 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		Award award = NewAward(weaponInfo, vsBot);
 		WeaponProgress weapon = player.Weapon(weaponInfo.Key);
 		weapon.IsDirty = true;
-		EarnSkillShot(player, weapon, award, skillShot, result);
+		EarnSkillShot(weapon, award, skillShot, result);
 		Credit(player, weapon, award, result);
 	}
 
-	private void EarnSkillShot(PlayerProgress player, WeaponProgress weapon, Award award, SkillShotDefinition skillShot, ProgressionResult result)
+	private void EarnSkillShot(WeaponProgress weapon, Award award, SkillShotDefinition skillShot, ProgressionResult result)
 	{
 		int xp = SkillShotXp(skillShot.Rarity);
 		award.EventXp += xp;
-		result.Notices.Add(new() { Kind = NoticeKind.SkillShot, Weapon = award.Weapon, SkillShot = skillShot, Xp = (long)Math.Round(ScaleForBots(xp * award.Multiplier, award.VsBot)) });
+		result.Notices.Add(new() { Kind = NoticeKind.SkillShot, Weapon = award.Weapon, SkillShot = skillShot, Xp = (long)Math.Round(ScaleForBots(xp, award.VsBot)) });
 		result.Signals.Add(new(SignalKind.SkillShot, award.Weapon, SkillShot: skillShot));
-		CountSkillShotToday(player);
 		Advance(weapon, award, skillShot.Id.WeakString, result);
-	}
-
-	private void CountSkillShotToday(PlayerProgress player)
-	{
-		DayProgress day = player.Day(Today);
-		day.SkillShots++;
-		day.IsDirty = true;
 	}
 
 	private void Advance(WeaponProgress weapon, Award award, string challengeId, ProgressionResult result)
@@ -391,7 +389,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		}
 
 		ChallengeProgress progress = weapon.Challenge(challengeId);
-		progress.Count++;
+		progress.Count += award.LadderStep;
 		progress.IsDirty = true;
 
 		int tier = definition.TierFor(progress.Count);
@@ -428,13 +426,13 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 			result.Signals.Add(new(SignalKind.WeaponLevel, award.Weapon));
 		}
 
-		double rankXp = ScaleForBots(award.EventXp * award.Multiplier, award.VsBot) + award.BonusXp;
+		double rankXp = ScaleForBots(award.EventXp, award.VsBot) + award.BonusXp;
 		CreditRankXp(player, rankXp, result);
 	}
 
 	/// <summary>
-	/// Counts what an event did toward the running contracts, pays for any it finishes, and drops contract and
-	/// day rows from earlier periods once they're saved.
+	/// Counts what an event did toward the running contracts, pays for any it finishes, and drops contract rows
+	/// from earlier periods once they're saved.
 	/// </summary>
 	private ProgressionResult Settle(PlayerProgress player, ProgressionResult result)
 	{
@@ -470,7 +468,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		return result;
 	}
 
-	private void DropStale(PlayerProgress player, IReadOnlyList<ActiveContract> active)
+	private static void DropStale(PlayerProgress player, IReadOnlyList<ActiveContract> active)
 	{
 		// A row is stale once its contract stops running. It goes only after it has saved, so the count isn't lost.
 		bool IsRunning((string Period, string Contract) key) => active.Any(a => (a.PeriodKey == key.Period) && (a.Definition.Id == key.Contract));
@@ -484,51 +482,9 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 				}
 			}
 		}
-
-		if (player.Days.Count > 1)
-		{
-			DateOnly today = Today;
-			foreach (DateOnly day in player.Days.Keys.ToList())
-			{
-				if ((day != today) && !player.Days[day].IsDirty)
-				{
-					player.Days.Remove(day);
-				}
-			}
-		}
 	}
 
-	/// <summary>
-	/// Adds or removes rank XP by hand, for an admin putting a mistake right. Added XP announces any rank-ups it
-	/// reaches, but neither counts toward the day's XP nor seasons. Removing XP is the one way a rank can go down.
-	/// </summary>
-	/// <param name="player">The player's progress.</param>
-	/// <param name="xp">The XP to add, or a negative amount to remove.</param>
-	/// <returns>What it earned.</returns>
-	public ProgressionResult Grant(PlayerProgress player, long xp)
-	{
-		Ensure.NotNull(player);
-
-		ProgressionResult result = new();
-		if (xp > 0)
-		{
-			CreditRankXp(player, xp, result, countToday: false);
-			return result;
-		}
-
-		player.RankXp = Math.Max(0, player.RankXp + xp);
-		player.Rank = Ranks.RankFor(player.RankXp);
-		player.IsDirty = true;
-		DayProgress day = player.Day(Today);
-		day.RankXp = player.RankXp;
-		day.IsDirty = true;
-		return result;
-	}
-
-	private Award NewAward(WeaponInfo weapon, bool vsBot) =>
-		new(weapon, vsBot, weapon.Class == FeaturedClass ? Settings.FeaturedWeaponMultiplier : 1);
-
-	private void CreditRankXp(PlayerProgress player, double xp, ProgressionResult result, bool countToday = true)
+	private void CreditRankXp(PlayerProgress player, double xp, ProgressionResult result)
 	{
 		result.XpEarned += Math.Max(0, xp);
 		double total = player.PendingXp + xp;
@@ -546,15 +502,6 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		player.IsDirty = true;
 		result.XpGained += whole;
 
-		DayProgress day = player.Day(Today);
-		day.RankXp = player.RankXp;
-		if (countToday)
-		{
-			day.Xp += whole;
-		}
-
-		day.IsDirty = true;
-
 		int rank = Ranks.RankFor(player.RankXp);
 		player.Rank = Math.Max(before, rank);
 		if (rank > before)
@@ -565,13 +512,20 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 
 	private double ScaleForBots(double xp, bool vsBot) => vsBot ? xp * Settings.BotXpMultiplier : xp;
 
+	private Award NewAward(WeaponInfo weapon, bool vsBot) =>
+		new(weapon, vsBot, IsFeatured(weapon) ? Settings.FeaturedWeaponMultiplier : 1);
+
 	private sealed class Award(WeaponInfo weapon, bool vsBot, double multiplier)
 	{
 		public WeaponInfo Weapon { get; } = weapon;
 
 		public bool VsBot { get; } = vsBot;
 
+		/// <summary>Gets the featured multiplier on weapon XP, or 1 for a weapon that isn't featured.</summary>
 		public double Multiplier { get; } = multiplier;
+
+		/// <summary>Gets how far each ladder moves.</summary>
+		public int LadderStep { get; } = FeaturedWeapon.LadderStep(multiplier);
 
 		public long EventXp { get; set; }
 

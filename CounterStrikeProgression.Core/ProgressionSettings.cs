@@ -168,8 +168,9 @@ public sealed class ProgressionSettings
 	public int AnnounceWeaponLevelEvery { get; set; } = 5;
 
 	/// <summary>
-	/// Gets or sets how much more XP the day's featured weapon class earns, for both rank XP and weapon XP. Tier and
-	/// level-up bonuses aren't multiplied. 1 turns the featured weapon off.
+	/// Gets or sets how much more weapon XP and ladder progress the day's featured weapon class earns. Ladder counts
+	/// step by this rounded to a whole number. Rank XP isn't multiplied, though the faster levels and tiers pay their
+	/// bonuses sooner. 1 turns the featured weapon off.
 	/// </summary>
 	public double FeaturedWeaponMultiplier { get; set; } = 2;
 
@@ -184,19 +185,4 @@ public sealed class ProgressionSettings
 
 	/// <summary>Gets or sets the rank XP for finishing the weekly contract.</summary>
 	public int WeeklyContractXp { get; set; } = 2500;
-
-	/// <summary>Gets or sets how long each season lasts, in months. Seasons start on 1 January and every this many months after.</summary>
-	public int SeasonMonths { get; set; } = 3;
-
-	/// <summary>Gets or sets the kills in one life that earn Unstoppable.</summary>
-	public int UnstoppableKills { get; set; } = 10;
-
-	/// <summary>Gets or sets the kills in one life that earn Godlike.</summary>
-	public int GodlikeKills { get; set; } = 20;
-
-	/// <summary>Gets or sets the kills in a row, without taking damage in between, that earn Untouchable.</summary>
-	public int UntouchableKills { get; set; } = 3;
-
-	/// <summary>Gets or sets the kills in one round that earn Ace. Ace is never earned in deathmatch, where a round is the whole map.</summary>
-	public int AceKills { get; set; } = 5;
 }

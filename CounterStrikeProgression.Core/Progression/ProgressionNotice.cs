@@ -70,9 +70,6 @@ internal sealed class ProgressionResult
 	/// <summary>Gets the moments worth telling the player about, in the order they happened.</summary>
 	public IList<ProgressionNotice> Notices { get; } = [];
 
-	/// <summary>Gets the kills the event made, for the map recap.</summary>
-	public int Kills { get; internal set; }
-
 	/// <summary>Gets what the event did that contracts might count. The engine empties it once they're counted.</summary>
 	internal IList<ContractSignal> Signals { get; } = [];
 }

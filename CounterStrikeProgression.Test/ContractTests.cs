@@ -3,6 +3,7 @@
 namespace ktsu.CounterStrikeProgression.Test;
 
 using ktsu.CounterStrikeProgression.Core;
+using ktsu.CounterStrikeProgression.Core.Admin;
 using ktsu.CounterStrikeProgression.Core.Contracts;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Panel;
@@ -399,57 +400,6 @@ public sealed class ContractTests
 	}
 
 	[TestMethod]
-	public void TheFeaturedClassEarnsMoreWeaponXp()
-	{
-		ManualTime time = new();
-		ProgressionEngine engine = TestHelpers.Engine(s => s.FeaturedWeaponMultiplier = 2, time);
-		WeaponClass featured = engine.FeaturedClass!.Value;
-		WeaponInfo boosted = WeaponCatalog.All.First(w => w.Class == featured);
-		WeaponInfo plain = WeaponCatalog.All.First(w => w.IsGun && w.Class != featured);
-		PlayerProgress player = TestHelpers.Player();
-
-		engine.ApplyCombat(player, TestHelpers.Hit(boosted.Key.WeakString));
-		engine.ApplyCombat(player, TestHelpers.Hit(plain.Key.WeakString));
-
-		Assert.AreEqual(2 * player.Weapons[plain.Key].Xp, player.Weapons[boosted.Key].Xp);
-		Assert.IsNull(TestHelpers.Engine(time: time).FeaturedClass);
-	}
-
-	[TestMethod]
-	public void GrantAddsAndRemovesRankXp()
-	{
-		ManualTime time = new();
-		ProgressionEngine engine = TestHelpers.Engine(time: time);
-		PlayerProgress player = TestHelpers.Player();
-
-		engine.Grant(player, 20_000);
-		Assert.AreEqual(20_000, player.RankXp);
-		Assert.AreEqual(0, player.Day(engine.Today).Xp);
-
-		engine.Grant(player, -30_000);
-		Assert.AreEqual(0, player.RankXp);
-		Assert.AreEqual(0, player.Rank);
-		Assert.AreEqual(0, player.Day(engine.Today).RankXp);
-	}
-
-	[TestMethod]
-	public void DaysOtherThanTodayAreDroppedOnceSaved()
-	{
-		ManualTime time = new();
-		ProgressionEngine engine = TestHelpers.Engine(time: time);
-		PlayerProgress player = TestHelpers.Player();
-		DateOnly yesterday = engine.Today;
-		engine.ApplyCombat(player, TestHelpers.Kill("ak47"));
-		player.Day(yesterday).IsDirty = false;
-
-		time.Advance(TimeSpan.FromDays(1));
-		engine.ApplyCombat(player, TestHelpers.Kill("ak47"));
-
-		Assert.IsFalse(player.Days.ContainsKey(yesterday));
-		Assert.AreEqual(1, player.Day(engine.Today).Kills);
-	}
-
-	[TestMethod]
 	[DataRow(2026, 10, 17, 3, "Oct–Dec 2026", 2026, 7, 1)]
 	[DataRow(2026, 2, 3, 1, "Feb 2026", 2026, 1, 1)]
 	[DataRow(2026, 5, 9, 5, "Apr–Jun 2026", 2026, 1, 1)]
@@ -465,5 +415,23 @@ public sealed class ContractTests
 	{
 		Assert.AreEqual(TestHelpers.SteamId, ProgressMerge.SteamIdOf(new ProgressSnapshot(null, [], [new ChallengeRow(TestHelpers.SteamId, "ak47", "kills", 1, 0)])));
 		Assert.IsNull(ProgressMerge.SteamIdOf(new ProgressSnapshot(null, [], [])));
+	}
+
+	[TestMethod]
+	public async Task AResetClearsContracts()
+	{
+		ManualTime time = new();
+		ProgressionEngine engine = Engine(time);
+		PlayerProgress player = TestHelpers.Player();
+		Kill(engine, player, WeaponFor(ClassKills(engine)), 1);
+		InMemoryProgressionStore store = new();
+		await store.SaveAsync(ProgressSnapshot.Capture(player), TestContext.CancellationToken).ConfigureAwait(false);
+
+		new AdminCorrection(CorrectionKind.Reset).Apply(player, engine.Ranks);
+		await store.ResetAsync(ProgressSnapshot.ToRow(player), TestContext.CancellationToken).ConfigureAwait(false);
+
+		Assert.IsEmpty(player.Contracts);
+		PlayerProgress? loaded = await store.LoadAsync(TestHelpers.SteamId, TestContext.CancellationToken).ConfigureAwait(false);
+		Assert.IsEmpty(loaded!.Contracts);
 	}
 }

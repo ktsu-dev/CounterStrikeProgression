@@ -69,6 +69,30 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 	}
 
 	/// <inheritdoc/>
+	public Task ResetAsync(PlayerRow player, CancellationToken cancellationToken)
+	{
+		Ensure.NotNull(player);
+
+		foreach ((ulong, string) key in weapons.Keys.Where(k => k.Item1 == player.SteamId).ToList())
+		{
+			weapons.TryRemove(key, out _);
+		}
+
+		foreach ((ulong, string, string) key in challenges.Keys.Where(k => k.Item1 == player.SteamId).ToList())
+		{
+			challenges.TryRemove(key, out _);
+		}
+
+		foreach ((ulong, string, string) key in contracts.Keys.Where(k => k.Item1 == player.SteamId).ToList())
+		{
+			contracts.TryRemove(key, out _);
+		}
+
+		players[player.SteamId] = player;
+		return Task.CompletedTask;
+	}
+
+	/// <inheritdoc/>
 	public Task<IReadOnlyList<LeaderboardEntry>> TopAsync(int count, CancellationToken cancellationToken)
 	{
 		IReadOnlyList<LeaderboardEntry> top = [.. players.Values.OrderByDescending(p => p.RankXp).Take(count).Select(p => new LeaderboardEntry(p.Name, p.RankXp, p.Rank))];

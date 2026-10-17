@@ -94,6 +94,24 @@ main {
 	text-transform: uppercase;
 }
 
+.featured {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 4px 12px;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--line);
+	background: var(--gold-bg);
+}
+
+.featured[hidden] {
+	display: none;
+}
+
+.featured b {
+	color: var(--gold);
+}
+
 .top b {
 	color: var(--orange);
 	font-weight: bold;
@@ -706,6 +724,55 @@ td.name {
 
 .bar.thin {
 	height: 4px;
+}
+
+.picker {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 10px;
+}
+
+.picker select {
+	background: var(--bg);
+	color: var(--text);
+	border: 1px solid var(--line);
+	padding: 4px 6px;
+	font: inherit;
+	max-width: 100%;
+}
+
+.board-controls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 4px 12px;
+}
+
+.board-controls .picker {
+	margin-bottom: 0;
+}
+
+.board-controls + .table-wrap,
+.board-controls + .message {
+	margin-top: 10px;
+}
+
+.challenges.single {
+	grid-template-columns: minmax(0, 1fr);
+}
+
+.guide-entry .xp {
+	color: var(--gold);
+}
+
+.guide-earned {
+	margin-top: 4px;
+	font-size: 12px;
+}
+
+.guide-entry.highlight {
+	outline: 1px solid var(--orange);
 }
 
 @media (max-width: 900px) {

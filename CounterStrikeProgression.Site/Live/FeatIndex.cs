@@ -4,6 +4,7 @@ namespace ktsu.CounterStrikeProgression.Site.Live;
 
 using System.Collections.Concurrent;
 using System.Data.Common;
+using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Feats;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Progression;
@@ -59,24 +60,27 @@ internal sealed class FeatIndex
 }
 
 /// <summary>
-/// Fills the <see cref="FeatIndex"/> for every ranked player shortly after start, then every few minutes.
+/// Fills the <see cref="FeatIndex"/> and the <see cref="BoardIndex"/> for every ranked player shortly after start,
+/// then every few minutes.
 /// </summary>
 /// <param name="index">The index to fill.</param>
+/// <param name="boards">The leaderboard tallies to fill.</param>
 /// <param name="reader">Reads the stored progress.</param>
 /// <param name="live">The live state, for progress not yet saved and the plugin's settings.</param>
-internal sealed class FeatRefresher(FeatIndex index, ProgressReader reader, LiveState live) : BackgroundService
+internal sealed class FeatRefresher(FeatIndex index, BoardIndex boards, ProgressReader reader, LiveState live) : BackgroundService
 {
 	/// <summary>How often the whole index is rebuilt.</summary>
 	public static readonly TimeSpan Every = TimeSpan.FromMinutes(5);
 
 	/// <summary>
-	/// Rebuilds the index for every ranked player.
+	/// Rebuilds the indexes for every ranked player.
 	/// </summary>
 	/// <param name="cancellationToken">Stops the rebuild.</param>
 	/// <returns>A task that completes when the rebuild is done.</returns>
 	public async Task RefreshAsync(CancellationToken cancellationToken)
 	{
-		FeatCatalog feats = new(live.Settings);
+		ProgressionSettings settings = live.Settings;
+		FeatCatalog feats = new(settings);
 		IReadOnlyList<RankingEntry> rankings = await reader.RankingsAsync(cancellationToken).ConfigureAwait(false);
 		foreach (RankingEntry entry in rankings)
 		{
@@ -84,9 +88,13 @@ internal sealed class FeatRefresher(FeatIndex index, ProgressReader reader, Live
 			ProgressSnapshot? overlay = live.Overlay(entry.SteamId);
 			if ((stored is not null) || (overlay is not null))
 			{
-				index.Set(entry.SteamId, feats.Earned(ProgressMerge.Merge(stored, overlay)));
+				PlayerProgress merged = ProgressMerge.Merge(stored, overlay);
+				index.Set(entry.SteamId, feats.Earned(merged));
+				boards.Set(merged, settings);
 			}
 		}
+
+		boards.MarkUpdated();
 	}
 
 	/// <inheritdoc/>
