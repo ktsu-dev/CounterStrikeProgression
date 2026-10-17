@@ -14,7 +14,8 @@ using ktsu.CounterStrikeProgression.Core.Progression;
 /// Draws "+XP" text in the world where a player earned it: above the target for hits and kills, and just in
 /// front of the player for XP with no target. Only the player who earned it can see it. Each floatie rises
 /// and fades, and gains on the same target close together add up in one floatie. Floaties are rescaled
-/// every tick by their distance from the player, so they keep the same size on screen.
+/// every tick by their distance from the player, so they keep the same size on screen, and drawn just in front
+/// of the player on their line of sight, so walls don't clip them.
 /// </summary>
 /// <remarks>
 /// World text has no outline, so the stroke is four copies of the text in the stroke color, nudged
@@ -251,7 +252,9 @@ internal sealed class XpFloaties(FloatieSettings settings)
 		}
 	}
 
-	// Puts the text at a position and the stroke copies around it, all sized for the owner's distance.
+	// Puts the text and its stroke copies where the owner sees the floatie's world position. Text kept at a
+	// constant screen size looks identical anywhere along the line of sight, so it's drawn just in front of
+	// the owner's eyes on that line, which keeps walls between them and the target from clipping it.
 	private void Place(Floatie floatie, CCSPlayerPawn ownerPawn, Vector position)
 	{
 		Vector eye = Eye(ownerPawn);
@@ -259,9 +262,12 @@ internal sealed class XpFloaties(FloatieSettings settings)
 		double dy = position.Y - eye.Y;
 		double dz = position.Z - eye.Z;
 		double distance = Math.Sqrt((dx * dx) + (dy * dy) + (dz * dz));
-		Rescale(floatie, distance);
+		double drawDistance = settings.DrawDistance > 0 ? Math.Min(distance, settings.DrawDistance) : distance;
+		double pull = distance > 0.001 ? drawDistance / distance : 1;
+		Vector drawn = new((float)(eye.X + (dx * pull)), (float)(eye.Y + (dy * pull)), (float)(eye.Z + (dz * pull)));
+		Rescale(floatie, drawDistance);
 
-		floatie.Text.Teleport(position, null, null);
+		floatie.Text.Teleport(drawn, null, null);
 		if (floatie.Strokes.Count == 0)
 		{
 			return;
@@ -280,9 +286,9 @@ internal sealed class XpFloaties(FloatieSettings settings)
 			(int right, int up) = StrokeDirections[i % StrokeDirections.Length];
 			floatie.Strokes[i].Teleport(
 				new Vector(
-					(float)(position.X + (rightX * offset * right) + (awayX * depth)),
-					(float)(position.Y + (rightY * offset * right) + (awayY * depth)),
-					(float)(position.Z + (offset * up) + (awayZ * depth))),
+					(float)(drawn.X + (rightX * offset * right) + (awayX * depth)),
+					(float)(drawn.Y + (rightY * offset * right) + (awayY * depth)),
+					(float)(drawn.Z + (offset * up) + (awayZ * depth))),
 				null,
 				null);
 		}
