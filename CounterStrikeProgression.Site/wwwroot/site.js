@@ -1249,14 +1249,20 @@
 				const tr = el("tr", !current && row.position <= 3 ? `place-${row.position}` : null);
 				tr.append(
 					cell("num", row.position),
-					cell("name", playerLink(row.steamId, row.name)),
+					cell("name", (() => {
+						const span = el("span");
+						span.append(playerLink(row.steamId, row.name));
+						if (row.online) {
+							span.append(" ", el("span", "online", "online"));
+						}
+						return span;
+					})()),
 					cell(null, rankBadge(row.rank, row.rankName)),
 					cell("num", formatXp(row.xp)),
-					cell(row.online ? "online" : null, row.online ? "online" : ""),
 				);
 				return tr;
 			});
-			body.replaceChildren(intro, table([["#", "num"], ["Player"], ["Rank"], ["Season XP", "num"], [""]], trs));
+			body.replaceChildren(intro, table([["#", "num"], ["Player"], ["Rank"], ["Season XP", "num"]], trs));
 		}
 
 		async function load() {
