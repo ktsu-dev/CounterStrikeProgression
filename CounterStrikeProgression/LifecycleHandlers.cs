@@ -81,6 +81,7 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 			}
 		}
 
+		RankTags.Refresh(session);
 		session.Combat.Reset();
 		session.WasScoped = false;
 		session.LastWeaponIndex = 0;
@@ -92,6 +93,7 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 		if (Sessions.Get(@event.Userid) is PlayerSession session)
 		{
 			services.Panel.Close(@event.Userid, session);
+			RankTags.Refresh(session);
 		}
 
 		return HookResult.Continue;
@@ -139,6 +141,7 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 				TrackPawn(session, pawn, now);
 			}
 
+			services.RankTags.Tick(player, session);
 			services.Panel.Tick(player, session);
 		}
 

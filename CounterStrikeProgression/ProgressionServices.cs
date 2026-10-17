@@ -37,6 +37,9 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	/// <summary>Gets the floating "+XP" text.</summary>
 	public XpFloaties Floaties { get; } = new(config.Floaties);
 
+	/// <summary>Gets the rank clan tags and chat prefixes.</summary>
+	public RankTags RankTags { get; } = new(config.RankTags, sessions);
+
 	/// <summary>Gets the round's kills.</summary>
 	public RoundTracker Round { get; } = new(config.Progression);
 
