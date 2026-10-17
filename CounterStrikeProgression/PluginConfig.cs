@@ -84,7 +84,7 @@ public sealed class FloatieSettings
 
 	/// <summary>Gets or sets where floaties appear.</summary>
 	[JsonConverter(typeof(JsonStringEnumConverter<FloatieMode>))]
-	public FloatieMode Mode { get; set; } = FloatieMode.Hud;
+	public FloatieMode Mode { get; set; } = FloatieMode.World;
 
 	/// <summary>Gets or sets how far in front of the eyes a HUD floatie appears, in units.</summary>
 	public double HudDistance { get; set; } = 20;
@@ -117,11 +117,16 @@ public sealed class FloatieSettings
 	public float FontSize { get; set; } = 48;
 
 	/// <summary>
-	/// Gets or sets how big floaties look on screen. A floatie is scaled by this times its distance from the
-	/// player every tick, so it stays the same size on screen however near or far it is. The default draws the
-	/// number about 21 pixels tall at 1080p with the default font size.
+	/// Gets or sets how much bigger a floatie is drawn per unit of distance, so far ones stay readable. The size
+	/// is set once, when the floatie appears, and it keeps that size in the world as the player moves.
 	/// </summary>
-	public double ScreenSize { get; set; } = 0.0006;
+	public double SizePerUnitOfDistance { get; set; } = 0.00022;
+
+	/// <summary>Gets or sets the smallest world units per pixel, for floaties close by.</summary>
+	public double MinWorldUnitsPerPixel { get; set; } = 0.025;
+
+	/// <summary>Gets or sets the largest world units per pixel, for floaties far away.</summary>
+	public double MaxWorldUnitsPerPixel { get; set; } = 0.6;
 
 	/// <summary>
 	/// Gets or sets how far from the player's eyes floaties are drawn, in units. A floatie lands in the same spot

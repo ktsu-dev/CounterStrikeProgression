@@ -89,7 +89,7 @@ Settings left out keep their defaults.
 
 ### Panel placement
 
-`Floaties` picks `Hud` (the default) or `World` mode, turns the floating XP text on or off, and sets how long it lasts, how far it rises, how quickly gains merge, how many one player can have at once, its colors, `ScreenSize`, and the outline (`StrokeWidthPixels`, `StrokeColor`, `StrokeOpacity`). In `Hud` mode a floatie appears just above the crosshair and stays at that spot as you move, and new XP adds to it while your crosshair stays within `HudReuseDegrees` of where it appeared. Floaties keep the same size on screen at any distance and have a half-opacity black outline for contrast.
+`Floaties` picks `World` (the default) or `Hud` mode, turns the floating XP text on or off, and sets how long it lasts, how far it rises, how quickly gains merge, how many one player can have at once, its colors, how big it's drawn by distance (`SizePerUnitOfDistance`, `MinWorldUnitsPerPixel`, `MaxWorldUnitsPerPixel`), and the outline (`StrokeWidthPixels`, `StrokeColor`, `StrokeOpacity`). In `Hud` mode a floatie appears just above the crosshair and stays at that spot as you move, and new XP adds to it while your crosshair stays within `HudReuseDegrees` of where it appeared. In `World` mode a floatie appears above the target, or in front of you for XP with no target. A floatie's size is set when it appears and doesn't change after, and it has a half-opacity black outline for contrast.
 
 `Panel` sets the draw mode (`Auto`, `WorldText`, `CenterHtml`, or `Chat`), how many lines each mode shows, and the side panel's font size, scale, color, and offsets. The default placement suits a 16:9 display. CS2 has no client-predicted anchor for world text, so the side panel trails slightly behind fast turns.
 

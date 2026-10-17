@@ -16,8 +16,8 @@ using ktsu.CounterStrikeProgression.Core.Progression;
 /// add up in it while the crosshair stays near where it appeared. In <see cref="FloatieMode.World"/> mode it
 /// appears above the target for hits and kills, and just in front of the player for XP with no target, and
 /// gains on the same target close together add up in one floatie. Only the player who earned it can see it.
-/// Each floatie rises and fades. Floaties are rescaled
-/// every tick by their distance from the player, so they keep the same size on screen. With a
+/// Each floatie rises and fades. Its size is set by its distance from the player when it appears, and it
+/// keeps that size in the world, so it looks bigger as the player walks towards it. With a
 /// <see cref="FloatieSettings.DrawDistance"/> set, they're drawn that close on the player's line of sight, so
 /// walls don't clip them.
 /// </summary>
@@ -32,12 +32,6 @@ internal sealed class XpFloaties(FloatieSettings settings)
 {
 	// A floatie above a player sits roughly at head height.
 	private const float HeadHeight = 72;
-
-	// Rescaling sends the new size to the client, so it's skipped until the size has drifted this far.
-	private const double RescaleThreshold = 0.03;
-
-	// Keeps a floatie at the player's own position from shrinking to nothing.
-	private const double MinWorldUnitsPerPixel = 0.001;
 
 	// How far behind the main text, in pixels at its scale, the stroke copies sit so they draw underneath.
 	private const double StrokeDepthPixels = 1.5;
@@ -282,7 +276,6 @@ internal sealed class XpFloaties(FloatieSettings settings)
 		double drawDistance = settings.DrawDistance > 0 ? Math.Min(distance, settings.DrawDistance) : distance;
 		double pull = distance > 0.001 ? drawDistance / distance : 1;
 		Vector drawn = new((float)(eye.X + (dx * pull)), (float)(eye.Y + (dy * pull)), (float)(eye.Z + (dz * pull)));
-		Rescale(floatie, drawDistance);
 
 		floatie.Text.Teleport(drawn, null, null);
 		if (floatie.Strokes.Count == 0)
@@ -369,24 +362,9 @@ internal sealed class XpFloaties(FloatieSettings settings)
 			eye.Z);
 	}
 
-	private void Rescale(Floatie floatie, double distance)
-	{
-		double scale = ScaleFor(distance);
-		if (Math.Abs(scale - floatie.Scale) <= (floatie.Scale * RescaleThreshold))
-		{
-			return;
-		}
-
-		floatie.Scale = scale;
-		foreach (CPointWorldText layer in floatie.Layers)
-		{
-			layer.WorldUnitsPerPx = (float)scale;
-			Utilities.SetStateChanged(layer, "CPointWorldText", "m_flWorldUnitsPerPx");
-		}
-	}
-
-	// World units per pixel proportional to distance is what holds the on-screen size constant.
-	private double ScaleFor(double distance) => Math.Max(MinWorldUnitsPerPixel, distance * settings.ScreenSize);
+	// Bigger with distance, so a floatie across the map is still readable when it appears.
+	private double ScaleFor(double distance) =>
+		Math.Clamp(distance * settings.SizePerUnitOfDistance, settings.MinWorldUnitsPerPixel, settings.MaxWorldUnitsPerPixel);
 
 	private static Vector Eye(CCSPlayerPawn pawn)
 	{
