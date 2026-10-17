@@ -13,13 +13,20 @@ using ktsu.CounterStrikeProgression.Core.Progression;
 /// <summary>
 /// Draws "+XP" text in the world where a player earned it: above the target for hits and kills, and just in
 /// front of the player for XP with no target. Only the player who earned it can see it. Each floatie rises
-/// and fades, and gains on the same target close together add up in one floatie.
+/// and fades, and gains on the same target close together add up in one floatie. Floaties are rescaled
+/// every tick by their distance from the player, so they keep the same size on screen.
 /// </summary>
 /// <param name="settings">How floaties look and how long they last.</param>
 internal sealed class XpFloaties(FloatieSettings settings)
 {
 	// A floatie above a player sits roughly at head height.
 	private const float HeadHeight = 72;
+
+	// Rescaling sends the new size to the client, so it's skipped until the size has drifted this far.
+	private const double RescaleThreshold = 0.03;
+
+	// Keeps a floatie at the player's own position from shrinking to nothing.
+	private const double MinWorldUnitsPerPixel = 0.001;
 
 	private readonly List<Floatie> active = [];
 	private readonly Dictionary<int, FloatieMerger> mergers = [];
@@ -78,7 +85,7 @@ internal sealed class XpFloaties(FloatieSettings settings)
 			return;
 		}
 
-		active.Add(new Floatie(entity, owner.Slot, key, anchor) { Born = now, Highlight = update.Highlight });
+		active.Add(new Floatie(entity, owner.Slot, key, anchor) { Born = now, Highlight = update.Highlight, Scale = entity.WorldUnitsPerPx });
 		RefreshShown();
 	}
 
@@ -109,6 +116,7 @@ internal sealed class XpFloaties(FloatieSettings settings)
 			double progress = age / settings.LifetimeSeconds;
 			Vector position = new(floatie.Anchor.X, floatie.Anchor.Y, (float)(floatie.Anchor.Z + (settings.RiseUnits * progress)));
 			floatie.Entity.Teleport(position, null, null);
+			Rescale(floatie, position);
 
 			// Fully opaque for the first part of its life, then fading out.
 			const double FadeStart = 0.6;
@@ -172,14 +180,12 @@ internal sealed class XpFloaties(FloatieSettings settings)
 
 		try
 		{
-			// Sized by distance, so a floatie across the map is as readable as one up close.
-			double distance = Distance(ownerPawn, anchor);
 			entity.MessageText = update.Text;
 			entity.Enabled = true;
 			entity.Fullbright = true;
 			entity.FontSize = settings.FontSize;
 			entity.FontName = "Arial Bold";
-			entity.WorldUnitsPerPx = (float)Math.Clamp(distance * settings.SizePerUnitOfDistance, settings.MinWorldUnitsPerPixel, settings.MaxWorldUnitsPerPixel);
+			entity.WorldUnitsPerPx = (float)ScaleFor(Distance(ownerPawn, anchor));
 			entity.Color = ColorFor(update.Highlight, 255);
 			entity.JustifyHorizontal = PointWorldTextJustifyHorizontal_t.POINT_WORLD_TEXT_JUSTIFY_HORIZONTAL_CENTER;
 			entity.JustifyVertical = PointWorldTextJustifyVertical_t.POINT_WORLD_TEXT_JUSTIFY_VERTICAL_BOTTOM;
@@ -207,6 +213,27 @@ internal sealed class XpFloaties(FloatieSettings settings)
 			(float)(origin.Y + (Math.Sin(yaw) * settings.SelfDistance)),
 			origin.Z + pawn.ViewOffset.Z);
 	}
+
+	private void Rescale(Floatie floatie, Vector position)
+	{
+		if (GameState.PawnOf(Utilities.GetPlayerFromSlot(floatie.Owner)) is not CCSPlayerPawn pawn)
+		{
+			return;
+		}
+
+		double scale = ScaleFor(Distance(pawn, position));
+		if (Math.Abs(scale - floatie.Scale) <= (floatie.Scale * RescaleThreshold))
+		{
+			return;
+		}
+
+		floatie.Scale = scale;
+		floatie.Entity.WorldUnitsPerPx = (float)scale;
+		Utilities.SetStateChanged(floatie.Entity, "CPointWorldText", "m_flWorldUnitsPerPx");
+	}
+
+	// World units per pixel proportional to distance is what holds the on-screen size constant.
+	private double ScaleFor(double distance) => Math.Max(MinWorldUnitsPerPixel, distance * settings.ScreenSize);
 
 	private static double Distance(CCSPlayerPawn pawn, Vector point)
 	{
@@ -264,5 +291,7 @@ internal sealed class XpFloaties(FloatieSettings settings)
 		public double Born { get; set; }
 
 		public bool Highlight { get; set; }
+
+		public double Scale { get; set; }
 	}
 }

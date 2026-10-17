@@ -89,7 +89,7 @@ Settings left out keep their defaults.
 
 ### Panel placement
 
-`Floaties` turns the floating XP text on or off and sets how long it lasts, how far it rises, how quickly gains merge, how many one player can have at once, and its colors.
+`Floaties` turns the floating XP text on or off and sets how long it lasts, how far it rises, how quickly gains merge, how many one player can have at once, its colors, and `ScreenSize`. Floaties keep the same size on screen at any distance.
 
 `Panel` sets the draw mode (`Auto`, `WorldText`, `CenterHtml`, or `Chat`), how many lines each mode shows, and the side panel's font size, scale, color, and offsets. The default placement suits a 16:9 display. CS2 has no client-predicted anchor for world text, so the side panel trails slightly behind fast turns.
 

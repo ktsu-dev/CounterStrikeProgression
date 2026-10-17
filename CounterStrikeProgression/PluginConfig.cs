@@ -85,14 +85,12 @@ public sealed class FloatieSettings
 	/// <summary>Gets or sets the font size.</summary>
 	public float FontSize { get; set; } = 48;
 
-	/// <summary>Gets or sets how much bigger a floatie is drawn per unit of distance, so far ones stay readable.</summary>
-	public double SizePerUnitOfDistance { get; set; } = 0.00022;
-
-	/// <summary>Gets or sets the smallest world units per pixel, for floaties close by.</summary>
-	public double MinWorldUnitsPerPixel { get; set; } = 0.025;
-
-	/// <summary>Gets or sets the largest world units per pixel, for floaties far away.</summary>
-	public double MaxWorldUnitsPerPixel { get; set; } = 0.6;
+	/// <summary>
+	/// Gets or sets how big floaties look on screen. A floatie is scaled by this times its distance from the
+	/// player every tick, so it stays the same size on screen however near or far it is. The default draws the
+	/// number about 28 pixels tall at 1080p with the default font size.
+	/// </summary>
+	public double ScreenSize { get; set; } = 0.0008;
 
 	/// <summary>Gets or sets how far in front of the player a floatie with no target appears, in units.</summary>
 	public double SelfDistance { get; set; } = 90;
