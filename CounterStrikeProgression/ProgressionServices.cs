@@ -6,6 +6,7 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using ktsu.CounterStrikeProgression.Core.Floaties;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.Tracking;
 using ktsu.CounterStrikeProgression.Panel;
 using ktsu.CounterStrikeProgression.Site;
@@ -69,10 +70,40 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 		}
 
 		session.MapXp += result.XpEarned;
+		session.Recap.Add(result);
 		Site?.Record(session, player.PlayerName ?? string.Empty, result);
 		PanelPresenter.Invalidate(session);
 		Floaties.Show(player, result, floatieKey, at);
 		announcer.Announce(player, session, result);
+	}
+
+	/// <summary>
+	/// Ends a player's map recap, sends it to the site, and tells them about it. A session that earned
+	/// nothing just starts over.
+	/// </summary>
+	/// <param name="session">The player's session.</param>
+	/// <param name="player">The player, or <see langword="null"/> when their controller is already gone.</param>
+	/// <param name="map">The map played.</param>
+	/// <param name="announce">Whether to tell the player in chat.</param>
+	public void FinishRecap(PlayerSession session, CCSPlayerController? player, string map, bool announce)
+	{
+		Ensure.NotNull(session);
+		DateTime now = DateTime.UtcNow;
+		if (session.Recap.IsEmpty)
+		{
+			session.Recap.Restart(now);
+			return;
+		}
+
+		bool valid = player is { IsValid: true };
+		CSMatchStats_t? stats = valid ? player!.ActionTrackingServices?.MatchStats : null;
+		string name = (valid ? player!.PlayerName : null) ?? session.Progress?.Name ?? string.Empty;
+		MapRecap recap = session.Recap.Finish(session.SteamId, name, map, stats?.Kills ?? 0, stats?.Deaths ?? 0, now);
+		Site?.Record(recap);
+		if (announce && valid)
+		{
+			announcer.AnnounceRecap(player!, recap);
+		}
 	}
 
 	/// <summary>

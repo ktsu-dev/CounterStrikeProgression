@@ -211,4 +211,7 @@ public sealed class PluginConfig : BasePluginConfig
 
 	/// <summary>Gets or sets a value indicating whether common skill shots are announced to the player who earned them.</summary>
 	public bool AnnounceCommonSkillShots { get; set; }
+
+	/// <summary>Gets or sets a value indicating whether each player gets a one-line recap of what they earned when the map ends.</summary>
+	public bool AnnounceMapRecap { get; set; } = true;
 }

@@ -5,10 +5,12 @@ namespace ktsu.CounterStrikeProgression.Site.Live;
 using System.Globalization;
 using System.Text.Json;
 using ktsu.CounterStrikeProgression.Core.Live;
+using ktsu.CounterStrikeProgression.Core.Recap;
 
 /// <summary>
-/// Keeps the feed history in a JSON file, and each player's feed in a <c>players</c> folder next to it, one
-/// file per player, so both survive a restart and a batch rewrites only the players it touched.
+/// Keeps the feed history in a JSON file, each player's feed in a <c>players</c> folder next to it, one
+/// file per player, and each player's last map recap in a <c>recaps.json</c> beside it, so all of it
+/// survives a restart and a batch rewrites only the players it touched.
 /// </summary>
 /// <param name="path">The file to read and write.</param>
 internal sealed class FeedStore(string path)
@@ -18,6 +20,9 @@ internal sealed class FeedStore(string path)
 
 	/// <summary>Gets the folder each player's feed is kept in.</summary>
 	public string PlayersPath { get; } = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path) ?? string.Empty, "players");
+
+	/// <summary>Gets the file each player's last map recap is kept in.</summary>
+	public string RecapsPath { get; } = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path) ?? string.Empty, "recaps.json");
 
 	/// <summary>
 	/// Reads the saved entries.
@@ -76,10 +81,24 @@ internal sealed class FeedStore(string path)
 	/// <param name="steamId">The player's 64-bit Steam ID.</param>
 	public void DeletePlayer(ulong steamId) => File.Delete(PlayerFile(steamId));
 
+	/// <summary>
+	/// Reads every player's last map recap.
+	/// </summary>
+	/// <returns>The recaps, or an empty list when the file is missing or unreadable.</returns>
+	public IReadOnlyList<MapRecap> LoadRecaps() => Read<MapRecap>(RecapsPath);
+
+	/// <summary>
+	/// Replaces the saved recaps, the same way <see cref="Save"/> does.
+	/// </summary>
+	/// <param name="recaps">The recaps to save.</param>
+	public void SaveRecaps(IReadOnlyList<MapRecap> recaps) => Write(RecapsPath, recaps);
+
 	private string PlayerFile(ulong steamId) =>
 		System.IO.Path.Combine(PlayersPath, steamId.ToString(CultureInfo.InvariantCulture) + ".json");
 
-	private static List<FeedEntry> Read(string file)
+	private static List<FeedEntry> Read(string file) => Read<FeedEntry>(file);
+
+	private static List<T> Read<T>(string file)
 	{
 		try
 		{
@@ -89,7 +108,7 @@ internal sealed class FeedStore(string path)
 			}
 
 			using FileStream stream = File.OpenRead(file);
-			return JsonSerializer.Deserialize<List<FeedEntry>>(stream, LiveJson.Options) ?? [];
+			return JsonSerializer.Deserialize<List<T>>(stream, LiveJson.Options) ?? [];
 		}
 		catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
 		{
@@ -97,7 +116,7 @@ internal sealed class FeedStore(string path)
 		}
 	}
 
-	private static void Write(string file, IReadOnlyList<FeedEntry> entries)
+	private static void Write<T>(string file, IReadOnlyList<T> entries)
 	{
 		Ensure.NotNull(entries);
 
