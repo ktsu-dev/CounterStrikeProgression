@@ -112,6 +112,25 @@ internal interface IProgressionStore
 	public Task<IReadOnlyList<RankingEntry>> RankingsAsync(int count, CancellationToken cancellationToken);
 
 	/// <summary>
+	/// Gets a player's daily rows from a day on, with the latest row before it and their earliest row, so
+	/// <see cref="XpHistory"/> can tell what they earned on the first day.
+	/// </summary>
+	/// <param name="steamId">The 64-bit Steam ID.</param>
+	/// <param name="from">The first day wanted.</param>
+	/// <param name="cancellationToken">Cancels the operation.</param>
+	/// <returns>The rows, earliest first.</returns>
+	public Task<IReadOnlyList<DailyXp>> HistoryAsync(ulong steamId, DateOnly from, CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Gets the players who earned the most rank XP from a day on, measured as <see cref="XpHistory.GainedSince"/> does.
+	/// </summary>
+	/// <param name="start">The first day to count.</param>
+	/// <param name="count">How many to return.</param>
+	/// <param name="cancellationToken">Cancels the operation.</param>
+	/// <returns>The players who earned any, most first and then by Steam ID.</returns>
+	public Task<IReadOnlyList<XpGainEntry>> GainsSinceAsync(DateOnly start, int count, CancellationToken cancellationToken);
+
+	/// <summary>
 	/// Gets the players who earned the most rank XP in one season, ordered by that XP and then Steam ID.
 	/// </summary>
 	/// <param name="start">The season's first day.</param>

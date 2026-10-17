@@ -8,6 +8,11 @@ using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 using MySqlConnector;
 
+/// <summary>A <c>csp_daily</c> row as read, with the day as the <see cref="DateTime"/> the driver returns.</summary>
+/// <param name="Day">The day, at midnight.</param>
+/// <param name="RankXp">The rank XP at the end of the day.</param>
+internal sealed record DailyRow(DateTime Day, long RankXp);
+
 /// <summary>
 /// Keeps progress in MariaDB or MySQL, in tables prefixed <c>csp_</c>.
 /// </summary>
@@ -57,6 +62,13 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			PRIMARY KEY (steam_id, weapon, challenge)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+		CREATE TABLE IF NOT EXISTS csp_daily (
+			steam_id BIGINT UNSIGNED NOT NULL,
+			day DATE NOT NULL,
+			rank_xp BIGINT NOT NULL DEFAULT 0,
+			PRIMARY KEY (steam_id, day)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 		CREATE TABLE IF NOT EXISTS csp_seasons (
 			steam_id BIGINT UNSIGNED NOT NULL,
 			season_start DATE NOT NULL,
@@ -68,6 +80,19 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		INSERT IGNORE INTO csp_schema (id, version) VALUES (1, @version);
 		""";
 
+	/// <summary>
+	/// Gives each player who has no daily rows yet, such as everyone who played before the table existed, one
+	/// starting row with their current total, dated the day before they were last seen. Without it their whole
+	/// total would count as earned on the next day they play. The row sits before any day a later save writes,
+	/// so it's never overwritten.
+	/// </summary>
+	private const string SeedDaily = """
+		INSERT IGNORE INTO csp_daily (steam_id, day, rank_xp)
+		SELECT p.steam_id, DATE(p.last_seen) - INTERVAL 1 DAY, p.rank_xp
+		FROM csp_players p
+		WHERE NOT EXISTS (SELECT 1 FROM csp_daily d WHERE d.steam_id = p.steam_id);
+		""";
+
 	private const string MigrateToStagedRanks = """
 		UPDATE csp_players SET rank_index = 0 WHERE (SELECT version FROM csp_schema WHERE id = 1) < 3;
 		UPDATE csp_schema SET version = 3 WHERE id = 1 AND version < 3;
@@ -77,6 +102,41 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		INSERT INTO csp_players (steam_id, name, rank_xp, rank_index, first_seen, last_seen)
 		VALUES (@SteamId, @Name, @RankXp, @Rank, @FirstSeen, @LastSeen)
 		ON DUPLICATE KEY UPDATE name = VALUES(name), rank_xp = VALUES(rank_xp), rank_index = VALUES(rank_index), last_seen = VALUES(last_seen);
+		""";
+
+	private const string UpsertDaily = """
+		INSERT INTO csp_daily (steam_id, day, rank_xp)
+		VALUES (@SteamId, DATE(@LastSeen), @RankXp)
+		ON DUPLICATE KEY UPDATE rank_xp = VALUES(rank_xp);
+		""";
+
+	private const string SelectHistory = """
+		(SELECT day AS Day, rank_xp AS RankXp FROM csp_daily WHERE steam_id = @steamId AND day < @from ORDER BY day DESC LIMIT 1)
+		UNION
+		(SELECT day AS Day, rank_xp AS RankXp FROM csp_daily WHERE steam_id = @steamId ORDER BY day ASC LIMIT 1)
+		UNION
+		(SELECT day AS Day, rank_xp AS RankXp FROM csp_daily WHERE steam_id = @steamId AND day >= @from)
+		ORDER BY Day
+		""";
+
+	/// <summary>
+	/// The same rule as <see cref="XpHistory.Baseline"/>: the latest row before the start, else 0 for a player first
+	/// seen since, else their earliest row, else their current total.
+	/// </summary>
+	private const string SelectGains = """
+		SELECT SteamId, Name, RankXp, `Rank`, Gained FROM (
+			SELECT p.steam_id AS SteamId, p.name AS Name, p.rank_xp AS RankXp, p.rank_index AS `Rank`,
+				p.rank_xp - COALESCE(
+					(SELECT d.rank_xp FROM csp_daily d WHERE d.steam_id = p.steam_id AND d.day < @start ORDER BY d.day DESC LIMIT 1),
+					IF(p.first_seen >= @start, 0, NULL),
+					(SELECT d.rank_xp FROM csp_daily d WHERE d.steam_id = p.steam_id ORDER BY d.day ASC LIMIT 1),
+					p.rank_xp) AS Gained
+			FROM csp_players p
+			WHERE p.last_seen >= @start
+		) g
+		WHERE Gained > 0
+		ORDER BY Gained DESC, SteamId ASC
+		LIMIT @count
 		""";
 
 	private const string UpsertWeapon = """
@@ -116,10 +176,16 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		ORDER BY s.season_start DESC
 		""";
 
+	/// <summary>
+	/// Clears a player's rows for a reset. Their daily history starts again from the day before, so the XP they
+	/// keep isn't counted as earned.
+	/// </summary>
 	private const string DeletePlayerRows = """
 		DELETE FROM csp_challenges WHERE steam_id = @SteamId;
 		DELETE FROM csp_weapons WHERE steam_id = @SteamId;
 		DELETE FROM csp_seasons WHERE steam_id = @SteamId;
+		DELETE FROM csp_daily WHERE steam_id = @SteamId;
+		INSERT INTO csp_daily (steam_id, day, rank_xp) VALUES (@SteamId, DATE(@LastSeen) - INTERVAL 1 DAY, @RankXp);
 		""";
 
 	private readonly string connectionString = ConnectionStringFor(settings);
@@ -157,6 +223,7 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		MySqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
 		await using ConfiguredAsyncDisposable transactionScope = transaction.ConfigureAwait(false);
 		await connection.ExecuteAsync(new CommandDefinition(MigrateToStagedRanks, transaction: transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+		await connection.ExecuteAsync(new CommandDefinition(SeedDaily, transaction: transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
 		await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 	}
 
@@ -211,6 +278,7 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		if (snapshot.Player is not null)
 		{
 			await connection.ExecuteAsync(new CommandDefinition(UpsertPlayer, snapshot.Player, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+			await connection.ExecuteAsync(new CommandDefinition(UpsertDaily, snapshot.Player, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
 		}
 
 		if (snapshot.Weapons.Count > 0)
@@ -241,7 +309,7 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		MySqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
 		await using ConfiguredAsyncDisposable transactionScope = transaction.ConfigureAwait(false);
 
-		await connection.ExecuteAsync(new CommandDefinition(DeletePlayerRows, new { player.SteamId }, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+		await connection.ExecuteAsync(new CommandDefinition(DeletePlayerRows, new { player.SteamId, player.LastSeen, player.RankXp }, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
 		await connection.ExecuteAsync(new CommandDefinition(UpsertPlayer, player, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
 		await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 	}
@@ -281,6 +349,30 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			new { count },
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 		return [.. rankings];
+	}
+
+	/// <inheritdoc/>
+	public async Task<IReadOnlyList<DailyXp>> HistoryAsync(ulong steamId, DateOnly from, CancellationToken cancellationToken)
+	{
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		IEnumerable<DailyRow> rows = await connection.QueryAsync<DailyRow>(new CommandDefinition(
+			SelectHistory,
+			new { steamId, from = from.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc) },
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+		return [.. rows.Select(r => new DailyXp(DateOnly.FromDateTime(r.Day), r.RankXp))];
+	}
+
+	/// <inheritdoc/>
+	public async Task<IReadOnlyList<XpGainEntry>> GainsSinceAsync(DateOnly start, int count, CancellationToken cancellationToken)
+	{
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		IEnumerable<XpGainEntry> gains = await connection.QueryAsync<XpGainEntry>(new CommandDefinition(
+			SelectGains,
+			new { start = start.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc), count },
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+		return [.. gains];
 	}
 
 	/// <inheritdoc/>

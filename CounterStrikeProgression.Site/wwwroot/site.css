@@ -871,3 +871,80 @@ tr.place-3 td.num:first-child {
 		width: 60px;
 	}
 }
+
+.spans {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.chart-box {
+	margin: 0 0 16px;
+}
+
+.chart-box figcaption {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	gap: 4px 12px;
+	margin-bottom: 4px;
+	font-size: 12px;
+	letter-spacing: 1px;
+	text-transform: uppercase;
+}
+
+.chart-box figcaption .muted {
+	text-transform: none;
+	letter-spacing: 0;
+}
+
+.chart {
+	display: block;
+	width: 100%;
+	height: auto;
+	background: var(--bg);
+	touch-action: pan-y;
+}
+
+.chart .grid {
+	stroke: var(--line);
+	stroke-width: 1;
+}
+
+.chart .axis {
+	fill: var(--muted);
+	font-size: 11px;
+}
+
+.chart .mark {
+	fill: var(--orange);
+}
+
+.chart .line {
+	fill: none;
+	stroke: var(--orange);
+	stroke-width: 2;
+	stroke-linejoin: round;
+}
+
+.chart .area {
+	fill: var(--orange);
+	opacity: 0.12;
+}
+
+.chart .guide {
+	stroke: var(--muted);
+	stroke-width: 1;
+	stroke-dasharray: 3 3;
+}
+
+.chart .dot {
+	fill: var(--orange);
+	stroke: var(--panel);
+	stroke-width: 2;
+}
+
+.chart .hit {
+	fill: transparent;
+	pointer-events: all;
+}

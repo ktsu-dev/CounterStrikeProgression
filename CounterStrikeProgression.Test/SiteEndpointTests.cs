@@ -503,6 +503,10 @@ public sealed class SiteEndpointTests
 
 		public Task<IReadOnlyList<RankingEntry>> RankingsAsync(int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<RankingEntry>>([]);
 
+		public Task<IReadOnlyList<DailyXp>> HistoryAsync(ulong steamId, DateOnly from, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<DailyXp>>([]);
+
+		public Task<IReadOnlyList<XpGainEntry>> GainsSinceAsync(DateOnly start, int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<XpGainEntry>>([]);
+
 		public Task<IReadOnlyList<SeasonStanding>> SeasonStandingsAsync(DateOnly start, int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<SeasonStanding>>([]);
 
 		public Task<IReadOnlyList<SeasonResult>> SeasonResultsAsync(ulong steamId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<SeasonResult>>([]);
