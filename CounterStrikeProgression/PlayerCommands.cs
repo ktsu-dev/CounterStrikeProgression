@@ -167,14 +167,13 @@ internal sealed class PlayerCommands(ProgressionServices services, string module
 		}
 
 		// Only connected players, whose progress is already in memory, so a lookup never waits on the database.
-		List<(CCSPlayerController Player, PlayerProgress Progress)> online = [];
-		foreach (CCSPlayerController other in Utilities.GetPlayers())
-		{
-			if ((services.Sessions.Get(other) is PlayerSession session) && (session.Progress is PlayerProgress progress))
-			{
-				online.Add((other, progress));
-			}
-		}
+		List<(CCSPlayerController Player, PlayerProgress Progress)> online =
+		[
+			.. Utilities.GetPlayers()
+				.Select(other => (Player: other, services.Sessions.Get(other)?.Progress))
+				.Where(o => o.Progress is not null)
+				.Select(o => (o.Player, o.Progress!)),
+		];
 
 		List<(CCSPlayerController Player, PlayerProgress Progress)> matches =
 			[.. online.Where(o => string.Equals(o.Player.PlayerName, query, StringComparison.OrdinalIgnoreCase))];
