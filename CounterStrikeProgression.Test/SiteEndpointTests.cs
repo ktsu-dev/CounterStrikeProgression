@@ -494,6 +494,8 @@ public sealed class SiteEndpointTests
 
 		public Task SaveAsync(ProgressSnapshot snapshot, CancellationToken cancellationToken) => Task.CompletedTask;
 
+		public Task ResetAsync(PlayerRow player, CancellationToken cancellationToken) => Task.CompletedTask;
+
 		public Task<IReadOnlyList<LeaderboardEntry>> TopAsync(int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<LeaderboardEntry>>([]);
 
 		public Task<IReadOnlyList<WeaponLeaderboardEntry>> TopByWeaponAsync(WeaponKey weapon, int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<WeaponLeaderboardEntry>>([]);
