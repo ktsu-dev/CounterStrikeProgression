@@ -1,6 +1,6 @@
-## v1.13.0 (minor)
+## v1.13.1 (patch)
 
-Changes since v1.12.0:
+Changes since v1.13.0:
 
-- [minor] Add daily and weekly contracts (#13) (matt-edmondson)
+- [patch] Keep featured weapons to extra weapon XP, not faster ladders (matt-edmondson)
 
