@@ -51,6 +51,7 @@ Nothing goes to NuGet. ktsu.Sdk marks every library packable from its targets, a
 - **`Core/Tracking/`:** `RoundTracker` (opening kills, multi-kills, collaterals, trades, clutches), `PlayerCombatTracker` (landing, scope, weapon switch, reload, flick), and `LifeTracker` (per-life accuracy).
 - **`Core/Storage/`:** `ProgressSnapshot` (dirty rows copied on the game thread), `MySqlProgressionStore`, and `InMemoryProgressionStore`.
 - **`Core/Discord/`:** `DiscordMessages` picks the feats, epic skill shots, and rank-ups worth posting, and `DiscordSender` posts them to the optional webhook from the thread pool.
+- **`Core/Rotation/Season.cs`:** seasons, which start on 1 January and every `SeasonMonths` months after. Every point of rank XP also counts toward the current season (`PlayerProgress.SeasonXp`, saved to `csp_seasons`), while lifetime rank never resets. The site's `/seasons` page ranks a season, and the player page shows this season's place and every top 3 finish.
 - **`Core/Panel/`:** `PanelBuilder` builds the pages, and `PanelFormatter` renders plain text, center HTML, or chat.
 - **`Core/Recap/`:** `RecapTracker` adds up what each player earns over a map, and `MapRecap` is the result: a chat line at the win panel (`PanelFormatter.ToRecapChat`), and the "Last session" the site keeps per player in `recaps.json`.
 - **`CounterStrikeProgression/CombatHandlers.cs`:** the combat events that become `CombatEvent` snapshots.

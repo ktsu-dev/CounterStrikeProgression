@@ -180,7 +180,7 @@ The image listens on two ports:
 
 Point the health probe at `/healthz` on port 8080. Port 8081 answers nothing but the ingest route, so a probe there always fails.
 
-The site reads progress from the plugin's database and never writes to it. Give it a user with `SELECT` on `csp_players`, `csp_weapons`, and `csp_challenges` and nothing else. The live state and the feed history live in the site's memory and in a file under `/data`, so mount a volume there if the feed should survive a restart. The image runs as the non-root user with UID 1654, so that user must be able to write to the volume (in Kubernetes, set the pod's `fsGroup` to 1654).
+The site reads progress from the plugin's database and never writes to it. Give it a user with `SELECT` on `csp_players`, `csp_weapons`, `csp_challenges`, and `csp_seasons` and nothing else. The live state and the feed history live in the site's memory and in a file under `/data`, so mount a volume there if the feed should survive a restart. The image runs as the non-root user with UID 1654, so that user must be able to write to the volume (in Kubernetes, set the pod's `fsGroup` to 1654).
 
 Configure the site with environment variables:
 
@@ -220,6 +220,7 @@ Point the plugin's `Site.Url` at port 8081 and set `Site.Token` to the same valu
 | `csp_players` | Steam ID, name, rank XP, rank, first and last seen |
 | `csp_weapons` | Steam ID, weapon, weapon XP, level, kills, headshots, hits, shots |
 | `csp_challenges` | Steam ID, weapon, challenge, count, tier reached |
+| `csp_seasons` | Steam ID, season start, rank XP earned in the season |
 | `csp_schema` | The schema version |
 
 Skill shot ids double as challenge ids in `csp_challenges`, so an id is never renamed once released.
