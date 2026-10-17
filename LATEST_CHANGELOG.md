@@ -1,7 +1,8 @@
-## v1.1.2 (patch)
+## v1.1.3 (patch)
 
-Changes since v1.1.1:
+Changes since v1.1.2:
 
-- Add the progression site design (matt-edmondson)
-- [patch] Draw XP floaties in the world at a fixed size (matt-edmondson)
+- [patch] Draw XP floaties 50% bigger (matt-edmondson)
+- Ignore local worktrees (matt-edmondson)
+- Add the progression site plan (matt-edmondson)
 
