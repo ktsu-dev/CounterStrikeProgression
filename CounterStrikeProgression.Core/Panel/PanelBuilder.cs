@@ -100,7 +100,7 @@ internal sealed class PanelBuilder(ProgressionEngine engine)
 
 			ContractProgress? progress = player.Contracts.GetValueOrDefault((contract.PeriodKey, contract.Definition.Id));
 			long count = Math.Min(progress?.Count ?? 0, contract.Definition.Target);
-			if (progress?.Completed == true)
+			if (progress?.Completed ?? false)
 			{
 				done++;
 				lines.Add(new(contract.Definition.Description, "Done", LineState.Done));
@@ -161,7 +161,7 @@ internal sealed class PanelBuilder(ProgressionEngine engine)
 		IReadOnlyList<ActiveContract> contracts = engine.ActiveContracts;
 		if (contracts.Count > 0)
 		{
-			int done = contracts.Count(c => player.Contracts.GetValueOrDefault((c.PeriodKey, c.Definition.Id))?.Completed == true);
+			int done = contracts.Count(c => player.Contracts.GetValueOrDefault((c.PeriodKey, c.Definition.Id))?.Completed ?? false);
 			lines.Add(new("Contracts", $"{done} of {contracts.Count} done", done == contracts.Count ? LineState.Done : LineState.InProgress));
 		}
 

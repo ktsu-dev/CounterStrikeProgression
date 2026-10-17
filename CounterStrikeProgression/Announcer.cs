@@ -60,8 +60,8 @@ internal sealed class Announcer(PluginConfig config)
 					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} earned the feat {ChatColors.Gold}{notice.Feat.Name}{ChatColors.Default}: {notice.Feat.Description}!");
 					break;
 
-				case NoticeKind.ContractCompleted when notice.Contract?.Definition.Period == ContractPeriod.Weekly:
-					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} finished the weekly contract {ChatColors.Gold}{notice.Contract.Definition.Description}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
+				case NoticeKind.ContractCompleted when notice.Contract is { Definition.Period: ContractPeriod.Weekly } weekly:
+					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} finished the weekly contract {ChatColors.Gold}{weekly.Definition.Description}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
 					break;
 
 				case NoticeKind.ContractCompleted when notice.Contract is not null:
