@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Core.Panel;
 using System.Globalization;
 using System.Net;
 using System.Text;
+using ktsu.CounterStrikeProgression.Core.Recap;
 
 /// <summary>
 /// Turns a panel page into the text each way of drawing the panel needs.
@@ -137,6 +138,42 @@ internal static class PanelFormatter
 		List<string> lines = [$"{page.Title} ({page.Subtitle}) {Bar(page.Progress, 10)} {page.ProgressLabel}"];
 		lines.AddRange(page.Lines.Where(l => l.State != LineState.Heading).Select(l => $" {Marker(l.State)} {l.Label}  {l.Detail}"));
 		return lines;
+	}
+
+	/// <summary>
+	/// Formats a map recap as one chat line, leaving out what didn't happen.
+	/// </summary>
+	/// <param name="recap">The recap.</param>
+	/// <returns>The line, such as <c>This map: +1,240 XP · 18/9 K/D · 4 skill shots · 2 levels · best: Wallbang with the AK-47</c>.</returns>
+	public static string ToRecapChat(MapRecap recap)
+	{
+		Ensure.NotNull(recap);
+
+		List<string> parts = [string.Format(CultureInfo.InvariantCulture, "+{0:N0} XP", recap.Xp)];
+		if ((recap.Kills > 0) || (recap.Deaths > 0))
+		{
+			parts.Add(string.Format(CultureInfo.InvariantCulture, "{0}/{1} K/D", recap.Kills, recap.Deaths));
+		}
+
+		AddCount(parts, recap.SkillShots, "skill shot", "skill shots");
+		AddCount(parts, recap.Levels, "level", "levels");
+		AddCount(parts, recap.Tiers, "tier", "tiers");
+		AddCount(parts, recap.RankUps, "rank up", "rank ups");
+		AddCount(parts, recap.Feats, "feat", "feats");
+		if (!string.IsNullOrEmpty(recap.Best))
+		{
+			parts.Add($"best: {recap.Best}");
+		}
+
+		return "This map: " + string.Join(" · ", parts);
+	}
+
+	private static void AddCount(List<string> parts, int count, string one, string many)
+	{
+		if (count > 0)
+		{
+			parts.Add(string.Format(CultureInfo.InvariantCulture, "{0} {1}", count, count == 1 ? one : many));
+		}
 	}
 
 	private static string Marker(LineState state) => state switch
