@@ -11,6 +11,9 @@ using ktsu.CounterStrikeProgression.Core.Live;
 /// <param name="path">The file to read and write.</param>
 internal sealed class FeedStore(string path)
 {
+	/// <summary>Gets the file the history is kept in.</summary>
+	public string Path => path;
+
 	/// <summary>
 	/// Reads the saved entries.
 	/// </summary>
@@ -41,7 +44,7 @@ internal sealed class FeedStore(string path)
 	{
 		Ensure.NotNull(entries);
 
-		string? directory = Path.GetDirectoryName(path);
+		string? directory = System.IO.Path.GetDirectoryName(path);
 		if (!string.IsNullOrEmpty(directory))
 		{
 			Directory.CreateDirectory(directory);

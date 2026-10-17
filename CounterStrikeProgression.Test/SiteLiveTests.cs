@@ -9,6 +9,8 @@ using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 using ktsu.CounterStrikeProgression.Site;
 using ktsu.CounterStrikeProgression.Site.Live;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 [TestClass]
 public sealed class SiteLiveTests
@@ -41,7 +43,7 @@ public sealed class SiteLiveTests
 	private static LivePlayer Human(ulong steamId) => new(0, steamId, "Tester", false, 1, 0, 0, 0);
 
 	private LiveState NewState(ManualTime time, SiteOptions? options = null) =>
-		new(options ?? new SiteOptions(), new FeedStore(FeedPath), time);
+		new(options ?? new SiteOptions(), new FeedStore(FeedPath), time, NullLogger<LiveState>.Instance);
 
 	[TestMethod]
 	public void Apply_FirstBatch_SetsSnapshotAndOnline()
@@ -340,5 +342,51 @@ public sealed class SiteLiveTests
 		Assert.AreEqual("Newer", overlay.Player?.Name);
 		Assert.AreEqual(Start.AddMinutes(-1), overlay.Player?.FirstSeen);
 		Assert.AreEqual(Start.AddMinutes(5), overlay.Player?.LastSeen);
+	}
+
+	[TestMethod]
+	public void Apply_FeedWriteFails_KeepsBatchAndWarnsOncePerStreak()
+	{
+		string blocker = Path.Combine(directory, "blocker");
+		File.WriteAllText(blocker, "a file where the history folder should be");
+		CapturingLogger logger = new();
+		LiveState state = new(new SiteOptions(), new FeedStore(Path.Combine(blocker, "feed.json")), new ManualTime(), logger);
+
+		LiveChanges first = state.Apply(Batch(Server(Start), [Entry(1)]));
+		state.Apply(Batch(Server(Start.AddSeconds(2)), [Entry(2)]));
+
+		Assert.IsTrue(first.SnapshotChanged);
+		Assert.HasCount(2, state.Feed);
+		Assert.IsTrue(state.IsOnline);
+		LogEntry warning = Assert.ContainsSingle(logger.Entries);
+		Assert.AreEqual(LogLevel.Warning, warning.Level);
+		Assert.Contains(blocker, warning.Message);
+		Assert.IsNotNull(warning.Exception);
+
+		File.Delete(blocker);
+		state.Apply(Batch(Server(Start.AddSeconds(4)), [Entry(3)]));
+		state.Apply(Batch(Server(Start.AddSeconds(6)), [Entry(4)]));
+		Directory.Delete(Path.Combine(directory, "blocker"), recursive: true);
+		File.WriteAllText(blocker, "blocked again");
+		state.Apply(Batch(Server(Start.AddSeconds(8)), [Entry(5)]));
+
+		Assert.HasCount(3, logger.Entries);
+		Assert.AreEqual(LogLevel.Information, logger.Entries[1].Level);
+		Assert.AreEqual(LogLevel.Warning, logger.Entries[2].Level);
+	}
+
+	private sealed record LogEntry(LogLevel Level, string Message, Exception? Exception);
+
+	private sealed class CapturingLogger : ILogger<LiveState>
+	{
+		public List<LogEntry> Entries { get; } = [];
+
+		public IDisposable? BeginScope<TState>(TState state)
+			where TState : notnull => null;
+
+		public bool IsEnabled(LogLevel logLevel) => true;
+
+		public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+			Entries.Add(new(logLevel, formatter(state, exception), exception));
 	}
 }

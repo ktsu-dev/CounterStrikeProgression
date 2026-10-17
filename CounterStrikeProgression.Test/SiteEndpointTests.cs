@@ -14,6 +14,7 @@ using ktsu.CounterStrikeProgression.Site.Live;
 using ktsu.CounterStrikeProgression.Site.Views;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Extensions.Logging.Abstractions;
 
 [TestClass]
 public sealed class SiteEndpointTests
@@ -33,7 +34,7 @@ public sealed class SiteEndpointTests
 	public void Cleanup() => Directory.Delete(directory, recursive: true);
 
 	private LiveState NewState(TimeProvider? time = null) =>
-		new(new SiteOptions(), new FeedStore(Path.Combine(directory, "feed.json")), time ?? new ManualTime());
+		new(new SiteOptions(), new FeedStore(Path.Combine(directory, "feed.json")), time ?? new ManualTime(), NullLogger<LiveState>.Instance);
 
 	private static LiveBatch Batch(params FeedEntry[] feed) =>
 		new(new ServerSnapshot(Start, "de_inferno", "Deathmatch", 16, [new LivePlayer(1, TestHelpers.SteamId, "Tester", false, 2, 3, 1, 40)]), feed, [], new ProgressionSettings());

@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Site.Live;
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Storage;
+using Microsoft.Extensions.Logging;
 
 /// <summary>What one applied batch changed.</summary>
 /// <param name="SnapshotChanged">Whether the server snapshot was replaced.</param>
@@ -20,13 +21,15 @@ internal sealed record LiveChanges(bool SnapshotChanged, IReadOnlyList<FeedEntry
 /// <param name="options">The site settings.</param>
 /// <param name="feed">Where the feed history is saved.</param>
 /// <param name="time">The clock.</param>
-internal sealed class LiveState(SiteOptions options, FeedStore feed, TimeProvider time)
+/// <param name="logger">Where feed history write failures are reported.</param>
+internal sealed partial class LiveState(SiteOptions options, FeedStore feed, TimeProvider time, ILogger<LiveState> logger)
 {
 	private readonly Lock gate = new();
 	private readonly Dictionary<ulong, ProgressSnapshot> overlays = [];
 	private List<FeedEntry> entries = [.. feed.Load().Take(options.FeedLength)];
 	private ServerSnapshot? snapshot;
 	private DateTimeOffset lastBatchAt;
+	private bool feedSaveFailing;
 
 	/// <summary>Gets the latest server snapshot, or <see langword="null"/> before the first batch.</summary>
 	public ServerSnapshot? Snapshot
@@ -161,12 +164,29 @@ internal sealed class LiveState(SiteOptions options, FeedStore feed, TimeProvide
 		try
 		{
 			feed.Save(entries);
+			if (feedSaveFailing)
+			{
+				feedSaveFailing = false;
+				LogFeedSaveRecovered(logger, feed.Path);
+			}
 		}
 		catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 		{
-			// The history is only a convenience across restarts, so a failed write keeps the batch applied in memory.
+			// The batch stays applied in memory, so a disk fault can't block live updates. The warning goes out
+			// once per failure streak, because batches arrive every few seconds.
+			if (!feedSaveFailing)
+			{
+				feedSaveFailing = true;
+				LogFeedSaveFailed(logger, ex, feed.Path);
+			}
 		}
 	}
+
+	[LoggerMessage(Level = LogLevel.Warning, Message = "Can't write the feed history to {Path}, so it won't survive a restart. Live updates go on.")]
+	private static partial void LogFeedSaveFailed(ILogger logger, Exception exception, string path);
+
+	[LoggerMessage(Level = LogLevel.Information, Message = "Writing the feed history to {Path} works again.")]
+	private static partial void LogFeedSaveRecovered(ILogger logger, string path);
 
 	private bool IsOnlineLocked() =>
 		(snapshot is not null) && ((time.GetUtcNow() - lastBatchAt).TotalSeconds <= options.OfflineAfterSeconds);
