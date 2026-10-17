@@ -26,6 +26,7 @@ Players climb an up-only rank ladder from Silver I to Global Elite. Every weapon
 - **XP floaties**: every XP gain floats up as "+XP" text from the center of your screen. Only you see your own. Quick gains add up in one floatie, and skill shots, tiers, and level-ups are named under the number in gold. A `World` mode floats them above the target instead.
 - **Feats**: eight really difficult feats, such as Global Elite, Millionaire, Weapon master, Full ladder, Collector, and Chicken overlord. They are worked out from the stored progress, announced to the server when earned, and shown as medallions on the progression site.
 - **Announcements**: rank-ups, finished tiers, and every fifth weapon level go to the whole server.
+- **Map recap**: when the map ends, each player gets one chat line with the XP, kills and deaths, skill shots, levels, and tiers they earned, and their best moment. The recap also goes to the progression site, which shows it as "Last session" on the player page, and a player who leaves early still gets one there. `AnnounceMapRecap` turns the chat line off.
 - **Durable storage**: progress is kept in MariaDB or MySQL in `csp_` tables, saved off the game thread, and retried after a failed save without double counting.
 - **Configurable**: every XP value, multiplier, and detection threshold is a setting.
 
