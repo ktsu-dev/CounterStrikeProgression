@@ -107,6 +107,24 @@ main {
 	color: var(--red);
 }
 
+.featured {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 4px 12px;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--line);
+	background: var(--gold-bg);
+}
+
+.featured[hidden] {
+	display: none;
+}
+
+.featured b {
+	color: var(--gold);
+}
+
 .pad {
 	padding: 12px;
 }

@@ -467,6 +467,8 @@
 
 	function initLive(root) {
 		const top = el("div", "top");
+		const featuredBox = el("div", "featured");
+		featuredBox.hidden = true;
 		const grid = el("div", "live-grid");
 		const boardBox = el("section");
 		const feedBox = el("section");
@@ -477,13 +479,31 @@
 		boardBox.append(board);
 		grid.append(boardBox, feedBox);
 		const panel = el("div", "panel");
-		panel.append(top, grid);
+		panel.append(top, featuredBox, grid);
 		root.replaceChildren(panel);
 
 		let serverOnline = false;
 		let snapshot = null;
 		let feats = {};
 		let feed = [];
+		let featured = null;
+
+		function renderFeatured() {
+			featuredBox.hidden = !featured;
+			if (!featured) {
+				return;
+			}
+			const times = `×${Number(featured.multiplier)}`;
+			const line = el("span");
+			line.append(el("b", null, `Featured today: ${featured.name}`), ` earn ${times} weapon XP and ladder progress`);
+			const weapons = Array.isArray(featured.weapons) ? featured.weapons.join(", ") : "";
+			featuredBox.replaceChildren(line, el("span", "muted", weapons));
+		}
+
+		// The pick changes at midnight UTC, so the page asks again once the day it was given is over.
+		function featuredStale() {
+			return featured !== null && featured.day !== new Date().toISOString().slice(0, 10);
+		}
 
 		function renderTop() {
 			const offline = !serverOnline || streamLost();
@@ -577,10 +597,12 @@
 				snapshot = live.snapshot ?? null;
 				feed = mergeFeed(Array.isArray(live.feed) ? live.feed : []);
 				feats = live.feats && typeof live.feats === "object" ? live.feats : {};
+				featured = live.featured ?? null;
 			} catch {
 				serverOnline = false;
 			}
 			renderTop();
+			renderFeatured();
 			renderBoard();
 			renderFeed();
 		}
@@ -613,7 +635,13 @@
 				renderTop();
 			}
 		});
-		setInterval(renderFeed, 30000);
+		setInterval(() => {
+			if (featuredStale()) {
+				load();
+			} else {
+				renderFeed();
+			}
+		}, 30000);
 		load();
 	}
 

@@ -310,7 +310,7 @@ public sealed class SiteEndpointTests
 		LiveState live = NewState();
 		live.Apply(Batch(new FeedEntry(Start, TestHelpers.SteamId, "Tester", FeedKind.SkillShot, "Wallbang", "AK-47", 25)));
 
-		IResult result = Endpoints.Live(live, new FeatIndex());
+		IResult result = Endpoints.Live(live, new FeatIndex(), new ManualTime());
 
 		Ok<LiveView> ok = Assert.IsInstanceOfType<Ok<LiveView>>(result);
 		Assert.IsTrue(ok.Value!.Online);
