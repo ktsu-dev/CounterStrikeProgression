@@ -189,4 +189,52 @@ public sealed class LiveSenderTests
 
 		Assert.IsFalse(sender.TryEnqueue(Batch("A")));
 	}
+
+	[TestMethod]
+	public async Task Dispose_WithQueuedBatchesAndASendInFlight_NeverReportsFailure()
+	{
+		int reports = 0;
+		TaskCompletionSource arrived = new(TaskCreationOptions.RunContinuationsAsynchronously);
+		TaskCompletionSource cancelled = new(TaskCreationOptions.RunContinuationsAsynchronously);
+		using StubHandler handler = new(async (_, _, token) =>
+		{
+			arrived.TrySetResult();
+			try
+			{
+				await Task.Delay(Timeout.Infinite, token).ConfigureAwait(false);
+			}
+			finally
+			{
+				cancelled.TrySetResult();
+			}
+
+			return Ok();
+		});
+		LiveSender sender = new(Endpoint, "secret", 8, TimeSpan.FromSeconds(30), _ => Interlocked.Increment(ref reports), handler);
+
+		sender.TryEnqueue(Batch("A"));
+		await arrived.Task.WaitAsync(Generous).ConfigureAwait(false);
+		sender.TryEnqueue(Batch("B"));
+		sender.TryEnqueue(Batch("C"));
+		sender.Dispose();
+		await cancelled.Task.WaitAsync(Generous).ConfigureAwait(false);
+		await sender.StopAsync(Generous).ConfigureAwait(false);
+		sender.Dispose();
+
+		Assert.AreEqual(0, Volatile.Read(ref reports));
+	}
+
+	[TestMethod]
+	public async Task Dispose_Immediately_NeverReportsFailure()
+	{
+		int reports = 0;
+		using StubHandler handler = new((_, _, _) => Task.FromResult(Ok()));
+		LiveSender sender = new(Endpoint, "secret", 8, TimeSpan.FromSeconds(30), _ => Interlocked.Increment(ref reports), handler);
+
+		sender.TryEnqueue(Batch("A"));
+		sender.Dispose();
+		await sender.StopAsync(Generous).ConfigureAwait(false);
+
+		Assert.AreEqual(0, Volatile.Read(ref reports));
+	}
 }
