@@ -36,14 +36,14 @@ internal static class DiscordMessages
 		List<string> lines = [];
 		foreach (ProgressionNotice notice in result.Notices)
 		{
-			string? line = notice.Kind switch
+			string? line = notice switch
 			{
-				NoticeKind.FeatEarned when settings.Feats && (notice.Feat is not null) =>
-					$"🏅 {name} earned the feat **{notice.Feat.Name}**: {notice.Feat.Description}!",
-				NoticeKind.RankUp when settings.RankUps && (notice.Value >= minimumRank) && (notice.Value < RankLadder.Names.Count) =>
-					$"⬆️ {name} ranked up to **{RankLadder.Names[notice.Value]}**!",
-				NoticeKind.SkillShot when settings.EpicSkillShots && (notice.SkillShot?.Rarity == Rarity.Epic) =>
-					$"💥 {name} landed **{notice.SkillShot.Name}**{(notice.Weapon is null ? "" : $" with the {notice.Weapon.DisplayName}")} (+{notice.Xp.ToString("N0", CultureInfo.InvariantCulture)} XP)",
+				{ Kind: NoticeKind.FeatEarned, Feat: { } feat } when settings.Feats =>
+					$"🏅 {name} earned the feat **{feat.Name}**: {feat.Description}!",
+				{ Kind: NoticeKind.RankUp, Value: int rank } when settings.RankUps && (rank >= minimumRank) && (rank < RankLadder.Names.Count) =>
+					$"⬆️ {name} ranked up to **{RankLadder.Names[rank]}**!",
+				{ Kind: NoticeKind.SkillShot, SkillShot: { Rarity: Rarity.Epic } shot } when settings.EpicSkillShots =>
+					$"💥 {name} landed **{shot.Name}**{(notice.Weapon is { } weapon ? $" with the {weapon.DisplayName}" : "")} (+{notice.Xp.ToString("N0", CultureInfo.InvariantCulture)} XP)",
 				_ => null,
 			};
 
