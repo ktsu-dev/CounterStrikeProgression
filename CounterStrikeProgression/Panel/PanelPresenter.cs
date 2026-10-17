@@ -24,14 +24,24 @@ internal sealed class PanelPresenter(PanelSettings settings, PanelBuilder builde
 	public WorldTextPanel WorldText { get; } = new(settings);
 
 	/// <summary>
-	/// Opens the panel on the overview, or closes it when it's already open.
+	/// Opens the panel on a page, or closes it when it's already open. Asking for another page while the panel is
+	/// open turns to that page instead.
 	/// </summary>
 	/// <param name="player">The player.</param>
 	/// <param name="session">The player's session.</param>
-	public void Toggle(CCSPlayerController player, PlayerSession session)
+	/// <param name="page">The page to open on, where 0 is the overview.</param>
+	public void Toggle(CCSPlayerController player, PlayerSession session, int page = 0)
 	{
 		Ensure.NotNull(player);
 		Ensure.NotNull(session);
+
+		if (session.Panel.IsOpen && (page != 0) && (session.Panel.Page != page))
+		{
+			session.Panel.Page = page;
+			session.Panel.Scroll = 0;
+			session.Panel.IsStale = true;
+			return;
+		}
 
 		if (session.Panel.IsOpen)
 		{
@@ -46,7 +56,7 @@ internal sealed class PanelPresenter(PanelSettings settings, PanelBuilder builde
 		}
 
 		session.Panel.IsOpen = true;
-		session.Panel.Page = 0;
+		session.Panel.Page = page;
 		session.Panel.Scroll = 0;
 		session.Panel.IsStale = true;
 		session.Panel.LastButtons = player.Buttons;

@@ -61,6 +61,17 @@ internal sealed class ProgressChangeTracker
 			}
 		}
 
+		List<ContractRow> contracts = [];
+		foreach (ContractRow row in all.Contracts)
+		{
+			(string, string) key = (row.Period, row.Contract);
+			if (!last.Contracts.TryGetValue(key, out ContractRow? previous) || (previous != row))
+			{
+				contracts.Add(row);
+				last.Contracts[key] = row;
+			}
+		}
+
 		List<SeasonRow> seasons = [];
 		foreach (SeasonRow row in all.Seasons)
 		{
@@ -71,7 +82,7 @@ internal sealed class ProgressChangeTracker
 			}
 		}
 
-		ProgressSnapshot changes = new(player, weapons, challenges) { Seasons = seasons };
+		ProgressSnapshot changes = new(player, weapons, challenges) { Contracts = contracts, Seasons = seasons };
 		return changes.IsEmpty ? null : changes;
 	}
 
@@ -95,5 +106,7 @@ internal sealed class ProgressChangeTracker
 		public Dictionary<string, WeaponRow> Weapons { get; } = new(StringComparer.Ordinal);
 
 		public Dictionary<(string, string), ChallengeRow> Challenges { get; } = [];
+
+		public Dictionary<(string, string), ContractRow> Contracts { get; } = [];
 	}
 }

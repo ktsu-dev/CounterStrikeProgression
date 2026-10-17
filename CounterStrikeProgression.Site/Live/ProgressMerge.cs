@@ -70,13 +70,21 @@ internal static class ProgressMerge
 			(var o, var n) => LargerPlayer(o!, n!),
 		};
 
+		Dictionary<(string Period, string Contract), ContractRow> contracts = older.Contracts.ToDictionary(c => (c.Period, c.Contract));
+		foreach (ContractRow row in newer.Contracts)
+		{
+			contracts[(row.Period, row.Contract)] = contracts.TryGetValue((row.Period, row.Contract), out ContractRow? existing)
+				? existing with { Count = Math.Max(existing.Count, row.Count), Completed = existing.Completed || row.Completed }
+				: row;
+		}
+
 		Dictionary<DateTime, SeasonRow> seasons = older.Seasons.ToDictionary(r => r.Start);
 		foreach (SeasonRow row in newer.Seasons)
 		{
 			seasons[row.Start] = seasons.TryGetValue(row.Start, out SeasonRow? existing) && existing.Xp > row.Xp ? existing : row;
 		}
 
-		return new(player, [.. weapons.Values], [.. challenges.Values]) { Seasons = [.. seasons.Values.OrderBy(r => r.Start)] };
+		return new(player, [.. weapons.Values], [.. challenges.Values]) { Contracts = [.. contracts.Values], Seasons = [.. seasons.Values.OrderBy(r => r.Start)] };
 	}
 
 	/// <summary>
@@ -106,6 +114,11 @@ internal static class ProgressMerge
 			return snapshot.Challenges[0].SteamId;
 		}
 
+		if (snapshot.Contracts.Count > 0)
+		{
+			return snapshot.Contracts[0].SteamId;
+		}
+
 		return snapshot.Seasons.Count > 0 ? snapshot.Seasons[0].SteamId : null;
 	}
 
@@ -133,6 +146,13 @@ internal static class ProgressMerge
 				challengeCopy.Count = challenge.Count;
 				challengeCopy.TierReached = challenge.TierReached;
 			}
+		}
+
+		foreach (((string period, string id), ContractProgress contract) in stored.Contracts)
+		{
+			ContractProgress copy = result.Contract(period, id);
+			copy.Count = contract.Count;
+			copy.Completed = contract.Completed;
 		}
 	}
 
@@ -173,6 +193,13 @@ internal static class ProgressMerge
 			ChallengeProgress challenge = result.Weapon(key).Challenge(row.Challenge);
 			challenge.Count = Math.Max(challenge.Count, row.Count);
 			challenge.TierReached = Math.Max(challenge.TierReached, row.Tier);
+		}
+
+		foreach (ContractRow row in live.Contracts)
+		{
+			ContractProgress contract = result.Contract(row.Period, row.Contract);
+			contract.Count = Math.Max(contract.Count, row.Count);
+			contract.Completed = contract.Completed || row.Completed;
 		}
 
 		// Only the latest season is kept, so a live row for a later season replaces the stored one.

@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Core.Storage;
 using System.Runtime.CompilerServices;
 using Dapper;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Rotation;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 using MySqlConnector;
 
@@ -60,6 +61,15 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			count BIGINT NOT NULL DEFAULT 0,
 			tier INT NOT NULL DEFAULT 0,
 			PRIMARY KEY (steam_id, weapon, challenge)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+		CREATE TABLE IF NOT EXISTS csp_contracts (
+			steam_id BIGINT UNSIGNED NOT NULL,
+			period VARCHAR(16) NOT NULL,
+			contract VARCHAR(48) NOT NULL,
+			count BIGINT NOT NULL DEFAULT 0,
+			completed TINYINT(1) NOT NULL DEFAULT 0,
+			PRIMARY KEY (steam_id, period, contract)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 		CREATE TABLE IF NOT EXISTS csp_daily (
@@ -151,6 +161,12 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		ON DUPLICATE KEY UPDATE count = VALUES(count), tier = VALUES(tier);
 		""";
 
+	private const string UpsertContract = """
+		INSERT INTO csp_contracts (steam_id, period, contract, count, completed)
+		VALUES (@SteamId, @Period, @Contract, @Count, @Completed)
+		ON DUPLICATE KEY UPDATE count = VALUES(count), completed = VALUES(completed);
+		""";
+
 	private const string UpsertSeason = """
 		INSERT INTO csp_seasons (steam_id, season_start, xp)
 		VALUES (@SteamId, @Start, @Xp)
@@ -176,6 +192,9 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		ORDER BY s.season_start DESC
 		""";
 
+	private const string SelectContracts =
+		"SELECT steam_id AS SteamId, period AS Period, contract AS Contract, count AS `Count`, completed AS Completed FROM csp_contracts WHERE steam_id = @steamId AND period IN (@day, @week)";
+
 	/// <summary>
 	/// Clears a player's rows for a reset. Their daily history starts again from the day before, so the XP they
 	/// keep isn't counted as earned.
@@ -183,6 +202,7 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 	private const string DeletePlayerRows = """
 		DELETE FROM csp_challenges WHERE steam_id = @SteamId;
 		DELETE FROM csp_weapons WHERE steam_id = @SteamId;
+		DELETE FROM csp_contracts WHERE steam_id = @SteamId;
 		DELETE FROM csp_seasons WHERE steam_id = @SteamId;
 		DELETE FROM csp_daily WHERE steam_id = @SteamId;
 		INSERT INTO csp_daily (steam_id, day, rank_xp) VALUES (@SteamId, DATE(@LastSeen) - INTERVAL 1 DAY, @RankXp);
@@ -258,7 +278,14 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			parameters,
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-		return ProgressSnapshot.Rebuild(player, weapons, challenges, season);
+		// Only the running day and week matter, so older contract rows stay in the table but aren't read.
+		DateOnly today = DailyRotation.Day(DateTime.UtcNow);
+		IEnumerable<ContractRow> contracts = await connection.QueryAsync<ContractRow>(new CommandDefinition(
+			SelectContracts,
+			new { steamId, day = DailyRotation.DayKey(today), week = DailyRotation.WeekKey(today) },
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+		return ProgressSnapshot.Rebuild(player, weapons, challenges, season, contracts);
 	}
 
 	/// <inheritdoc/>
@@ -289,6 +316,11 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		if (snapshot.Challenges.Count > 0)
 		{
 			await connection.ExecuteAsync(new CommandDefinition(UpsertChallenge, snapshot.Challenges, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+		}
+
+		if (snapshot.Contracts.Count > 0)
+		{
+			await connection.ExecuteAsync(new CommandDefinition(UpsertContract, snapshot.Contracts, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
 		}
 
 		if (snapshot.Seasons.Count > 0)

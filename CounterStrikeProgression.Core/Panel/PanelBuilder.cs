@@ -4,13 +4,14 @@ namespace ktsu.CounterStrikeProgression.Core.Panel;
 
 using System.Globalization;
 using ktsu.CounterStrikeProgression.Core.Challenges;
+using ktsu.CounterStrikeProgression.Core.Contracts;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Rotation;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
 /// <summary>
-/// Builds the pages of the progress panel from a player's progress. Page 0 is the overview, and every later
-/// page is one weapon, with the weapons the player uses most first.
+/// Builds the pages of the progress panel from a player's progress. Page 0 is the overview, page 1 is the
+/// contracts, and every later page is one weapon, with the weapons the player uses most first.
 /// </summary>
 /// <param name="engine">The engine whose ranks, levels, and ladders to show.</param>
 internal sealed class PanelBuilder(ProgressionEngine engine)
@@ -23,7 +24,7 @@ internal sealed class PanelBuilder(ProgressionEngine engine)
 	/// Gets the weapons in page order: those the player has used, most XP first, then the rest in catalogue order.
 	/// </summary>
 	/// <param name="player">The player's progress.</param>
-	/// <returns>The weapons, one per page after the overview.</returns>
+	/// <returns>The weapons, one per page after the overview and the contracts.</returns>
 	public static IReadOnlyList<WeaponInfo> WeaponOrder(PlayerProgress player)
 	{
 		Ensure.NotNull(player);
@@ -38,15 +39,20 @@ internal sealed class PanelBuilder(ProgressionEngine engine)
 	}
 
 	/// <summary>
-	/// Gets the number of pages: the overview plus one per weapon.
+	/// Gets the number of pages: the overview, the contracts, and one per weapon.
 	/// </summary>
-	public static int PageCount => WeaponCatalog.All.Count + 1;
+	public static int PageCount => WeaponCatalog.All.Count + FirstWeaponPage;
+
+	/// <summary>Gets the index of the contracts page.</summary>
+	public static int ContractsPage => 1;
+
+	private static int FirstWeaponPage => ContractsPage + 1;
 
 	/// <summary>
 	/// Builds one page.
 	/// </summary>
 	/// <param name="player">The player's progress.</param>
-	/// <param name="pageIndex">The page, where 0 is the overview.</param>
+	/// <param name="pageIndex">The page, where 0 is the overview and 1 the contracts.</param>
 	/// <returns>The page.</returns>
 	public PanelPage Page(PlayerProgress player, int pageIndex)
 	{
@@ -56,8 +62,74 @@ internal sealed class PanelBuilder(ProgressionEngine engine)
 			return Overview(player);
 		}
 
+		if (pageIndex == ContractsPage)
+		{
+			return Contracts(player);
+		}
+
 		IReadOnlyList<WeaponInfo> order = WeaponOrder(player);
-		return Weapon(player, order[Math.Min(pageIndex - 1, order.Count - 1)]);
+		return Weapon(player, order[Math.Min(pageIndex - FirstWeaponPage, order.Count - 1)]);
+	}
+
+	/// <summary>
+	/// Builds the contracts page: today's contracts, then the week's, each with its count and reward.
+	/// </summary>
+	/// <param name="player">The player's progress.</param>
+	/// <returns>The page.</returns>
+	public PanelPage Contracts(PlayerProgress player)
+	{
+		Ensure.NotNull(player);
+
+		IReadOnlyList<ActiveContract> active = engine.ActiveContracts;
+		if (active.Count == 0)
+		{
+			return new PanelPage("Contracts", "Off", 0, "No contracts are running", []);
+		}
+
+		DateTime now = engine.Time.GetUtcNow().UtcDateTime;
+		List<PanelLine> lines = [];
+		int done = 0;
+		ContractPeriod? section = null;
+		foreach (ActiveContract contract in active)
+		{
+			if (contract.Definition.Period != section)
+			{
+				section = contract.Definition.Period;
+				string name = section == ContractPeriod.Weekly ? "This week" : "Today";
+				lines.Add(PanelLine.Heading($"{name}, {Remaining(contract.EndsAt - now)} left"));
+			}
+
+			ContractProgress? progress = player.Contracts.GetValueOrDefault((contract.PeriodKey, contract.Definition.Id));
+			long count = Math.Min(progress?.Count ?? 0, contract.Definition.Target);
+			if (progress?.Completed ?? false)
+			{
+				done++;
+				lines.Add(new(contract.Definition.Description, "Done", LineState.Done));
+				continue;
+			}
+
+			string detail = $"{Number(count)}/{Number(contract.Definition.Target)}  +{Number(contract.Xp)}";
+			lines.Add(new(contract.Definition.Description, detail, count > 0 ? LineState.InProgress : LineState.NotStarted));
+		}
+
+		return new PanelPage("Contracts", "Daily and weekly", (double)done / active.Count, $"{done} of {active.Count} done", lines);
+	}
+
+	/// <summary>
+	/// Writes how long is left in a contract's period, such as <c>5h 12m</c> or <c>3d 4h</c>.
+	/// </summary>
+	/// <param name="left">The time left.</param>
+	/// <returns>The text.</returns>
+	public static string Remaining(TimeSpan left)
+	{
+		if (left < TimeSpan.Zero)
+		{
+			left = TimeSpan.Zero;
+		}
+
+		return left.TotalDays >= 1
+			? string.Create(CultureInfo.InvariantCulture, $"{(int)left.TotalDays}d {left.Hours}h")
+			: string.Create(CultureInfo.InvariantCulture, $"{left.Hours}h {left.Minutes}m");
 	}
 
 	/// <summary>
@@ -92,8 +164,16 @@ internal sealed class PanelBuilder(ProgressionEngine engine)
 			new("Weapons levelled", $"{levelled} of {WeaponCatalog.All.Count}", LineState.InProgress),
 			new("Tiers finished", Number(tiers), LineState.InProgress),
 			new($"Season {engine.CurrentSeason.Name}", $"{Number(engine.SeasonXp(player))} XP", LineState.InProgress),
-			PanelLine.Heading("Closest tiers"),
 		]);
+
+		IReadOnlyList<ActiveContract> contracts = engine.ActiveContracts;
+		if (contracts.Count > 0)
+		{
+			int done = contracts.Count(c => player.Contracts.GetValueOrDefault((c.PeriodKey, c.Definition.Id))?.Completed ?? false);
+			lines.Add(new("Contracts", $"{done} of {contracts.Count} done", done == contracts.Count ? LineState.Done : LineState.InProgress));
+		}
+
+		lines.Add(PanelLine.Heading("Closest tiers"));
 
 		lines.AddRange(ClosestTiers(player, ClosestTiersShown));
 		return new PanelPage(RankLadder.Names[rank], "Overview", engine.Ranks.ProgressToNext(player.RankXp), progressLabel, lines);

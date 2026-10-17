@@ -15,6 +15,7 @@ internal enum FeedKind
 	WeaponLevelUp,
 	TierCompleted,
 	FeatEarned,
+	ContractCompleted,
 }
 
 /// <summary>One line of the live feed.</summary>

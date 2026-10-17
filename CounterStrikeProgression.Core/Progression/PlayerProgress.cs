@@ -21,6 +21,21 @@ internal sealed class ChallengeProgress
 }
 
 /// <summary>
+/// One contract's count in one day or week.
+/// </summary>
+internal sealed class ContractProgress
+{
+	/// <summary>Gets or sets how many matching things the player has done.</summary>
+	public long Count { get; set; }
+
+	/// <summary>Gets or sets a value indicating whether the contract is finished and paid.</summary>
+	public bool Completed { get; set; }
+
+	/// <summary>Gets or sets a value indicating whether the row changed since it was last saved.</summary>
+	public bool IsDirty { get; set; }
+}
+
+/// <summary>
 /// A player's progress with one weapon.
 /// </summary>
 /// <param name="weapon">The weapon.</param>
@@ -100,6 +115,9 @@ internal sealed class PlayerProgress(ulong steamId)
 	/// <summary>Gets the player's weapons, keyed by weapon.</summary>
 	public Dictionary<WeaponKey, WeaponProgress> Weapons { get; } = [];
 
+	/// <summary>Gets the player's contracts, keyed by the period's key and the contract id. Only current periods are loaded.</summary>
+	public Dictionary<(string Period, string Contract), ContractProgress> Contracts { get; } = [];
+
 	/// <summary>
 	/// Gets or sets the first day of the season <see cref="SeasonXp"/> was earned in, or <see langword="null"/> before
 	/// the player has earned any. Only the latest season is loaded, so it can be a season that has already ended.
@@ -120,6 +138,14 @@ internal sealed class PlayerProgress(ulong steamId)
 
 	/// <summary>Gets or sets a value indicating whether the player row changed since it was last saved.</summary>
 	public bool IsDirty { get; set; }
+
+	/// <summary>
+	/// Gets a contract's progress in a period, creating it when the player hasn't started it.
+	/// </summary>
+	/// <param name="period">The period's key, such as <c>2026-10-17</c> or <c>2026-W42</c>.</param>
+	/// <param name="contract">The contract id.</param>
+	/// <returns>The contract's progress.</returns>
+	public ContractProgress Contract(string period, string contract) => Contracts.GetOrCreate((period, contract));
 
 	/// <summary>
 	/// Gets a weapon's progress, creating it when the player hasn't used the weapon.

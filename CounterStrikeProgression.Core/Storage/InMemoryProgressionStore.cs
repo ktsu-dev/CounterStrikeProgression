@@ -15,6 +15,7 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 	private readonly ConcurrentDictionary<ulong, PlayerRow> players = new();
 	private readonly ConcurrentDictionary<(ulong, string), WeaponRow> weapons = new();
 	private readonly ConcurrentDictionary<(ulong, string, string), ChallengeRow> challenges = new();
+	private readonly ConcurrentDictionary<(ulong, string, string), ContractRow> contracts = new();
 	private readonly ConcurrentDictionary<(ulong SteamId, DateOnly Day), long> daily = new();
 	private readonly ConcurrentDictionary<(ulong, DateTime), SeasonRow> seasons = new();
 
@@ -36,7 +37,8 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 			player,
 			weapons.Values.Where(w => w.SteamId == steamId),
 			challenges.Values.Where(c => c.SteamId == steamId),
-			seasons.Values.Where(s => s.SteamId == steamId).MaxBy(s => s.Start));
+			seasons.Values.Where(s => s.SteamId == steamId).MaxBy(s => s.Start),
+			contracts.Values.Where(c => c.SteamId == steamId));
 		return Task.FromResult<PlayerProgress?>(progress);
 	}
 
@@ -61,6 +63,11 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 			challenges[(row.SteamId, row.Weapon, row.Challenge)] = row;
 		}
 
+		foreach (ContractRow row in snapshot.Contracts)
+		{
+			contracts[(row.SteamId, row.Period, row.Contract)] = row;
+		}
+
 		foreach (SeasonRow row in snapshot.Seasons)
 		{
 			seasons[(row.SteamId, row.Start)] = row;
@@ -83,6 +90,11 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 		foreach ((ulong, string, string) key in challenges.Keys.Where(k => k.Item1 == player.SteamId).ToList())
 		{
 			challenges.TryRemove(key, out _);
+		}
+
+		foreach ((ulong, string, string) key in contracts.Keys.Where(k => k.Item1 == player.SteamId).ToList())
+		{
+			contracts.TryRemove(key, out _);
 		}
 
 		foreach ((ulong, DateTime) key in seasons.Keys.Where(k => k.Item1 == player.SteamId).ToList())

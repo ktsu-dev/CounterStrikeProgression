@@ -14,7 +14,7 @@ using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
 /// <summary>
-/// The chat and console commands: <c>!rank</c> (also <c>!xp</c> and <c>!progress</c>), <c>!top</c> and
+/// The chat and console commands: <c>!rank</c> (also <c>!xp</c> and <c>!progress</c>), <c>!contracts</c>, <c>!top</c> and
 /// <c>!top &lt;weapon&gt;</c>, <c>!next</c>, <c>!feats</c>, <c>!stats</c>, <c>!site</c>, and the admin-only
 /// <c>css_csp_status</c>.
 /// </summary>
@@ -38,6 +38,7 @@ internal sealed class PlayerCommands(ProgressionServices services, string module
 		plugin.AddCommand("css_rank", "Open or close your progress panel", OnRank);
 		plugin.AddCommand("css_xp", "Open or close your progress panel", OnRank);
 		plugin.AddCommand("css_progress", "Open or close your progress panel", OnRank);
+		plugin.AddCommand("css_contracts", "Open your progress panel on today's contracts", OnContracts);
 		plugin.AddCommand("css_top", "Show the players with the most rank XP, or with a weapon: !top <weapon>", OnTop);
 		plugin.AddCommand("css_next", "Show your three challenges closest to their next tier", OnNext);
 		plugin.AddCommand("css_feats", "Show the feats and how close you are to each", OnFeats);
@@ -51,6 +52,14 @@ internal sealed class PlayerCommands(ProgressionServices services, string module
 		if ((player is not null) && (services.Sessions.Get(player) is PlayerSession session))
 		{
 			services.Panel.Toggle(player, session);
+		}
+	}
+
+	private void OnContracts(CCSPlayerController? player, CommandInfo command)
+	{
+		if ((player is not null) && (services.Sessions.Get(player) is PlayerSession session))
+		{
+			services.Panel.Toggle(player, session, PanelBuilder.ContractsPage);
 		}
 	}
 

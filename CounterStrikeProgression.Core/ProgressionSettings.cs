@@ -174,6 +174,18 @@ public sealed class ProgressionSettings
 	/// </summary>
 	public double FeaturedWeaponMultiplier { get; set; } = 2;
 
+	/// <summary>Gets or sets a value indicating whether daily and weekly contracts run.</summary>
+	public bool ContractsEnabled { get; set; } = true;
+
+	/// <summary>Gets or sets how many contracts each day has, up to the size of the daily pool.</summary>
+	public int DailyContracts { get; set; } = 3;
+
+	/// <summary>Gets or sets the rank XP for finishing a daily contract.</summary>
+	public int DailyContractXp { get; set; } = 500;
+
+	/// <summary>Gets or sets the rank XP for finishing the weekly contract.</summary>
+	public int WeeklyContractXp { get; set; } = 2500;
+
 	/// <summary>Gets or sets how long each season lasts, in months. Seasons start on 1 January and every this many months after.</summary>
 	public int SeasonMonths { get; set; } = 3;
 }

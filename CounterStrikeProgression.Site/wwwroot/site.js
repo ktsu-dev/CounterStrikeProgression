@@ -49,7 +49,7 @@
 	const REFETCH_EVERY_MS = 2000;
 	const STREAM_GRACE_MS = 15000;
 	const STEAM_ID = /^\d{17}$/;
-	const GOLD_KINDS = new Set(["RankUp", "WeaponLevelUp", "TierCompleted", "FeatEarned"]);
+	const GOLD_KINDS = new Set(["RankUp", "WeaponLevelUp", "TierCompleted", "FeatEarned", "ContractCompleted"]);
 	const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 
 	function el(tag, className, text) {
@@ -780,6 +780,27 @@
 		return card;
 	}
 
+	// Says how long a contract has left, such as "5h 12m left" or "3d 4h left".
+	function timeLeft(endsAt) {
+		const ms = Math.max(0, new Date(endsAt).getTime() - Date.now());
+		const minutes = Math.floor(ms / 60000);
+		const days = Math.floor(minutes / 1440);
+		const hours = Math.floor((minutes % 1440) / 60);
+		return days > 0 ? `${days}d ${hours}h left` : `${hours}h ${minutes % 60}m left`;
+	}
+
+	function contractCard(contract) {
+		const card = el("div", contract.completed ? "suggestion contract done" : "suggestion contract");
+		const head = el("div", "head");
+		head.append(el("b", null, contract.description), el("span", "xp", contract.completed ? "Done" : `+${formatXp(contract.xp)}`));
+		const period = contract.period === "Weekly" ? "Weekly" : "Daily";
+		card.append(head, el("div", "muted", `${period} contract · ${timeLeft(contract.endsAt)}`));
+		const target = Number(contract.target) || 0;
+		const count = Math.min(Number(contract.count) || 0, target);
+		card.append(bar(target > 0 ? count / target : 0), el("div", "muted", `${formatXp(count)}/${formatXp(target)}`));
+		return card;
+	}
+
 	// Skill shots on the weapons tab are listed commonest first.
 	const RARITY_ORDER = { Common: 0, Rare: 1, Epic: 2 };
 
@@ -1066,11 +1087,19 @@
 
 		function nextTab(player) {
 			const suggestions = Array.isArray(player.suggestions) ? player.suggestions : [];
-			return suggestions.length > 0 ? "next" : "weapons";
+			const contracts = Array.isArray(player.contracts) ? player.contracts : [];
+			return suggestions.length > 0 || contracts.length > 0 ? "next" : "weapons";
 		}
 
 		function renderNext(player) {
 			const box = el("div", "pad");
+			const contracts = Array.isArray(player.contracts) ? player.contracts : [];
+			if (contracts.length > 0) {
+				const done = contracts.filter((contract) => contract.completed).length;
+				const contractCards = el("div", "suggestions");
+				contractCards.append(...contracts.map(contractCard));
+				box.append(el("h2", "section-title", `Contracts · ${done}/${contracts.length} done`), contractCards);
+			}
 			const suggestions = Array.isArray(player.suggestions) ? player.suggestions : [];
 			if (suggestions.length === 0) {
 				box.append(message("Nothing to suggest yet. Play a few rounds and the closest tiers show up here."));

@@ -3,6 +3,7 @@
 namespace ktsu.CounterStrikeProgression.Core.Progression;
 
 using ktsu.CounterStrikeProgression.Core.Challenges;
+using ktsu.CounterStrikeProgression.Core.Contracts;
 using ktsu.CounterStrikeProgression.Core.Events;
 using ktsu.CounterStrikeProgression.Core.Feats;
 using ktsu.CounterStrikeProgression.Core.Rotation;
@@ -18,7 +19,7 @@ using ktsu.CounterStrikeProgression.Core.Weapons;
 /// level-up bonuses are paid in full, because they reward the ladder rather than one event. The day's featured
 /// weapon class earns <see cref="ProgressionSettings.FeaturedWeaponMultiplier"/> times the weapon XP and ladder
 /// progress, but not the rank XP. Every point of rank XP also counts toward the current season, which starts again
-/// from 0 when the next season begins.
+/// from 0 when the next season begins. Contracts count what each event did once it's applied.
 /// </remarks>
 /// <param name="settings">The XP values and thresholds.</param>
 /// <param name="time">The clock that decides the day and the season, or the system clock when omitted.</param>
@@ -46,6 +47,9 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		Ensure.NotNull(weapon);
 		return weapon.Class == FeaturedClass;
 	}
+
+	/// <summary>Gets the contracts running today.</summary>
+	public IReadOnlyList<ActiveContract> ActiveContracts => ContractCatalog.Active(Today, Settings);
 
 	/// <summary>Gets the season running now.</summary>
 	public Season CurrentSeason => Season.For(DateOnly.FromDateTime(Time.GetUtcNow().UtcDateTime), Settings.SeasonMonths);
@@ -135,6 +139,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		{
 			award.EventXp += Settings.KillXp;
 			weapon.Kills++;
+			result.Signals.Add(new(SignalKind.Kill, combat.Weapon, combat.IsHeadshot));
 			Advance(weapon, award, ChallengeDefinition.KillsId, result);
 			if (combat.IsHeadshot)
 			{
@@ -160,7 +165,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		}
 
 		Credit(player, weapon, award, result);
-		return result;
+		return Settle(player, result);
 	}
 
 	/// <summary>
@@ -180,6 +185,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		WeaponProgress progress = player.Weapon(chicken.Weapon.Key);
 		progress.IsDirty = true;
 		award.EventXp += Settings.ChickenXp;
+		result.Signals.Add(new(SignalKind.Chicken, chicken.Weapon));
 		Advance(progress, award, ChallengeDefinition.ChickensId, result);
 		foreach (SkillShotDefinition skillShot in SkillShotCatalog.For(SkillTrigger.Chicken))
 		{
@@ -190,7 +196,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		}
 
 		Credit(player, progress, award, result);
-		return result;
+		return Settle(player, result);
 	}
 
 	/// <summary>
@@ -231,7 +237,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 			AwardSkillShot(player, reload.Weapon, SkillShotCatalog.EfficientReload, vsBot: false, result);
 		}
 
-		return result;
+		return Settle(player, result);
 	}
 
 	/// <summary>
@@ -270,7 +276,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 			AwardSkillShot(player, life.Weapon, SkillShotCatalog.Headhunter, life.MostlyBots, result);
 		}
 
-		return result;
+		return Settle(player, result);
 	}
 
 	/// <summary>
@@ -289,6 +295,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		award.EventXp = Settings.AssistXp;
 		WeaponProgress weapon = player.Weapon(assist.Weapon.Key);
 		weapon.IsDirty = true;
+		result.Signals.Add(new(SignalKind.Assist, assist.Weapon));
 
 		SkillShotDefinition flashAssist = SkillShotCatalog.Get(SkillShotCatalog.FlashAssist);
 		if (assist.ByFlash && flashAssist.AppliesTo(assist.Weapon))
@@ -297,7 +304,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		}
 
 		Credit(player, weapon, award, result);
-		return result;
+		return Settle(player, result);
 	}
 
 	/// <summary>
@@ -317,7 +324,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 			AwardSkillShot(player, flash.Weapon, SkillShotCatalog.LongFlash, flash.VictimIsBot, result);
 		}
 
-		return result;
+		return Settle(player, result);
 	}
 
 	/// <summary>
@@ -343,12 +350,13 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 			// No weapon to put the ladder progress on, so the clutch pays XP alone.
 			ProgressionNotice notice = new() { Kind = NoticeKind.SkillShot, SkillShot = skillShot, Xp = SkillShotXp(skillShot.Rarity) };
 			result.Notices.Add(notice);
+			result.Signals.Add(new(SignalKind.SkillShot, SkillShot: skillShot));
 			CreditRankXp(player, SkillShotXp(skillShot.Rarity), result);
-			return result;
+			return Settle(player, result);
 		}
 
 		AwardSkillShot(player, clutch.LastWeapon, SkillShotCatalog.Clutch, vsBot: false, result);
-		return result;
+		return Settle(player, result);
 	}
 
 	/// <summary>
@@ -383,6 +391,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		int xp = SkillShotXp(skillShot.Rarity);
 		award.EventXp += xp;
 		result.Notices.Add(new() { Kind = NoticeKind.SkillShot, Weapon = award.Weapon, SkillShot = skillShot, Xp = (long)Math.Round(ScaleForBots(xp, award.VsBot)) });
+		result.Signals.Add(new(SignalKind.SkillShot, award.Weapon, SkillShot: skillShot));
 		Advance(weapon, award, skillShot.Id.WeakString, result);
 	}
 
@@ -414,6 +423,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 				Xp = bonus,
 				Broadcast = true,
 			});
+			result.Signals.Add(new(SignalKind.Tier, award.Weapon));
 		}
 	}
 
@@ -428,10 +438,65 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 			award.BonusXp += bonus;
 			bool broadcast = (Settings.AnnounceWeaponLevelEvery > 0) && ((level % Settings.AnnounceWeaponLevelEvery) == 0);
 			result.Notices.Add(new() { Kind = NoticeKind.WeaponLevelUp, Weapon = award.Weapon, Value = level, Xp = bonus, Broadcast = broadcast });
+			result.Signals.Add(new(SignalKind.WeaponLevel, award.Weapon));
 		}
 
 		double rankXp = ScaleForBots(award.EventXp, award.VsBot) + award.BonusXp;
 		CreditRankXp(player, rankXp, result);
+	}
+
+	/// <summary>
+	/// Counts what an event did toward the running contracts, pays for any it finishes, and drops contract rows
+	/// from earlier periods once they're saved.
+	/// </summary>
+	private ProgressionResult Settle(PlayerProgress player, ProgressionResult result)
+	{
+		IReadOnlyList<ActiveContract> active = ActiveContracts;
+		DropStale(player, active);
+		foreach (ContractSignal signal in result.Signals)
+		{
+			foreach (ActiveContract contract in active)
+			{
+				if (!contract.Definition.Counts(signal))
+				{
+					continue;
+				}
+
+				ContractProgress progress = player.Contract(contract.PeriodKey, contract.Definition.Id);
+				if (progress.Completed)
+				{
+					continue;
+				}
+
+				progress.Count++;
+				progress.IsDirty = true;
+				if (progress.Count >= contract.Definition.Target)
+				{
+					progress.Completed = true;
+					result.Notices.Add(new() { Kind = NoticeKind.ContractCompleted, Contract = contract, Xp = contract.Xp });
+					CreditRankXp(player, contract.Xp, result);
+				}
+			}
+		}
+
+		result.Signals.Clear();
+		return result;
+	}
+
+	private static void DropStale(PlayerProgress player, IReadOnlyList<ActiveContract> active)
+	{
+		// A row is stale once its contract stops running. It goes only after it has saved, so the count isn't lost.
+		bool IsRunning((string Period, string Contract) key) => active.Any(a => (a.PeriodKey == key.Period) && (a.Definition.Id == key.Contract));
+		if (!player.Contracts.Keys.All(IsRunning))
+		{
+			foreach ((string Period, string Contract) key in player.Contracts.Keys.ToList())
+			{
+				if (!player.Contracts[key].IsDirty && !IsRunning(key))
+				{
+					player.Contracts.Remove(key);
+				}
+			}
+		}
 	}
 
 	private void CreditRankXp(PlayerProgress player, double xp, ProgressionResult result)
