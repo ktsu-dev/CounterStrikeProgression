@@ -98,7 +98,24 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 		session.Combat.Reset();
 		session.WasScoped = false;
 		session.LastWeaponIndex = 0;
+		Welcome(player, session);
 		return HookResult.Continue;
+	}
+
+	// On the first spawn rather than on connect, because chat sent while the player is still loading in is
+	// easy to miss, and their progress may not have loaded yet. A load that finishes later waits for the next spawn.
+	private void Welcome(CCSPlayerController player, PlayerSession session)
+	{
+		if (session.Welcomed || !services.Config.WelcomeMessage || (session.Progress is not PlayerProgress progress))
+		{
+			return;
+		}
+
+		session.Welcomed = true;
+		foreach (string line in services.Reports.WelcomeLines(player.PlayerName, progress, services.Config.Site.PublicUrl))
+		{
+			player.PrintToChat($" {ChatColors.Gold}{services.Config.ChatPrefix}{ChatColors.Default} {line}");
+		}
 	}
 
 	private HookResult OnPlayerTeam(EventPlayerTeam @event, GameEventInfo info)

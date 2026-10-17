@@ -4,6 +4,7 @@ namespace ktsu.CounterStrikeProgression.Core.Storage;
 
 using System.Collections.Concurrent;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Weapons;
 
 /// <summary>
 /// Keeps progress in memory. Used by the tests, and by the plugin when no database is configured, in which
@@ -71,6 +72,19 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 	public Task<IReadOnlyList<LeaderboardEntry>> TopAsync(int count, CancellationToken cancellationToken)
 	{
 		IReadOnlyList<LeaderboardEntry> top = [.. players.Values.OrderByDescending(p => p.RankXp).Take(count).Select(p => new LeaderboardEntry(p.Name, p.RankXp, p.Rank))];
+		return Task.FromResult(top);
+	}
+
+	/// <inheritdoc/>
+	public Task<IReadOnlyList<WeaponLeaderboardEntry>> TopByWeaponAsync(WeaponKey weapon, int count, CancellationToken cancellationToken)
+	{
+		Ensure.NotNull(weapon);
+		IReadOnlyList<WeaponLeaderboardEntry> top = [.. weapons.Values
+			.Where(w => string.Equals(w.Weapon, weapon.WeakString, StringComparison.Ordinal) && (w.Xp > 0))
+			.OrderByDescending(w => w.Xp)
+			.ThenBy(w => w.SteamId)
+			.Take(count)
+			.Select(w => new WeaponLeaderboardEntry(players.TryGetValue(w.SteamId, out PlayerRow? p) ? p.Name : string.Empty, w.Xp, w.Level))];
 		return Task.FromResult(top);
 	}
 

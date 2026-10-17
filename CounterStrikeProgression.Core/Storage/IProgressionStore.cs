@@ -3,6 +3,7 @@
 namespace ktsu.CounterStrikeProgression.Core.Storage;
 
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Weapons;
 
 /// <summary>
 /// One row of the leaderboard.
@@ -11,6 +12,14 @@ using ktsu.CounterStrikeProgression.Core.Progression;
 /// <param name="RankXp">Their rank XP.</param>
 /// <param name="Rank">Their rank index.</param>
 internal sealed record LeaderboardEntry(string Name, long RankXp, int Rank);
+
+/// <summary>
+/// One row of a weapon's leaderboard.
+/// </summary>
+/// <param name="Name">The player's last known name.</param>
+/// <param name="Xp">Their XP with the weapon.</param>
+/// <param name="Level">Their stored level with the weapon.</param>
+internal sealed record WeaponLeaderboardEntry(string Name, long Xp, int Level);
 
 /// <summary>
 /// One row of the server rankings.
@@ -75,6 +84,15 @@ internal interface IProgressionStore
 	/// <param name="cancellationToken">Cancels the operation.</param>
 	/// <returns>The leaderboard, highest first.</returns>
 	public Task<IReadOnlyList<LeaderboardEntry>> TopAsync(int count, CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Gets the players with the most XP with one weapon.
+	/// </summary>
+	/// <param name="weapon">The weapon.</param>
+	/// <param name="count">How many to return.</param>
+	/// <param name="cancellationToken">Cancels the operation.</param>
+	/// <returns>The leaderboard, highest first.</returns>
+	public Task<IReadOnlyList<WeaponLeaderboardEntry>> TopByWeaponAsync(WeaponKey weapon, int count, CancellationToken cancellationToken);
 
 	/// <summary>
 	/// Gets every player's standing, ordered by rank XP and then Steam ID.
