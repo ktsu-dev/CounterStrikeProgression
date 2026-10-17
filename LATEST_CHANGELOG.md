@@ -1,7 +1,7 @@
-## v1.0.1 (patch)
+## v1.0.2 (patch)
 
-Changes since v1.0.0:
+Changes since v1.0.1:
 
-- [patch] Keep XP floaties the same size on screen (matt-edmondson)
-- [patch] Retry creating the tables at startup (matt-edmondson)
+- [patch] Draw XP floaties in front of walls (matt-edmondson)
+- [patch] Shrink XP floaties and give them a black outline (matt-edmondson)
 
