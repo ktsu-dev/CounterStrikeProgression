@@ -346,6 +346,7 @@ public sealed class SiteEndpointTests
 	[DataRow("{}")]
 	[DataRow("{\"snapshot\":{\"sentAt\":\"2026-10-17T12:00:00Z\",\"map\":\"x\",\"gameMode\":\"y\",\"maxPlayers\":1,\"players\":null},\"feed\":[],\"progress\":[],\"settings\":{}}")]
 	[DataRow("{\"snapshot\":{\"sentAt\":\"2026-10-17T12:00:00Z\",\"map\":\"x\",\"gameMode\":\"y\",\"maxPlayers\":1,\"players\":[null]},\"feed\":[],\"progress\":[],\"settings\":{}}")]
+	[DataRow("{\"snapshot\":{\"sentAt\":\"2026-10-17T12:00:00Z\",\"map\":\"x\",\"gameMode\":\"y\",\"maxPlayers\":1,\"players\":[]},\"feed\":[],\"progress\":[],\"settings\":{},\"recaps\":[{\"steamId\":1,\"playerName\":\"a\"}]}")]
 	public async Task Ingest_BadBody_Returns400(string body)
 	{
 		LiveState live = NewState();

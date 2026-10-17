@@ -51,6 +51,7 @@ Nothing goes to NuGet. ktsu.Sdk marks every library packable from its targets, a
 - **`Core/Tracking/`:** `RoundTracker` (opening kills, multi-kills, collaterals, trades, clutches), `PlayerCombatTracker` (landing, scope, weapon switch, reload, flick), and `LifeTracker` (per-life accuracy).
 - **`Core/Storage/`:** `ProgressSnapshot` (dirty rows copied on the game thread), `MySqlProgressionStore`, and `InMemoryProgressionStore`. Each save also upserts the player's total rank XP for the day into `csp_daily`, and `XpHistory` turns those rows into XP per day and XP since a date (the player page's History tab and the "XP this week" board on Ranks).
 - **`Core/Panel/`:** `PanelBuilder` builds the pages, and `PanelFormatter` renders plain text, center HTML, or chat.
+- **`Core/Recap/`:** `RecapTracker` adds up what each player earns over a map, and `MapRecap` is the result: a chat line at the win panel (`PanelFormatter.ToRecapChat`), and the "Last session" the site keeps per player in `recaps.json`.
 - **`CounterStrikeProgression/CombatHandlers.cs`:** the combat events that become `CombatEvent` snapshots.
 - **`CounterStrikeProgression/LifecycleHandlers.cs`:** connects, spawns, rounds, the per-tick tracking, and the transmit filter.
 - **`CounterStrikeProgression/Panel/WorldTextPanel.cs`:** the side panel, a `point_worldtext` moved in front of the eyes every tick.

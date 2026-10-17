@@ -8,6 +8,7 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Cvars;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using Microsoft.Extensions.Logging;
 
@@ -30,6 +31,7 @@ internal sealed class SiteReporter : IDisposable
 	private readonly LiveSender sender;
 	private readonly ProgressChangeTracker tracker = new();
 	private readonly List<FeedEntry> pendingFeed = [];
+	private readonly List<MapRecap> pendingRecaps = [];
 	private ConVar? gameType;
 	private ConVar? gameMode;
 	private int batchesSinceReset;
@@ -106,6 +108,21 @@ internal sealed class SiteReporter : IDisposable
 	}
 
 	/// <summary>
+	/// Adds a finished map recap to the next batch.
+	/// </summary>
+	/// <param name="recap">The recap.</param>
+	public void Record(MapRecap recap)
+	{
+		Ensure.NotNull(recap);
+
+		pendingRecaps.Add(recap);
+		if (pendingRecaps.Count > PendingFeedLimit)
+		{
+			pendingRecaps.RemoveRange(0, pendingRecaps.Count - PendingFeedLimit);
+		}
+	}
+
+	/// <summary>
 	/// Reads the server's state and queues a batch for the site. Call it on the game thread. A failure is
 	/// logged and skips this batch, so the site never breaks the game.
 	/// </summary>
@@ -165,8 +182,10 @@ internal sealed class SiteReporter : IDisposable
 
 		FeedEntry[] feed = [.. pendingFeed];
 		pendingFeed.Clear();
+		MapRecap[] recaps = [.. pendingRecaps];
+		pendingRecaps.Clear();
 
-		sender.TryEnqueue(new LiveBatch(snapshot, feed, progress, pluginConfig.Progression));
+		sender.TryEnqueue(new LiveBatch(snapshot, feed, progress, pluginConfig.Progression, recaps));
 	}
 
 	private List<LivePlayer> ReadPlayers()

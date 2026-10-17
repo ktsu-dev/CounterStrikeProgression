@@ -69,10 +69,37 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 		}
 
 		session.MapXp += result.XpEarned;
+		session.Recap.Add(result);
 		Site?.Record(session, player.PlayerName ?? string.Empty, result);
 		PanelPresenter.Invalidate(session);
 		Floaties.Show(player, result, floatieKey, at);
 		announcer.Announce(player, session, result);
+	}
+
+	/// <summary>
+	/// Ends a player's map recap, sends it to the site, and tells them about it. A session that earned
+	/// nothing just starts over.
+	/// </summary>
+	/// <param name="session">The player's session.</param>
+	/// <param name="player">The player, or <see langword="null"/> when their controller is already gone.</param>
+	/// <param name="map">The map played.</param>
+	/// <param name="announce">Whether to tell the player in chat.</param>
+	public void FinishRecap(PlayerSession session, CCSPlayerController? player, string map, bool announce)
+	{
+		Ensure.NotNull(session);
+		CCSPlayerController? valid = player is { IsValid: true } ? player : null;
+		CSMatchStats_t? stats = valid?.ActionTrackingServices?.MatchStats;
+		string name = valid?.PlayerName ?? session.Progress?.Name ?? string.Empty;
+		if (session.Recap.TryFinish(session.SteamId, name, map, stats?.Kills ?? 0, stats?.Deaths ?? 0, DateTime.UtcNow) is not { } recap)
+		{
+			return;
+		}
+
+		Site?.Record(recap);
+		if (announce && (valid is not null))
+		{
+			announcer.AnnounceRecap(valid, recap);
+		}
 	}
 
 	/// <summary>

@@ -14,7 +14,17 @@ using ktsu.CounterStrikeProgression.Core.Progression;
 /// <param name="services">The shared plugin pieces.</param>
 internal sealed class LifecycleHandlers(ProgressionServices services)
 {
+	// Set once the match-end recap has gone out, so the map ending doesn't send a second, near-empty one.
+	private bool recapSent;
+
 	private SessionManager Sessions => services.Sessions;
+
+	// Kept from the map start, so a recap names the map that was played even while the next one loads.
+	private string MapName
+	{
+		get => field ?? Server.MapName ?? string.Empty;
+		set;
+	}
 
 	/// <summary>
 	/// Hooks the lifecycle events and listeners.
@@ -28,6 +38,8 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 		plugin.RegisterEventHandler<EventPlayerTeam>(OnPlayerTeam);
 		plugin.RegisterEventHandler<EventRoundStart>(OnRoundStart);
 		plugin.RegisterEventHandler<EventRoundEnd>(OnRoundEnd);
+		plugin.RegisterEventHandler<EventCsWinPanelMatch>(OnMatchEnd);
+		plugin.RegisterListener<Listeners.OnMapStart>(OnMapStart);
 		plugin.RegisterListener<Listeners.OnTick>(OnTick);
 		plugin.RegisterListener<Listeners.OnClientDisconnect>(OnClientDisconnect);
 		plugin.RegisterListener<Listeners.OnMapEnd>(OnMapEnd);
@@ -56,6 +68,7 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 		if (session is not null)
 		{
 			services.Panel.Close(null, session);
+			services.FinishRecap(session, Utilities.GetPlayerFromSlot(playerSlot), MapName, announce: false);
 			services.Site?.Forget(session.SteamId);
 		}
 
@@ -122,6 +135,28 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 		return HookResult.Continue;
 	}
 
+	// The win panel is the last moment of a map players still read chat in, so the recap goes out here.
+	private HookResult OnMatchEnd(EventCsWinPanelMatch @event, GameEventInfo info)
+	{
+		foreach (PlayerSession session in Sessions.All)
+		{
+			services.FinishRecap(session, Utilities.GetPlayerFromSlot(session.Slot), MapName, announce: true);
+		}
+
+		recapSent = true;
+		return HookResult.Continue;
+	}
+
+	private void OnMapStart(string map)
+	{
+		MapName = map;
+		recapSent = false;
+		foreach (PlayerSession session in Sessions.All)
+		{
+			session.Recap.Restart(DateTime.UtcNow);
+		}
+	}
+
 	private void OnTick()
 	{
 		double now = Server.CurrentTime;
@@ -176,7 +211,15 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 		{
 			session.Panel.IsOpen = false;
 			session.MapXp = 0;
+
+			// A map changed by an admin or a vote skips the win panel, so the site still gets the recap, though no one would see chat now.
+			if (!recapSent)
+			{
+				services.FinishRecap(session, Utilities.GetPlayerFromSlot(session.Slot), MapName, announce: false);
+			}
 		}
+
+		recapSent = true;
 
 		Sessions.SaveAll();
 	}

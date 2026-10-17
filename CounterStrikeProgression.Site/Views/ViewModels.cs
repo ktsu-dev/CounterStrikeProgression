@@ -66,6 +66,7 @@ internal sealed record WeaponView(
 /// <param name="Suggestions">The challenges to try next, closest to a tier first.</param>
 /// <param name="Feats">Every feat, earned or not, with the player's progress toward it.</param>
 /// <param name="Feed">The player's feed, newest first.</param>
+/// <param name="LastSession">The player's last finished map, or <see langword="null"/> when none has been seen.</param>
 internal sealed record PlayerView(
 	string SteamId,
 	string Name,
@@ -81,7 +82,35 @@ internal sealed record PlayerView(
 	IReadOnlyList<WeaponView> Weapons,
 	IReadOnlyList<SuggestionView> Suggestions,
 	IReadOnlyList<FeatView> Feats,
-	IReadOnlyList<FeedItem> Feed);
+	IReadOnlyList<FeedItem> Feed,
+	SessionView? LastSession);
+
+/// <summary>A player's last finished map, as the player page shows it.</summary>
+/// <param name="Map">The map played.</param>
+/// <param name="StartedAt">When the session started, in UTC.</param>
+/// <param name="EndedAt">When the session ended, in UTC.</param>
+/// <param name="Xp">The rank XP earned.</param>
+/// <param name="Kills">Kills on the scoreboard.</param>
+/// <param name="Deaths">Deaths on the scoreboard.</param>
+/// <param name="SkillShots">The skill shots landed.</param>
+/// <param name="Levels">The weapon levels gained.</param>
+/// <param name="Tiers">The ladder tiers finished.</param>
+/// <param name="RankUps">The ranks gained.</param>
+/// <param name="Feats">The feats earned.</param>
+/// <param name="Best">The best moment, or <see langword="null"/> when nothing stood out.</param>
+internal sealed record SessionView(
+	string Map,
+	DateTime StartedAt,
+	DateTime EndedAt,
+	long Xp,
+	int Kills,
+	int Deaths,
+	int SkillShots,
+	int Levels,
+	int Tiers,
+	int RankUps,
+	int Feats,
+	string? Best);
 
 /// <summary>One feat on a player's page.</summary>
 /// <param name="Id">The feat id.</param>

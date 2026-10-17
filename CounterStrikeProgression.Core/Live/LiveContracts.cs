@@ -2,6 +2,7 @@
 
 namespace ktsu.CounterStrikeProgression.Core.Live;
 
+using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.Storage;
 
 /// <summary>
@@ -50,4 +51,5 @@ internal sealed record ServerSnapshot(DateTime SentAt, string Map, string GameMo
 /// <param name="Feed">The feed entries since the last batch.</param>
 /// <param name="Progress">The progress rows that changed since the last batch.</param>
 /// <param name="Settings">The plugin's settings, so the site can show the same XP values.</param>
-internal sealed record LiveBatch(ServerSnapshot Snapshot, IReadOnlyList<FeedEntry> Feed, IReadOnlyList<ProgressSnapshot> Progress, ProgressionSettings Settings);
+/// <param name="Recaps">The map recaps finished since the last batch, or <see langword="null"/> from a plugin that sends none.</param>
+internal sealed record LiveBatch(ServerSnapshot Snapshot, IReadOnlyList<FeedEntry> Feed, IReadOnlyList<ProgressSnapshot> Progress, ProgressionSettings Settings, IReadOnlyList<MapRecap>? Recaps = null);
