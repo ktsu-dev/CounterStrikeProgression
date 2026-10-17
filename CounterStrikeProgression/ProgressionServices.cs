@@ -58,6 +58,11 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	public void Apply(CCSPlayerController player, PlayerSession session, ProgressionResult result, int floatieKey = FloatieMerger.SelfKey, Vector? at = null)
 	{
 		Ensure.NotNull(result);
+		if (session.Progress is { } progress)
+		{
+			Engine.CheckFeats(progress, result);
+		}
+
 		if ((result.XpEarned <= 0) && (result.Notices.Count == 0))
 		{
 			return;

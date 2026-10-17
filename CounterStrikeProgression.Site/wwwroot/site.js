@@ -23,21 +23,33 @@
 	const STAGE_NUMERALS = ["I", "II", "III", "IV", "V"];
 	const RANK_NAMES = RANK_BASE_NAMES.flatMap((name) => STAGE_NUMERALS.map((stage) => `${name} · ${stage}`));
 
-	// Each family of ranks shares a badge color and emblem, and marks on the badge count the rank within it.
-	const RANK_FAMILIES = [
-		{ from: 0, color: "#b9c3cd", emblem: "star" },
-		{ from: 3, color: "#f2c94c", emblem: "star" },
-		{ from: 5, color: "#5fa8ff", emblem: "shield" },
-		{ from: 8, color: "#c77dff", emblem: "wings" },
-		{ from: 10, color: "#ff8a3d", emblem: "wings" },
-		{ from: 11, color: "#ff4d6d", emblem: "globe" },
+	// The badge color of each rank, by family: silver, gold, blue, purple, orange, and red.
+	const RANK_COLORS = [
+		"#b9c3cd", "#b9c3cd", "#b9c3cd",
+		"#f2c94c", "#f2c94c",
+		"#5fa8ff", "#5fa8ff", "#5fa8ff",
+		"#c77dff", "#c77dff",
+		"#ff8a3d",
+		"#ff4d6d",
 	];
+
+	// Matches FeatCatalog.All in CounterStrikeProgression.Core, for the names on icons outside the player page.
+	const FEATS = {
+		global_elite: "Global Elite",
+		millionaire: "Millionaire",
+		weapon_master: "Weapon master",
+		epic_ladder: "Epic ladder",
+		full_ladder: "Full ladder",
+		collector: "Collector",
+		chicken_overlord: "Chicken overlord",
+		chicken_connoisseur: "Chicken connoisseur",
+	};
 
 	const FEED_LIMIT = 50;
 	const REFETCH_EVERY_MS = 2000;
 	const STREAM_GRACE_MS = 15000;
 	const STEAM_ID = /^\d{17}$/;
-	const GOLD_KINDS = new Set(["RankUp", "WeaponLevelUp", "TierCompleted"]);
+	const GOLD_KINDS = new Set(["RankUp", "WeaponLevelUp", "TierCompleted", "FeatEarned"]);
 	const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 
 	function el(tag, className, text) {
@@ -104,66 +116,138 @@
 	function svgNode(tag, attributes) {
 		const node = document.createElementNS(SVG, tag);
 		for (const [name, value] of Object.entries(attributes)) {
-			node.setAttribute(name, String(value));
+			if (name === "textContent") {
+				node.textContent = String(value);
+			} else {
+				node.setAttribute(name, String(value));
+			}
 		}
 		return node;
 	}
 
-	function emblem(kind, color) {
-		const paint = { fill: color, stroke: "none" };
-		switch (kind) {
-			case "shield":
-				return svgNode("path", { d: "M6 4 L18 4 L18 10 Q18 16 12 18.5 Q6 16 6 10 Z", ...paint });
-			case "wings":
-				return svgNode("path", { d: "M2 15 L12 3.5 L22 15 L17.5 15 L12 9 L6.5 15 Z", ...paint });
-			case "globe": {
-				const group = svgNode("g", {});
-				group.append(
-					svgNode("circle", { cx: 12, cy: 11, r: 7, fill: color }),
-					svgNode("ellipse", { cx: 12, cy: 11, rx: 3, ry: 7, fill: "none", stroke: "#0d0f12", "stroke-width": 1.2 }),
-					svgNode("line", { x1: 5, y1: 11, x2: 19, y2: 11, stroke: "#0d0f12", "stroke-width": 1.2 }),
-				);
-				return group;
-			}
-			default: {
-				const points = [];
-				for (let i = 0; i < 10; i++) {
-					const radius = i % 2 === 0 ? 7.5 : 3.2;
-					const angle = (Math.PI / 5) * i - Math.PI / 2;
-					points.push(`${(12 + radius * Math.cos(angle)).toFixed(2)},${(11 + radius * Math.sin(angle)).toFixed(2)}`);
-				}
-				return svgNode("polygon", { points: points.join(" "), ...paint });
-			}
+	function starPoints(cx, cy, outer, inner) {
+		const points = [];
+		for (let i = 0; i < 10; i++) {
+			const radius = i % 2 === 0 ? outer : inner;
+			const angle = (Math.PI / 5) * i - Math.PI / 2;
+			points.push(`${(cx + radius * Math.cos(angle)).toFixed(2)},${(cy + radius * Math.sin(angle)).toFixed(2)}`);
 		}
+		return points.join(" ");
 	}
 
-	// A plate in the rank family's color: the emblem on the left, a mark for each step within the family, and
-	// five pips along the bottom that fill with the stage.
+	function chevron(y, color) {
+		return svgNode("path", { d: `M15 ${y + 6} L24 ${y} L33 ${y + 6} L33 ${y + 9} L24 ${y + 3} L15 ${y + 9} Z`, fill: color });
+	}
+
+	const SHIELD = "M17 3 L31 3 L31 10 Q31 16.5 24 19 Q17 16.5 17 10 Z";
+	const WINGS = "M6 9 Q14 4 21 8 L24 12 L27 8 Q34 4 42 9 Q35 9 31 12 Q34 12 36 14 Q30 14 27 16 L24 19 L21 16 Q18 14 12 14 Q14 12 17 12 Q13 9 6 9 Z";
+	const DARK = "#0d0f12";
+
+	// One emblem for each of the 12 ranks, drawn in the rank's color in the badge's upper area.
+	const RANK_EMBLEMS = [
+		(c) => [chevron(7, c)],
+		(c) => [chevron(4, c), chevron(10, c)],
+		(c) => [chevron(2, c), chevron(7, c), chevron(12, c)],
+		(c) => [svgNode("polygon", { points: starPoints(24, 11, 8, 3.4), fill: c })],
+		(c) => [
+			svgNode("circle", { cx: 24, cy: 11, r: 8.5, fill: "none", stroke: c, "stroke-width": 1.3 }),
+			svgNode("polygon", { points: starPoints(24, 11, 6, 2.6), fill: c }),
+		],
+		(c) => [svgNode("path", { d: SHIELD, fill: c })],
+		(c) => [svgNode("path", { d: SHIELD, fill: c }), svgNode("polygon", { points: starPoints(24, 10, 4, 1.7), fill: DARK })],
+		(c) => [
+			svgNode("path", { d: SHIELD, fill: c }),
+			svgNode("polygon", { points: starPoints(24, 10, 4, 1.7), fill: DARK }),
+			svgNode("polygon", { points: starPoints(11, 11, 3.5, 1.5), fill: c }),
+			svgNode("polygon", { points: starPoints(37, 11, 3.5, 1.5), fill: c }),
+		],
+		(c) => [svgNode("path", { d: WINGS, fill: c })],
+		(c) => [svgNode("path", { d: WINGS, fill: c }), svgNode("polygon", { points: starPoints(24, 4.5, 3.5, 1.5), fill: c })],
+		(c) => [
+			svgNode("path", { d: "M15 17 L15 7 L19.5 11 L24 4 L28.5 11 L33 7 L33 17 Z", fill: c }),
+			svgNode("polygon", { points: starPoints(9, 12, 3.5, 1.5), fill: c }),
+			svgNode("polygon", { points: starPoints(39, 12, 3.5, 1.5), fill: c }),
+		],
+		(c) => [
+			svgNode("circle", { cx: 24, cy: 11, r: 8, fill: c }),
+			svgNode("ellipse", { cx: 24, cy: 11, rx: 3.5, ry: 8, fill: "none", stroke: DARK, "stroke-width": 1.3 }),
+			svgNode("line", { x1: 16, y1: 11, x2: 32, y2: 11, stroke: DARK, "stroke-width": 1.3 }),
+			svgNode("polygon", { points: starPoints(9, 11, 3.5, 1.5), fill: c }),
+			svgNode("polygon", { points: starPoints(39, 11, 3.5, 1.5), fill: c }),
+		],
+	];
+
+	// A plate in the rank's color with the rank's own emblem, and five pips along the bottom that fill with the stage.
 	function badgeSvg(index) {
 		const rank = Math.max(0, Math.min(RANK_NAMES.length - 1, Math.floor(Number(index) || 0)));
 		const base = Math.floor(rank / STAGES_PER_RANK);
 		const stage = (rank % STAGES_PER_RANK) + 1;
-		const family = [...RANK_FAMILIES].reverse().find((f) => base >= f.from) ?? RANK_FAMILIES[0];
+		const color = RANK_COLORS[base] ?? RANK_COLORS[0];
 		const svg = svgNode("svg", { viewBox: "0 0 48 28", role: "img", "aria-hidden": "true" });
-		svg.append(
-			svgNode("rect", { x: 0.5, y: 0.5, width: 47, height: 27, rx: 4, fill: "#15181d", stroke: family.color, "stroke-width": 1 }),
-			emblem(family.emblem, family.color),
-		);
-		const marks = base - family.from + 1;
-		for (let i = 0; i < marks; i++) {
-			svg.append(svgNode("rect", { x: 24 + i * 3.6, y: 7, width: 2.2, height: 8, rx: 1, fill: family.color }));
-		}
+		svg.append(svgNode("rect", { x: 0.5, y: 0.5, width: 47, height: 27, rx: 4, fill: "#15181d", stroke: color, "stroke-width": 1 }));
+		svg.append(...RANK_EMBLEMS[base](color));
 		for (let i = 0; i < STAGES_PER_RANK; i++) {
 			svg.append(svgNode("rect", {
 				x: 4 + i * 8.2,
-				y: 21,
+				y: 22,
 				width: 7,
 				height: 3,
 				rx: 1,
-				fill: i < stage ? family.color : "#262b33",
+				fill: i < stage ? color : "#262b33",
 			}));
 		}
 		return svg;
+	}
+
+	// One glyph for each feat, drawn inside a round medallion.
+	const FEAT_GLYPHS = {
+		global_elite: (c) => [
+			svgNode("circle", { cx: 14, cy: 14, r: 6.5, fill: "none", stroke: c, "stroke-width": 1.5 }),
+			svgNode("ellipse", { cx: 14, cy: 14, rx: 2.8, ry: 6.5, fill: "none", stroke: c, "stroke-width": 1.2 }),
+			svgNode("line", { x1: 7.5, y1: 14, x2: 20.5, y2: 14, stroke: c, "stroke-width": 1.2 }),
+		],
+		millionaire: (c) => [svgNode("text", { x: 14, y: 17.5, "text-anchor": "middle", "font-size": 9, "font-weight": "bold", "font-family": "Consolas, monospace", fill: c, textContent: "1M" })],
+		weapon_master: (c) => [
+			svgNode("circle", { cx: 14, cy: 14, r: 5.5, fill: "none", stroke: c, "stroke-width": 1.5 }),
+			svgNode("path", { d: "M14 5 L14 10 M14 18 L14 23 M5 14 L10 14 M18 14 L23 14", stroke: c, "stroke-width": 1.5 }),
+		],
+		epic_ladder: (c) => [svgNode("path", { d: "M16 5 L9 15 L13.5 15 L11.5 23 L19 12 L14.5 12 Z", fill: c })],
+		full_ladder: (c) => [svgNode("path", { d: "M10 6 L10 22 M18 6 L18 22 M10 9 L18 9 M10 13 L18 13 M10 17 L18 17 M10 21 L18 21", stroke: c, "stroke-width": 1.5, fill: "none" })],
+		collector: (c) => {
+			const dots = [];
+			for (let row = 0; row < 3; row++) {
+				for (let column = 0; column < 3; column++) {
+					dots.push(svgNode("circle", { cx: 9.5 + column * 4.5, cy: 9.5 + row * 4.5, r: 1.6, fill: c }));
+				}
+			}
+			return dots;
+		},
+		chicken_overlord: (c) => [svgNode("path", { d: "M7 19 L7 10 L11 13.5 L14 7 L17 13.5 L21 10 L21 19 Z", fill: c })],
+		chicken_connoisseur: (c) => [
+			svgNode("ellipse", { cx: 11.5, cy: 11.5, rx: 5, ry: 4.2, transform: "rotate(-45 11.5 11.5)", fill: c }),
+			svgNode("path", { d: "M14.5 14.5 L19.5 19.5", stroke: c, "stroke-width": 2.2, "stroke-linecap": "round" }),
+			svgNode("circle", { cx: 20.5, cy: 18.5, r: 1.6, fill: c }),
+			svgNode("circle", { cx: 18.5, cy: 20.5, r: 1.6, fill: c }),
+		],
+	};
+
+	// An earned feat is gold, a locked one grey.
+	function featIcon(id, earned, title) {
+		const color = earned ? "#f2c94c" : "#4a515b";
+		const svg = svgNode("svg", { viewBox: "0 0 28 28", class: earned ? "feat-icon earned" : "feat-icon", role: "img" });
+		const label = svgNode("title", {});
+		label.textContent = title ?? FEATS[id] ?? id;
+		svg.append(label, svgNode("circle", { cx: 14, cy: 14, r: 13, fill: earned ? "#2a2410" : "#15181d", stroke: color, "stroke-width": 1.4 }));
+		svg.append(...(FEAT_GLYPHS[id] ?? (() => []))(color));
+		return svg;
+	}
+
+	function featIcons(ids) {
+		const span = el("span", "feat-icons");
+		for (const id of Array.isArray(ids) ? ids : []) {
+			span.append(featIcon(id, true));
+		}
+		return span;
 	}
 
 	function rankBadge(index, name, big = false) {
@@ -329,6 +413,12 @@
 	function feedItem(entry, showPlayer = true) {
 		const li = el("li", GOLD_KINDS.has(entry.kind) ? "gold" : null);
 		const what = el("span", "what");
+		if (entry.kind === "FeatEarned") {
+			const id = Object.keys(FEATS).find((key) => FEATS[key] === entry.title);
+			if (id) {
+				what.append(featIcon(id, true), " ");
+			}
+		}
 		if (showPlayer) {
 			what.append(playerLink(entry.steamId, entry.playerName), " · ");
 		}
@@ -368,6 +458,7 @@
 
 		let serverOnline = false;
 		let snapshot = null;
+		let feats = {};
 		let feed = [];
 
 		function renderTop() {
@@ -395,9 +486,14 @@
 			const rows = players.map((player) => {
 				const tr = el("tr");
 				const name = player.isBot ? el("span", null, player.name) : playerLink(player.steamId, player.name);
+				const nameCell = el("span");
+				nameCell.append(name);
+				if (!player.isBot && feats[String(player.steamId)]) {
+					nameCell.append(featIcons(feats[String(player.steamId)]));
+				}
 				const badge = player.isBot ? el("span", "rank bot", "bot") : rankBadge(player.rank);
 				tr.append(
-					cell("name", name),
+					cell("name", nameCell),
 					cell(null, badge),
 					cell("num", player.kills),
 					cell("num", player.deaths),
@@ -417,7 +513,7 @@
 				feedList.replaceChildren(el("li", null, "Nothing yet."));
 				return;
 			}
-			feedList.replaceChildren(...feed.map(feedItem));
+			feedList.replaceChildren(...feed.map((entry) => feedItem(entry)));
 		}
 
 		function atTime(entry) {
@@ -456,6 +552,7 @@
 				serverOnline = Boolean(live.online);
 				snapshot = live.snapshot ?? null;
 				feed = mergeFeed(Array.isArray(live.feed) ? live.feed : []);
+				feats = live.feats && typeof live.feats === "object" ? live.feats : {};
 			} catch {
 				serverOnline = false;
 			}
@@ -469,7 +566,17 @@
 			renderTop();
 			renderBoard();
 		});
-		on("feed", addFeed);
+		on("feed", (entry) => {
+			addFeed(entry);
+			const id = Object.keys(FEATS).find((key) => FEATS[key] === entry.title);
+			if (entry.kind === "FeatEarned" && id) {
+				const steamId = String(entry.steamId);
+				const ids = new Set(feats[steamId] ?? []);
+				ids.add(id);
+				feats[steamId] = Object.keys(FEATS).filter((key) => ids.has(key));
+				renderBoard();
+			}
+		});
 		on("online", (data) => {
 			serverOnline = data === true;
 			renderTop();
@@ -515,7 +622,11 @@
 				const tr = el("tr");
 				tr.append(
 					cell("num", row.position),
-					cell("name", playerLink(row.steamId, row.name)),
+					cell("name", (() => {
+						const span = el("span");
+						span.append(playerLink(row.steamId, row.name), featIcons(row.feats));
+						return span;
+					})()),
 					cell(null, rankBadge(row.rank, row.rankName)),
 					cell("num", formatXp(row.rankXp)),
 					cell(row.online ? "online" : null, ago(row.lastSeen, row.online)),
@@ -630,6 +741,26 @@
 				parts.push(next);
 			}
 
+			const featList = Array.isArray(player.feats) ? player.feats : [];
+			let featBox = null;
+			if (featList.length > 0) {
+				featBox = el("div", "pad");
+				const grid = el("div", "feats");
+				for (const feat of featList) {
+					const card = el("div", feat.earned ? "feat earned" : "feat");
+					const text = el("div", "feat-text");
+					text.append(el("b", null, feat.name), el("div", "muted", feat.description));
+					if (!feat.earned) {
+						const target = Number(feat.target) || 0;
+						text.append(bar(target > 0 ? Number(feat.current) / target : 0, "small"), el("span", "muted", ` ${formatXp(feat.current)}/${formatXp(target)}`));
+					}
+					card.append(featIcon(feat.id, feat.earned, feat.name), text);
+					grid.append(card);
+				}
+				const earnedCount = featList.filter((feat) => feat.earned).length;
+				featBox.append(el("h2", "section-title", `Feats · ${earnedCount}/${featList.length}`), grid);
+			}
+
 			const feed = Array.isArray(player.feed) ? player.feed : [];
 			const feedBox = el("div", "pad");
 			const feedList = el("ul", "feed");
@@ -672,7 +803,8 @@
 					parts.push(ladders);
 				}
 			}
-			parts.splice(suggestions.length > 0 ? 3 : 2, 0, feedBox);
+			const insertAt = suggestions.length > 0 ? 3 : 2;
+			parts.splice(insertAt, 0, ...(featBox ? [featBox, feedBox] : [feedBox]));
 			panel.replaceChildren(...parts);
 		}
 

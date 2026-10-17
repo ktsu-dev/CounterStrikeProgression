@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Site.Views;
 using System.Globalization;
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Challenges;
+using ktsu.CounterStrikeProgression.Core.Feats;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Weapons;
@@ -60,6 +61,7 @@ internal static class PlayerViewBuilder
 			online,
 			weapons,
 			ChallengeSuggester.Suggest(merged, settings, catalog),
+			[.. new FeatCatalog(settings).Measure(merged).Select(m => new FeatView(m.Feat.Id, m.Feat.Name, m.Feat.Description, m.Progress.IsEarned, Math.Min(m.Progress.Current, m.Progress.Target), m.Progress.Target))],
 			FeedCaptions.For(feed ?? [], settings));
 	}
 

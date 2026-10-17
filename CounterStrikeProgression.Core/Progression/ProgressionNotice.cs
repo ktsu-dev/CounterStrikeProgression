@@ -2,6 +2,8 @@
 
 namespace ktsu.CounterStrikeProgression.Core.Progression;
 
+using ktsu.CounterStrikeProgression.Core.Feats;
+
 using ktsu.CounterStrikeProgression.Core.SkillShots;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
@@ -14,6 +16,7 @@ internal enum NoticeKind
 	TierCompleted,
 	WeaponLevelUp,
 	RankUp,
+	FeatEarned,
 }
 
 /// <summary>
@@ -29,6 +32,9 @@ internal sealed record ProgressionNotice
 
 	/// <summary>Gets the skill shot earned, for skill shot notices.</summary>
 	public SkillShotDefinition? SkillShot { get; init; }
+
+	/// <summary>Gets the feat earned, for feat notices.</summary>
+	public FeatDefinition? Feat { get; init; }
 
 	/// <summary>Gets the challenge name, for tier notices.</summary>
 	public string? ChallengeName { get; init; }

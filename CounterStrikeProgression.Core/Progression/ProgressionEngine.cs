@@ -4,6 +4,7 @@ namespace ktsu.CounterStrikeProgression.Core.Progression;
 
 using ktsu.CounterStrikeProgression.Core.Challenges;
 using ktsu.CounterStrikeProgression.Core.Events;
+using ktsu.CounterStrikeProgression.Core.Feats;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
@@ -29,6 +30,44 @@ internal sealed class ProgressionEngine(ProgressionSettings settings)
 
 	/// <summary>Gets every weapon's ladder.</summary>
 	public ChallengeCatalog Challenges { get; } = new(settings);
+
+	/// <summary>Gets the feats.</summary>
+	public FeatCatalog Feats { get; } = new(settings);
+
+	/// <summary>
+	/// Adds a notice for each feat a result just earned. Call it after every result.
+	/// </summary>
+	/// <param name="player">The player's progress, with the result already applied.</param>
+	/// <param name="result">The result to add the notices to.</param>
+	/// <remarks>
+	/// The first call for a player records the feats they already have without announcing them. Feats move only
+	/// when something else is earned, so later calls check them only for results with notices. A feat earned by
+	/// the very first result of a session is recorded quietly.
+	/// </remarks>
+	public void CheckFeats(PlayerProgress player, ProgressionResult result)
+	{
+		Ensure.NotNull(player);
+		Ensure.NotNull(result);
+
+		if (player.EarnedFeats is null)
+		{
+			player.EarnedFeats = new(Feats.Earned(player).Select(f => f.Id), StringComparer.Ordinal);
+			return;
+		}
+
+		if (result.Notices.Count == 0)
+		{
+			return;
+		}
+
+		foreach (FeatDefinition feat in Feats.Earned(player))
+		{
+			if (player.EarnedFeats.Add(feat.Id))
+			{
+				result.Notices.Add(new() { Kind = NoticeKind.FeatEarned, Feat = feat, Broadcast = true });
+			}
+		}
+	}
 
 	/// <summary>
 	/// Credits a damaging bullet or a kill.

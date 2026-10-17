@@ -48,6 +48,7 @@ internal sealed record WeaponView(
 /// <param name="Online">Whether the player is on the server now.</param>
 /// <param name="Weapons">The player's weapons, most XP first.</param>
 /// <param name="Suggestions">The challenges to try next, closest to a tier first.</param>
+/// <param name="Feats">Every feat, earned or not, with the player's progress toward it.</param>
 /// <param name="Feed">The player's feed, newest first.</param>
 internal sealed record PlayerView(
 	string SteamId,
@@ -63,7 +64,17 @@ internal sealed record PlayerView(
 	bool Online,
 	IReadOnlyList<WeaponView> Weapons,
 	IReadOnlyList<SuggestionView> Suggestions,
+	IReadOnlyList<FeatView> Feats,
 	IReadOnlyList<FeedItem> Feed);
+
+/// <summary>One feat on a player's page.</summary>
+/// <param name="Id">The feat id.</param>
+/// <param name="Name">The name players see.</param>
+/// <param name="Description">What the player has to do.</param>
+/// <param name="Earned">Whether the player has earned it.</param>
+/// <param name="Current">The player's best value so far.</param>
+/// <param name="Target">The value that earns it.</param>
+internal sealed record FeatView(string Id, string Name, string Description, bool Earned, long Current, long Target);
 
 /// <summary>One feed line as the pages show it.</summary>
 /// <param name="At">When it happened, in UTC.</param>
@@ -110,4 +121,5 @@ internal sealed record SuggestionView(
 /// <param name="RankXp">The player's rank XP.</param>
 /// <param name="LastSeen">When the player was last seen, in UTC.</param>
 /// <param name="Online">Whether the player is on the server now.</param>
-internal sealed record RankRow(int Position, string SteamId, string Name, int Rank, string RankName, long RankXp, DateTime LastSeen, bool Online);
+/// <param name="Feats">The ids of the feats the player has earned.</param>
+internal sealed record RankRow(int Position, string SteamId, string Name, int Rank, string RankName, long RankXp, DateTime LastSeen, bool Online, IReadOnlyList<string> Feats);

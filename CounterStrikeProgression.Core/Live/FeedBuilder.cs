@@ -32,6 +32,7 @@ internal static class FeedBuilder
 				NoticeKind.RankUp => (FeedKind.RankUp, $"Rank up: {RankLadder.Names[notice.Value]}"),
 				NoticeKind.WeaponLevelUp => (FeedKind.WeaponLevelUp, $"{notice.Weapon?.DisplayName} level {notice.Value}"),
 				NoticeKind.TierCompleted => (FeedKind.TierCompleted, $"{notice.ChallengeName} {PanelBuilder.Numeral(notice.Value)}"),
+				NoticeKind.FeatEarned => (FeedKind.FeatEarned, notice.Feat?.Name),
 				_ => (FeedKind.SkillShot, null),
 			};
 

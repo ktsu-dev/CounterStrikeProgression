@@ -20,13 +20,15 @@ internal static class RanksViewBuilder
 	/// <param name="online">Tells whether a player is on the server now.</param>
 	/// <param name="settings">The plugin's settings, used to rank by the ladder. Without them the stored rank is used.</param>
 	/// <param name="overlayIds">The Steam IDs that have live rows, so a player not yet saved still appears.</param>
+	/// <param name="feats">Gets the ids of the feats a player has earned. Omitted, no row lists any.</param>
 	/// <returns>The rows, highest rank XP first, numbered from 1.</returns>
 	public static IReadOnlyList<RankRow> Build(
 		IReadOnlyList<RankingEntry> stored,
 		Func<ulong, ProgressSnapshot?> overlay,
 		Func<ulong, bool> online,
 		ProgressionSettings? settings = null,
-		IEnumerable<ulong>? overlayIds = null)
+		IEnumerable<ulong>? overlayIds = null,
+		Func<ulong, IReadOnlyList<string>>? feats = null)
 	{
 		Ensure.NotNull(stored);
 		Ensure.NotNull(overlay);
@@ -77,7 +79,8 @@ internal static class RanksViewBuilder
 				RankLadder.Names[rank],
 				entry.RankXp,
 				entry.LastSeen,
-				online(entry.SteamId)));
+				online(entry.SteamId),
+				feats?.Invoke(entry.SteamId) ?? []));
 		}
 
 		return rows;

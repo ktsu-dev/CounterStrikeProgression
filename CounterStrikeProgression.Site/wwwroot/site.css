@@ -196,6 +196,53 @@ td.name {
 	height: 23px;
 }
 
+.feat-icons {
+	display: inline-flex;
+	gap: 2px;
+	margin-left: 6px;
+	vertical-align: middle;
+}
+
+.feat-icon {
+	width: 18px;
+	height: 18px;
+	flex: none;
+	vertical-align: middle;
+}
+
+.feats {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+	gap: 8px;
+}
+
+.feat {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	background: var(--bg);
+	padding: 8px 10px;
+	opacity: 0.75;
+}
+
+.feat.earned {
+	background: var(--gold-bg);
+	opacity: 1;
+}
+
+.feat .feat-icon {
+	width: 40px;
+	height: 40px;
+}
+
+.feat-text {
+	min-width: 0;
+}
+
+.feat.earned b {
+	color: var(--gold);
+}
+
 .badge.big {
 	gap: 12px;
 }

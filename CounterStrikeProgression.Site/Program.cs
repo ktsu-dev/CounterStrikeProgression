@@ -46,6 +46,8 @@ internal static class Program
 		services.AddSingleton<IProgressionStore>(hasDatabase ? new MySqlProgressionStore(options.Database) : new InMemoryProgressionStore());
 		services.AddSingleton(provider => new ProgressReader(provider.GetRequiredService<IProgressionStore>(), provider.GetRequiredService<TimeProvider>()));
 		services.AddHostedService<OnlineWatcher>();
+		services.AddSingleton<FeatIndex>();
+		services.AddHostedService<FeatRefresher>();
 	}
 
 	private static void MapRoutes(WebApplication app)

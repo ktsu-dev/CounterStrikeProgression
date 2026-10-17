@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Site;
 using System.Data.Common;
 using System.Globalization;
 using System.Text.Json;
+using ktsu.CounterStrikeProgression.Core.Feats;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Storage;
@@ -21,7 +22,8 @@ using Microsoft.Extensions.Hosting;
 /// <param name="Online">Whether the server sent a batch within the offline window.</param>
 /// <param name="Snapshot">The latest server snapshot, or <see langword="null"/> before the first batch.</param>
 /// <param name="Feed">The feed, newest first.</param>
-internal sealed record LiveView(bool Online, ServerSnapshot? Snapshot, IReadOnlyList<FeedItem> Feed);
+/// <param name="Feats">The ids of the feats each player on the server has earned, keyed by Steam ID.</param>
+internal sealed record LiveView(bool Online, ServerSnapshot? Snapshot, IReadOnlyList<FeedItem> Feed, IReadOnlyDictionary<string, IReadOnlyList<string>> Feats);
 
 /// <summary>
 /// The site's route handlers.
@@ -87,11 +89,24 @@ internal static class Endpoints
 	/// Gets the live state for the live page.
 	/// </summary>
 	/// <param name="live">The live state.</param>
-	/// <returns>The online flag, the snapshot, and the feed.</returns>
-	public static IResult Live(LiveState live)
+	/// <param name="feats">The feats each player has earned.</param>
+	/// <returns>The online flag, the snapshot, the feed, and the feats of the players on the server.</returns>
+	public static IResult Live(LiveState live, FeatIndex feats)
 	{
 		Ensure.NotNull(live);
-		return TypedResults.Ok(new LiveView(live.IsOnline, live.Snapshot, FeedCaptions.For(live.Feed, live.Settings)));
+		Ensure.NotNull(feats);
+
+		ServerSnapshot? snapshot = live.Snapshot;
+		Dictionary<string, IReadOnlyList<string>> earned = [];
+		foreach (LivePlayer player in snapshot?.Players ?? [])
+		{
+			if (!player.IsBot && (feats.For(player.SteamId) is { Count: > 0 } ids))
+			{
+				earned[player.SteamId.ToString(CultureInfo.InvariantCulture)] = ids;
+			}
+		}
+
+		return TypedResults.Ok(new LiveView(live.IsOnline, snapshot, FeedCaptions.For(live.Feed, live.Settings), earned));
 	}
 
 	/// <summary>
@@ -100,8 +115,9 @@ internal static class Endpoints
 	/// <param name="reader">Reads the stored rankings.</param>
 	/// <param name="live">The live state.</param>
 	/// <param name="cancellationToken">Stops waiting when the request is aborted.</param>
+	/// <param name="feats">The feats each player has earned, kept current here.</param>
 	/// <returns>The rows, or 503 when the database can't be read.</returns>
-	public static async Task<IResult> RanksAsync(ProgressReader reader, LiveState live, CancellationToken cancellationToken)
+	public static async Task<IResult> RanksAsync(ProgressReader reader, LiveState live, FeatIndex feats, CancellationToken cancellationToken)
 	{
 		Ensure.NotNull(reader);
 		Ensure.NotNull(live);
@@ -116,7 +132,7 @@ internal static class Endpoints
 			return TypedResults.StatusCode(StatusCodes.Status503ServiceUnavailable);
 		}
 
-		return TypedResults.Ok(RanksViewBuilder.Build(stored, live.Overlay, live.IsPlaying, live.Settings, live.OverlayIds));
+		return TypedResults.Ok(RanksViewBuilder.Build(stored, live.Overlay, live.IsPlaying, live.Settings, live.OverlayIds, feats.For));
 	}
 
 	/// <summary>
@@ -126,8 +142,9 @@ internal static class Endpoints
 	/// <param name="reader">Reads the stored progress.</param>
 	/// <param name="live">The live state.</param>
 	/// <param name="cancellationToken">Stops waiting when the request is aborted.</param>
+	/// <param name="feats">The feats each player has earned, kept current here.</param>
 	/// <returns>The player, 404 for a bad or unknown id, or 503 when the database can't be read.</returns>
-	public static async Task<IResult> PlayerAsync(string id, ProgressReader reader, LiveState live, CancellationToken cancellationToken)
+	public static async Task<IResult> PlayerAsync(string id, ProgressReader reader, LiveState live, FeatIndex feats, CancellationToken cancellationToken)
 	{
 		Ensure.NotNull(reader);
 		Ensure.NotNull(live);
@@ -154,7 +171,9 @@ internal static class Endpoints
 		}
 
 		PlayerProgress merged = ProgressMerge.Merge(stored, overlay);
-		return TypedResults.Ok(PlayerViewBuilder.Build(merged, live.Settings, live.IsPlaying(steamId), live.PlayerFeed(steamId)));
+		PlayerView view = PlayerViewBuilder.Build(merged, live.Settings, live.IsPlaying(steamId), live.PlayerFeed(steamId));
+		feats.Set(steamId, view.Feats.Where(f => f.Earned).Select(f => FeatCatalog.All.First(d => d.Id == f.Id)));
+		return TypedResults.Ok(view);
 	}
 
 	/// <summary>
@@ -177,8 +196,9 @@ internal static class Endpoints
 	/// <param name="options">The site settings, for the token.</param>
 	/// <param name="live">The live state.</param>
 	/// <param name="broadcaster">Where the change events go.</param>
+	/// <param name="feats">The feats each player has earned, kept current here.</param>
 	/// <returns>204 on success, 401 without the token, 400 for a body that isn't a batch, or 413 for one over the limit.</returns>
-	public static async Task<IResult> IngestAsync(HttpContext context, SiteOptions options, LiveState live, Broadcaster broadcaster)
+	public static async Task<IResult> IngestAsync(HttpContext context, SiteOptions options, LiveState live, Broadcaster broadcaster, FeatIndex feats)
 	{
 		Ensure.NotNull(context);
 		Ensure.NotNull(options);
@@ -219,7 +239,9 @@ internal static class Endpoints
 			return TypedResults.BadRequest();
 		}
 
-		Publish(broadcaster, batch, live.Apply(batch));
+		LiveChanges changes = live.Apply(batch);
+		feats.Add(changes.NewFeed);
+		Publish(broadcaster, batch, changes);
 		return TypedResults.NoContent();
 	}
 

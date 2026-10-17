@@ -4,6 +4,7 @@ namespace ktsu.CounterStrikeProgression.Site.Views;
 
 using System.Globalization;
 using ktsu.CounterStrikeProgression.Core;
+using ktsu.CounterStrikeProgression.Core.Feats;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
@@ -50,6 +51,7 @@ internal static class FeedCaptions
 		{
 			FeedKind.SkillShot => SkillShotsByName.GetValueOrDefault(entry.Title)?.Description,
 			FeedKind.TierCompleted => TierCaption(entry, settings),
+			FeedKind.FeatEarned => FeatCatalog.FindByName(entry.Title)?.Description,
 			_ => null,
 		};
 

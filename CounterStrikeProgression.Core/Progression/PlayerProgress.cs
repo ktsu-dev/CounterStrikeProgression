@@ -91,6 +91,12 @@ internal sealed class PlayerProgress(ulong steamId)
 	/// <summary>Gets or sets when the player was last seen.</summary>
 	public DateTime LastSeen { get; set; } = DateTime.UtcNow;
 
+	/// <summary>
+	/// Gets or sets the ids of the feats the player had when this session started counting, plus any earned
+	/// since. Not saved, because feats are worked out from the rest of the progress.
+	/// </summary>
+	public HashSet<string>? EarnedFeats { get; set; }
+
 	/// <summary>Gets the player's weapons, keyed by weapon.</summary>
 	public Dictionary<WeaponKey, WeaponProgress> Weapons { get; } = [];
 

@@ -187,7 +187,7 @@ public sealed class SiteEndpointTests
 	{
 		using ProgressReader reader = new(new InMemoryProgressionStore());
 
-		IResult result = await Endpoints.PlayerAsync("76561197993183173", reader, NewState(), CancellationToken.None).ConfigureAwait(false);
+		IResult result = await Endpoints.PlayerAsync("76561197993183173", reader, NewState(), new FeatIndex(), CancellationToken.None).ConfigureAwait(false);
 
 		Assert.IsInstanceOfType<NotFound>(result);
 	}
@@ -197,7 +197,7 @@ public sealed class SiteEndpointTests
 	{
 		using ProgressReader reader = new(new InMemoryProgressionStore());
 
-		IResult result = await Endpoints.PlayerAsync("not-a-steam-id", reader, NewState(), CancellationToken.None).ConfigureAwait(false);
+		IResult result = await Endpoints.PlayerAsync("not-a-steam-id", reader, NewState(), new FeatIndex(), CancellationToken.None).ConfigureAwait(false);
 
 		Assert.IsInstanceOfType<NotFound>(result);
 	}
@@ -209,7 +209,7 @@ public sealed class SiteEndpointTests
 		await store.SaveAsync(ProgressSnapshot.CaptureAll(TestHelpers.Player()), CancellationToken.None).ConfigureAwait(false);
 		using ProgressReader reader = new(store);
 
-		IResult result = await Endpoints.PlayerAsync(TestHelpers.SteamId.ToString(System.Globalization.CultureInfo.InvariantCulture), reader, NewState(), CancellationToken.None).ConfigureAwait(false);
+		IResult result = await Endpoints.PlayerAsync(TestHelpers.SteamId.ToString(System.Globalization.CultureInfo.InvariantCulture), reader, NewState(), new FeatIndex(), CancellationToken.None).ConfigureAwait(false);
 
 		Ok<PlayerView> ok = Assert.IsInstanceOfType<Ok<PlayerView>>(result);
 		Assert.AreEqual("Tester", ok.Value?.Name);
@@ -224,7 +224,7 @@ public sealed class SiteEndpointTests
 
 		using ProgressReader reader = new(new InMemoryProgressionStore());
 
-		IResult result = await Endpoints.RanksAsync(reader, live, CancellationToken.None).ConfigureAwait(false);
+		IResult result = await Endpoints.RanksAsync(reader, live, new FeatIndex(), CancellationToken.None).ConfigureAwait(false);
 
 		Ok<IReadOnlyList<RankRow>> ok = Assert.IsInstanceOfType<Ok<IReadOnlyList<RankRow>>>(result);
 		Assert.HasCount(1, ok.Value!);
@@ -310,7 +310,7 @@ public sealed class SiteEndpointTests
 		LiveState live = NewState();
 		live.Apply(Batch(new FeedEntry(Start, TestHelpers.SteamId, "Tester", FeedKind.SkillShot, "Wallbang", "AK-47", 25)));
 
-		IResult result = Endpoints.Live(live);
+		IResult result = Endpoints.Live(live, new FeatIndex());
 
 		Ok<LiveView> ok = Assert.IsInstanceOfType<Ok<LiveView>>(result);
 		Assert.IsTrue(ok.Value!.Online);
@@ -324,7 +324,7 @@ public sealed class SiteEndpointTests
 		LiveState live = NewState();
 		DefaultHttpContext context = IngestContext(null, JsonSerializer.Serialize(Batch(), LiveJson.Options));
 
-		IResult result = await Endpoints.IngestAsync(context, new SiteOptions { Token = "dev" }, live, new Broadcaster()).ConfigureAwait(false);
+		IResult result = await Endpoints.IngestAsync(context, new SiteOptions { Token = "dev" }, live, new Broadcaster(), new FeatIndex()).ConfigureAwait(false);
 
 		Assert.AreEqual(StatusCodes.Status401Unauthorized, StatusOf(result));
 		Assert.IsNull(live.Snapshot);
@@ -335,7 +335,7 @@ public sealed class SiteEndpointTests
 	{
 		DefaultHttpContext context = IngestContext("Bearer ", JsonSerializer.Serialize(Batch(), LiveJson.Options));
 
-		IResult result = await Endpoints.IngestAsync(context, new SiteOptions(), NewState(), new Broadcaster()).ConfigureAwait(false);
+		IResult result = await Endpoints.IngestAsync(context, new SiteOptions(), NewState(), new Broadcaster(), new FeatIndex()).ConfigureAwait(false);
 
 		Assert.AreEqual(StatusCodes.Status401Unauthorized, StatusOf(result));
 	}
@@ -351,7 +351,7 @@ public sealed class SiteEndpointTests
 		LiveState live = NewState();
 		DefaultHttpContext context = IngestContext("Bearer dev", body);
 
-		IResult result = await Endpoints.IngestAsync(context, new SiteOptions { Token = "dev" }, live, new Broadcaster()).ConfigureAwait(false);
+		IResult result = await Endpoints.IngestAsync(context, new SiteOptions { Token = "dev" }, live, new Broadcaster(), new FeatIndex()).ConfigureAwait(false);
 
 		Assert.AreEqual(StatusCodes.Status400BadRequest, StatusOf(result));
 		Assert.IsNull(live.Snapshot);
@@ -363,7 +363,7 @@ public sealed class SiteEndpointTests
 		DefaultHttpContext context = IngestContext("Bearer dev", "{}");
 		context.Request.ContentLength = Endpoints.IngestBodyLimit + 1;
 
-		IResult result = await Endpoints.IngestAsync(context, new SiteOptions { Token = "dev" }, NewState(), new Broadcaster()).ConfigureAwait(false);
+		IResult result = await Endpoints.IngestAsync(context, new SiteOptions { Token = "dev" }, NewState(), new Broadcaster(), new FeatIndex()).ConfigureAwait(false);
 
 		Assert.AreEqual(StatusCodes.Status413PayloadTooLarge, StatusOf(result));
 	}
@@ -375,7 +375,7 @@ public sealed class SiteEndpointTests
 		string body = JsonSerializer.Serialize(Batch(), LiveJson.Options) + new string(' ', 3 * 1024 * 1024);
 		DefaultHttpContext context = IngestContext("Bearer dev", body);
 
-		IResult result = await Endpoints.IngestAsync(context, new SiteOptions { Token = "dev" }, live, new Broadcaster()).ConfigureAwait(false);
+		IResult result = await Endpoints.IngestAsync(context, new SiteOptions { Token = "dev" }, live, new Broadcaster(), new FeatIndex()).ConfigureAwait(false);
 
 		Assert.AreEqual(StatusCodes.Status204NoContent, StatusOf(result));
 		Assert.AreEqual("de_inferno", live.Snapshot?.Map);
@@ -394,7 +394,7 @@ public sealed class SiteEndpointTests
 		LiveBatch batch = Batch(second, first) with { Progress = [rows] };
 		DefaultHttpContext context = IngestContext("Bearer dev", JsonSerializer.Serialize(batch, LiveJson.Options));
 
-		IResult result = await Endpoints.IngestAsync(context, new SiteOptions { Token = "dev" }, live, broadcaster).ConfigureAwait(false);
+		IResult result = await Endpoints.IngestAsync(context, new SiteOptions { Token = "dev" }, live, broadcaster, new FeatIndex()).ConfigureAwait(false);
 
 		Assert.AreEqual(StatusCodes.Status204NoContent, StatusOf(result));
 		Assert.AreEqual("de_inferno", live.Snapshot?.Map);
