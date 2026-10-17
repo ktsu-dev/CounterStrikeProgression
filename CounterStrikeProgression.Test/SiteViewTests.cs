@@ -3,11 +3,13 @@
 namespace ktsu.CounterStrikeProgression.Test;
 
 using System.Globalization;
+using System.Text.Json;
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Challenges;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Core.Weapons;
+using ktsu.CounterStrikeProgression.Site.Live;
 using ktsu.CounterStrikeProgression.Site.Views;
 
 [TestClass]
@@ -243,5 +245,21 @@ public sealed class SiteViewTests
 
 		Assert.AreEqual("Lo", rows[0].Name);
 		Assert.AreEqual("Hi", rows[1].Name);
+	}
+
+	[TestMethod]
+	public void Player_StoredDates_SerializeAsUtc()
+	{
+		PlayerProgress stored = TestHelpers.Player();
+		stored.FirstSeen = Seen.AddDays(-3);
+		stored.LastSeen = Seen;
+
+		PlayerView view = PlayerViewBuilder.Build(ProgressMerge.Merge(stored, null), Settings(), online: false);
+		string json = JsonSerializer.Serialize(view, SiteJson.Options);
+
+		Assert.AreEqual(DateTimeKind.Utc, view.LastSeen.Kind);
+		Assert.AreEqual(DateTimeKind.Utc, view.FirstSeen.Kind);
+		Assert.Contains("\"lastSeen\":\"2026-10-17T12:00:00Z\"", json);
+		Assert.Contains("\"firstSeen\":\"2026-10-14T12:00:00Z\"", json);
 	}
 }

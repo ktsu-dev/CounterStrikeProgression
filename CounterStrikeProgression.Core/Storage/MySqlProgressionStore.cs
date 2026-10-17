@@ -10,7 +10,8 @@ using MySqlConnector;
 /// <summary>
 /// Keeps progress in MariaDB or MySQL, in tables prefixed <c>csp_</c>.
 /// </summary>
-internal sealed class MySqlProgressionStore : IProgressionStore
+/// <param name="settings">Where the database is.</param>
+internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgressionStore
 {
 	/// <summary>The schema version these statements create and expect.</summary>
 	public const int SchemaVersion = 1;
@@ -73,16 +74,18 @@ internal sealed class MySqlProgressionStore : IProgressionStore
 		ON DUPLICATE KEY UPDATE count = VALUES(count), tier = VALUES(tier);
 		""";
 
-	private readonly string connectionString;
+	private readonly string connectionString = ConnectionStringFor(settings);
 
 	/// <summary>
-	/// Initializes a new instance of the <see cref="MySqlProgressionStore"/> class.
+	/// Builds the connection string for a database. Dates are read back as UTC, because the plugin writes
+	/// <see cref="DateTime.UtcNow"/>, and a reader that sees an unspecified kind would treat them as local time.
 	/// </summary>
 	/// <param name="settings">Where the database is.</param>
-	public MySqlProgressionStore(DatabaseSettings settings)
+	/// <returns>The connection string.</returns>
+	public static string ConnectionStringFor(DatabaseSettings settings)
 	{
 		Ensure.NotNull(settings);
-		connectionString = new MySqlConnectionStringBuilder
+		return new MySqlConnectionStringBuilder
 		{
 			Server = settings.Host,
 			Port = (uint)settings.Port,
@@ -92,6 +95,7 @@ internal sealed class MySqlProgressionStore : IProgressionStore
 			SslMode = settings.RequireTls ? MySqlSslMode.Required : MySqlSslMode.Preferred,
 			AllowUserVariables = false,
 			ConnectionTimeout = 15,
+			DateTimeKind = MySqlDateTimeKind.Utc,
 		}.ConnectionString;
 	}
 
@@ -185,7 +189,7 @@ internal sealed class MySqlProgressionStore : IProgressionStore
 			"SELECT steam_id AS SteamId, name AS Name, rank_xp AS RankXp, rank_index AS `Rank`, last_seen AS LastSeen FROM csp_players ORDER BY rank_xp DESC, steam_id ASC LIMIT @count",
 			new { count },
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
-		return [.. rankings.Select(r => r with { LastSeen = DateTime.SpecifyKind(r.LastSeen, DateTimeKind.Utc) })];
+		return [.. rankings];
 	}
 
 	private async Task<MySqlConnection> OpenAsync(CancellationToken cancellationToken)

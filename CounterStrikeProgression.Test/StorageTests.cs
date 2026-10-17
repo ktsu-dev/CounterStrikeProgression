@@ -6,6 +6,7 @@ using ktsu.CounterStrikeProgression.Core.Challenges;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Core.Weapons;
+using MySqlConnector;
 
 [TestClass]
 public sealed class StorageTests
@@ -128,5 +129,13 @@ public sealed class StorageTests
 
 		IReadOnlyList<RankingEntry> capped = await store.RankingsAsync(2, TestContext.CancellationToken).ConfigureAwait(false);
 		Assert.HasCount(2, capped);
+	}
+
+	[TestMethod]
+	public void MySql_ReadsDatesBackAsUtc()
+	{
+		MySqlConnectionStringBuilder builder = new(MySqlProgressionStore.ConnectionStringFor(new DatabaseSettings()));
+
+		Assert.AreEqual(MySqlDateTimeKind.Utc, builder.DateTimeKind);
 	}
 }
