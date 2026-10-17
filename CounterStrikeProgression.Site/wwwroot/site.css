@@ -243,6 +243,43 @@ td.name {
 	color: var(--gold);
 }
 
+.challenge-icon {
+	width: 1.15em;
+	height: 1.15em;
+	vertical-align: -0.2em;
+	flex: none;
+}
+
+.tiers .challenge-icon {
+	width: 1.2em;
+	height: 1.2em;
+}
+
+.ladder tr.rank-start td {
+	border-top: 1px solid var(--line);
+}
+
+.ladder tr:not(.populated) td {
+	color: var(--muted);
+}
+
+.ladder tr:not(.populated) .badge svg {
+	opacity: 0.55;
+}
+
+.ladder-count {
+	white-space: nowrap;
+}
+
+.bar.count {
+	display: inline-block;
+	width: 160px;
+	max-width: 40vw;
+	height: 8px;
+	margin: 0 8px 0 0;
+	vertical-align: middle;
+}
+
 .badge.big {
 	gap: 12px;
 }
@@ -434,5 +471,13 @@ td.name {
 	.badge.big .rank {
 		display: inline;
 		font-size: 18px;
+	}
+
+	.ladder .badge .rank {
+		display: inline;
+	}
+
+	.bar.count {
+		width: 60px;
 	}
 }

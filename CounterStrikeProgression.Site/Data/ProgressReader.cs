@@ -16,8 +16,11 @@ using ktsu.CounterStrikeProgression.Core.Storage;
 /// <param name="time">The clock, or the system clock when omitted.</param>
 internal sealed class ProgressReader(IProgressionStore store, TimeProvider? time = null) : IDisposable
 {
-	/// <summary>How many players the rankings read.</summary>
+	/// <summary>How many players the ranks page reads.</summary>
 	public const int RankingsCount = 500;
+
+	/// <summary>A count large enough to read every player, for the rank distribution.</summary>
+	public const int AllPlayers = 1_000_000;
 
 	/// <summary>The lowest individual-account SteamID64.</summary>
 	public const ulong MinSteamId = 76561197960265729;
@@ -38,8 +41,8 @@ internal sealed class ProgressReader(IProgressionStore store, TimeProvider? time
 	private readonly Lock gate = new();
 	private readonly Dictionary<ulong, (PlayerProgress? Progress, DateTimeOffset Until)> players = [];
 	private readonly Dictionary<ulong, Lazy<Task<PlayerProgress?>>> loadingPlayers = [];
-	private (IReadOnlyList<RankingEntry> Rankings, DateTimeOffset Until)? rankings;
-	private Lazy<Task<IReadOnlyList<RankingEntry>>>? loadingRankings;
+	private readonly Dictionary<int, (IReadOnlyList<RankingEntry> Rankings, DateTimeOffset Until)> rankings = [];
+	private readonly Dictionary<int, Lazy<Task<IReadOnlyList<RankingEntry>>>> loadingRankings = [];
 
 	/// <summary>
 	/// Parses a SteamID64 from a URL.
@@ -69,17 +72,31 @@ internal sealed class ProgressReader(IProgressionStore store, TimeProvider? time
 	/// </summary>
 	/// <param name="cancellationToken">Stops this caller waiting. A query other callers share runs on.</param>
 	/// <returns>Up to <see cref="RankingsCount"/> rows.</returns>
-	public Task<IReadOnlyList<RankingEntry>> RankingsAsync(CancellationToken cancellationToken = default)
+	public Task<IReadOnlyList<RankingEntry>> RankingsAsync(CancellationToken cancellationToken = default) => RankingsAsync(RankingsCount, cancellationToken);
+
+	/// <summary>
+	/// Gets the stored rankings, highest rank XP first, up to a count. Each count is cached on its own.
+	/// </summary>
+	/// <param name="count">How many rows to read.</param>
+	/// <param name="cancellationToken">Stops this caller waiting. A query other callers share runs on.</param>
+	/// <returns>Up to <paramref name="count"/> rows.</returns>
+	public Task<IReadOnlyList<RankingEntry>> RankingsAsync(int count, CancellationToken cancellationToken = default)
 	{
 		Lazy<Task<IReadOnlyList<RankingEntry>>> load;
 		lock (gate)
 		{
-			if (rankings is { } cached && clock.GetUtcNow() < cached.Until)
+			if (rankings.TryGetValue(count, out (IReadOnlyList<RankingEntry> Rankings, DateTimeOffset Until) cached) && clock.GetUtcNow() < cached.Until)
 			{
 				return Task.FromResult(cached.Rankings);
 			}
 
-			load = loadingRankings ??= new(LoadRankingsAsync);
+			if (!loadingRankings.TryGetValue(count, out Lazy<Task<IReadOnlyList<RankingEntry>>>? existing))
+			{
+				existing = new(() => LoadRankingsAsync(count));
+				loadingRankings[count] = existing;
+			}
+
+			load = existing;
 		}
 
 		return load.Value.WaitAsync(cancellationToken);
@@ -116,15 +133,15 @@ internal sealed class ProgressReader(IProgressionStore store, TimeProvider? time
 	/// <inheritdoc/>
 	public void Dispose() => slots.Dispose();
 
-	private async Task<IReadOnlyList<RankingEntry>> LoadRankingsAsync()
+	private async Task<IReadOnlyList<RankingEntry>> LoadRankingsAsync(int count)
 	{
 		try
 		{
 			DateTimeOffset now = clock.GetUtcNow();
-			IReadOnlyList<RankingEntry> fresh = await QueryAsync(() => store.RankingsAsync(RankingsCount, CancellationToken.None)).ConfigureAwait(false);
+			IReadOnlyList<RankingEntry> fresh = await QueryAsync(() => store.RankingsAsync(count, CancellationToken.None)).ConfigureAwait(false);
 			lock (gate)
 			{
-				rankings = (fresh, now + CacheFor);
+				rankings[count] = (fresh, now + CacheFor);
 			}
 
 			return fresh;
@@ -133,7 +150,7 @@ internal sealed class ProgressReader(IProgressionStore store, TimeProvider? time
 		{
 			lock (gate)
 			{
-				loadingRankings = null;
+				loadingRankings.Remove(count);
 			}
 		}
 	}

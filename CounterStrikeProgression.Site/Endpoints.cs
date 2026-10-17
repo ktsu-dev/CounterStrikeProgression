@@ -136,6 +136,32 @@ internal static class Endpoints
 	}
 
 	/// <summary>
+	/// Gets the rank distribution: every ladder step, lowest first, with how many players stand on it.
+	/// </summary>
+	/// <param name="reader">Reads the stored rankings.</param>
+	/// <param name="live">The live state.</param>
+	/// <param name="cancellationToken">Stops waiting when the request is aborted.</param>
+	/// <returns>The steps, or 503 when the database can't be read.</returns>
+	public static async Task<IResult> LadderAsync(ProgressReader reader, LiveState live, CancellationToken cancellationToken)
+	{
+		Ensure.NotNull(reader);
+		Ensure.NotNull(live);
+
+		IReadOnlyList<RankingEntry> stored;
+		try
+		{
+			stored = await reader.RankingsAsync(ProgressReader.AllPlayers, cancellationToken).ConfigureAwait(false);
+		}
+		catch (DbException)
+		{
+			return TypedResults.StatusCode(StatusCodes.Status503ServiceUnavailable);
+		}
+
+		IReadOnlyList<RankRow> rows = RanksViewBuilder.Build(stored, live.Overlay, live.IsPlaying, live.Settings, live.OverlayIds);
+		return TypedResults.Ok(LadderViewBuilder.Build(rows, live.Settings));
+	}
+
+	/// <summary>
 	/// Gets one player's page.
 	/// </summary>
 	/// <param name="id">The SteamID64 from the URL.</param>

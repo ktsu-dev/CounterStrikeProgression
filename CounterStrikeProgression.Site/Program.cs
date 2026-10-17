@@ -66,10 +66,12 @@ internal static class Program
 
 		app.MapGet("/", (IWebHostEnvironment environment) => Endpoints.Page(environment, "index.html"));
 		app.MapGet("/ranks", (IWebHostEnvironment environment) => Endpoints.Page(environment, "ranks.html"));
+		app.MapGet("/ladder", (IWebHostEnvironment environment) => Endpoints.Page(environment, "ladder.html"));
 		app.MapGet("/players/{id}", Endpoints.PlayerPage);
 		app.MapGet("/healthz", Endpoints.Health);
 		app.MapGet("/api/live", Endpoints.Live);
 		app.MapGet("/api/ranks", Endpoints.RanksAsync);
+		app.MapGet("/api/ladder", Endpoints.LadderAsync);
 		app.MapGet("/api/players/{id}", Endpoints.PlayerAsync);
 		app.MapGet("/api/stream", Endpoints.Stream);
 		app.MapPost(Endpoints.IngestRoute, Endpoints.IngestAsync);
