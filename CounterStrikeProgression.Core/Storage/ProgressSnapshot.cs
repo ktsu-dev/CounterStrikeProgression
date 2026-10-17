@@ -33,6 +33,12 @@ internal sealed record WeaponRow(ulong SteamId, string Weapon, long Xp, int Leve
 /// <param name="Tier">The number of tiers finished.</param>
 internal sealed record ChallengeRow(ulong SteamId, string Weapon, string Challenge, long Count, int Tier);
 
+/// <summary>A player's XP in one season, as stored.</summary>
+/// <param name="SteamId">The 64-bit Steam ID.</param>
+/// <param name="Start">The season's first day, at midnight UTC.</param>
+/// <param name="Xp">The rank XP earned in the season.</param>
+internal sealed record SeasonRow(ulong SteamId, DateTime Start, long Xp);
+
 /// <summary>
 /// The rows of one player that changed since the last save, copied on the game thread so the database
 /// write can happen elsewhere. Every row holds full values, never increments, so saving the same snapshot
@@ -43,8 +49,14 @@ internal sealed record ChallengeRow(ulong SteamId, string Weapon, string Challen
 /// <param name="Challenges">The challenge rows that changed.</param>
 internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponRow> Weapons, IReadOnlyList<ChallengeRow> Challenges)
 {
+	/// <summary>
+	/// Gets the season rows that changed: usually the current season alone, and the season before it too when it
+	/// ended between saves.
+	/// </summary>
+	public IReadOnlyList<SeasonRow> Seasons { get; init; } = [];
+
 	/// <summary>Gets a value indicating whether there's nothing to save.</summary>
-	public bool IsEmpty => (Player is null) && (Weapons.Count == 0) && (Challenges.Count == 0);
+	public bool IsEmpty => (Player is null) && (Weapons.Count == 0) && (Challenges.Count == 0) && (Seasons.Count == 0);
 
 	/// <summary>
 	/// Copies a player's changed rows and clears their dirty flags.
@@ -82,7 +94,20 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 			}
 		}
 
-		return new(player, weapons, challenges);
+		List<SeasonRow> seasons = [];
+		if (progress.EndedSeason is { } ended)
+		{
+			seasons.Add(new(progress.SteamId, ended.Start.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc), ended.Xp));
+			progress.EndedSeason = null;
+		}
+
+		if (progress.IsSeasonDirty && (ToSeasonRow(progress) is { } season))
+		{
+			seasons.Add(season);
+			progress.IsSeasonDirty = false;
+		}
+
+		return new(player, weapons, challenges) { Seasons = seasons };
 	}
 
 	/// <summary>
@@ -105,7 +130,20 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 			}
 		}
 
-		return new(ToRow(progress), weapons, challenges);
+		return new(ToRow(progress), weapons, challenges) { Seasons = ToSeasonRow(progress) is { } season ? [season] : [] };
+	}
+
+	/// <summary>
+	/// Makes the row for a player's latest season.
+	/// </summary>
+	/// <param name="progress">The player's progress.</param>
+	/// <returns>The row, or <see langword="null"/> when the player hasn't earned XP in any season.</returns>
+	public static SeasonRow? ToSeasonRow(PlayerProgress progress)
+	{
+		Ensure.NotNull(progress);
+		return progress.SeasonStart is { } start
+			? new(progress.SteamId, start.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc), progress.SeasonXp)
+			: null;
 	}
 
 	/// <summary>
@@ -141,6 +179,19 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 		{
 			progress.Weapon(WeaponKey.Create(row.Weapon)).Challenge(row.Challenge).IsDirty = true;
 		}
+
+		foreach (SeasonRow row in Seasons)
+		{
+			DateOnly start = DateOnly.FromDateTime(row.Start);
+			if (progress.SeasonStart == start)
+			{
+				progress.IsSeasonDirty = true;
+			}
+			else
+			{
+				progress.EndedSeason ??= (start, row.Xp);
+			}
+		}
 	}
 
 	/// <summary>
@@ -149,8 +200,9 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 	/// <param name="player">The player row.</param>
 	/// <param name="weapons">The player's weapon rows.</param>
 	/// <param name="challenges">The player's challenge rows.</param>
+	/// <param name="season">The player's latest season row, if they have one.</param>
 	/// <returns>The progress, with nothing flagged dirty.</returns>
-	public static PlayerProgress Rebuild(PlayerRow player, IEnumerable<WeaponRow> weapons, IEnumerable<ChallengeRow> challenges)
+	public static PlayerProgress Rebuild(PlayerRow player, IEnumerable<WeaponRow> weapons, IEnumerable<ChallengeRow> challenges, SeasonRow? season = null)
 	{
 		Ensure.NotNull(player);
 		Ensure.NotNull(weapons);
@@ -163,6 +215,8 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 			Rank = player.Rank,
 			FirstSeen = player.FirstSeen,
 			LastSeen = player.LastSeen,
+			SeasonStart = season is null ? null : DateOnly.FromDateTime(season.Start),
+			SeasonXp = season?.Xp ?? 0,
 		};
 
 		foreach (WeaponRow row in weapons)

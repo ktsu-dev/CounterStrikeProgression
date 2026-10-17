@@ -849,6 +849,34 @@
 		return box;
 	}
 
+	function ordinal(n) {
+		const value = Number(n) || 0;
+		const tens = value % 100;
+		const suffix = tens >= 11 && tens <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" }[value % 10] ?? "th");
+		return `${value}${suffix}`;
+	}
+
+	// One chip per season: this season's place while it runs, then each top 3 finish of an ended season.
+	function seasonBadges(seasons) {
+		const badges = Array.isArray(seasons?.badges) ? seasons.badges : [];
+		if (badges.length === 0) {
+			return null;
+		}
+		const row = el("div", "season-badges");
+		for (const badge of badges) {
+			const place = Number(badge.place);
+			const medal = !badge.current && place >= 1 && place <= 3 ? ` place-${place}` : "";
+			const chip = el("a", `season-badge${badge.current ? " current" : ""}${medal}`);
+			chip.href = badge.current ? "/seasons" : `/seasons?start=${badge.start}`;
+			const text = badge.current
+				? `${badge.season} · ${ordinal(place)} of ${badge.players} · ${formatXp(badge.xp)} XP`
+				: `${ordinal(place)} · ${badge.season}`;
+			chip.append(el("b", null, badge.current ? "Played this season" : "Season finish"), el("span", null, text));
+			row.append(chip);
+		}
+		return row;
+	}
+
 	const PLAYER_TABS = [
 		["next", "Next up"],
 		["weapons", "Weapons"],
@@ -862,6 +890,7 @@
 		root.replaceChildren(panel);
 		let online = false;
 		let last = null;
+		let seasons = null;
 		// The open tab and the weapon picked on the weapons tab, kept across refetches.
 		let tab = null;
 		let weaponKey = null;
@@ -1077,6 +1106,10 @@
 			details.push(atTop ? "top rank" : `${formatXp(player.xpToNextRank)} XP to ${player.nextRankName}`);
 			details.push(`first seen ${formatDate(player.firstSeen)}`);
 			summary.append(rankBadge(player.rank, player.rankName, true), bar(atTop ? 1 : player.rankProgress), el("div", "muted", details.join(" · ")));
+			const badges = seasonBadges(seasons);
+			if (badges) {
+				summary.append(badges);
+			}
 
 			const body = el("div", "tab-panel");
 			body.id = "player-tab";
@@ -1098,7 +1131,13 @@
 
 		async function load() {
 			try {
-				render(await getJson(`/api/players/${id}`));
+				// The badges are extra, so the page still shows without them.
+				const [player, playerSeasons] = await Promise.all([
+					getJson(`/api/players/${id}`),
+					getJson(`/api/players/${id}/seasons`).catch(() => seasons),
+				]);
+				seasons = playerSeasons;
+				render(player);
 			} catch (error) {
 				if (error.status === 404) {
 					notFound();
@@ -1577,6 +1616,90 @@
 		load();
 	}
 
+	function initSeasons(root) {
+		const top = el("div", "top");
+		const body = el("div");
+		const panel = el("div", "panel");
+		panel.append(top, body);
+		root.replaceChildren(panel);
+		top.append(el("b", null, "Seasons"));
+
+		const requested = new URLSearchParams(window.location.search).get("start");
+		const start = /^\d{4}-\d{2}-\d{2}$/.test(requested ?? "") ? requested : null;
+		let current = start === null;
+
+		function seasonLink(text, target) {
+			const link = el("a", null, text);
+			link.href = target ? `/seasons?start=${target}` : "/seasons";
+			return link;
+		}
+
+		function render(season) {
+			current = Boolean(season.current);
+			document.title = `Season ${season.name} · ${SERVER_NAME}`;
+			const title = el("span");
+			title.append(el("b", null, `Season ${season.name}`), current ? " · running now" : " · ended");
+			const links = el("span");
+			links.append(seasonLink("← Previous", season.previous));
+			if (season.next) {
+				links.append(" · ", seasonLink("Next →", season.next));
+			}
+			top.replaceChildren(title, links);
+
+			const lastDay = new Date(`${season.end}T00:00:00Z`);
+			lastDay.setUTCDate(lastDay.getUTCDate() - 1);
+			const note = current
+				? `Season XP counts every point of rank XP earned from ${season.start} to ${lastDay.toISOString().slice(0, 10)} (UTC). Lifetime rank never resets.`
+				: `Final standings. The top 3 keep a badge on their player page.`;
+			const intro = el("div", "pad muted", note);
+
+			const rows = Array.isArray(season.rows) ? season.rows : [];
+			if (rows.length === 0) {
+				body.replaceChildren(intro, message(current ? "No one has earned XP this season yet." : "No one played this season."));
+				return;
+			}
+			const trs = rows.map((row) => {
+				const tr = el("tr", !current && row.position <= 3 ? `place-${row.position}` : null);
+				tr.append(
+					cell("num", row.position),
+					cell("name", (() => {
+						const span = el("span");
+						span.append(playerLink(row.steamId, row.name));
+						if (row.online) {
+							span.append(" ", el("span", "online", "online"));
+						}
+						return span;
+					})()),
+					cell(null, rankBadge(row.rank, row.rankName)),
+					cell("num", formatXp(row.xp)),
+				);
+				return tr;
+			});
+			body.replaceChildren(intro, table([["#", "num"], ["Player"], ["Rank"], ["Season XP", "num"]], trs));
+		}
+
+		async function load() {
+			try {
+				render(await getJson(start ? `/api/seasons?start=${start}` : "/api/seasons"));
+			} catch (error) {
+				body.replaceChildren(message(error.status === 404 ? "There's no such season." : "The season can't be loaded right now."));
+			}
+		}
+
+		const refetch = throttle(load, REFETCH_EVERY_MS);
+		on("progress", (changed) => {
+			if (current && Array.isArray(changed) && changed.length > 0) {
+				refetch();
+			}
+		});
+		onStatus(({ reconnected }) => {
+			if (reconnected) {
+				refetch();
+			}
+		});
+		load();
+	}
+
 	const pages = {
 		live: initLive,
 		ranks: initRanks,
@@ -1584,6 +1707,7 @@
 		ladder: initLadder,
 		leaderboards: initLeaderboards,
 		skillshots: initSkillShots,
+		seasons: initSeasons,
 	};
 
 	document.addEventListener("DOMContentLoaded", () => {

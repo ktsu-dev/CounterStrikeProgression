@@ -61,7 +61,17 @@ internal sealed class ProgressChangeTracker
 			}
 		}
 
-		ProgressSnapshot changes = new(player, weapons, challenges);
+		List<SeasonRow> seasons = [];
+		foreach (SeasonRow row in all.Seasons)
+		{
+			if (last.Season != row)
+			{
+				seasons.Add(row);
+				last.Season = row;
+			}
+		}
+
+		ProgressSnapshot changes = new(player, weapons, challenges) { Seasons = seasons };
 		return changes.IsEmpty ? null : changes;
 	}
 
@@ -79,6 +89,8 @@ internal sealed class ProgressChangeTracker
 	private sealed class Sent
 	{
 		public PlayerRow? Player { get; set; }
+
+		public SeasonRow? Season { get; set; }
 
 		public Dictionary<string, WeaponRow> Weapons { get; } = new(StringComparer.Ordinal);
 
