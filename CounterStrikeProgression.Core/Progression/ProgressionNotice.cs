@@ -2,8 +2,8 @@
 
 namespace ktsu.CounterStrikeProgression.Core.Progression;
 
+using ktsu.CounterStrikeProgression.Core.Contracts;
 using ktsu.CounterStrikeProgression.Core.Feats;
-
 using ktsu.CounterStrikeProgression.Core.SkillShots;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
@@ -17,6 +17,7 @@ internal enum NoticeKind
 	WeaponLevelUp,
 	RankUp,
 	FeatEarned,
+	ContractCompleted,
 }
 
 /// <summary>
@@ -35,6 +36,9 @@ internal sealed record ProgressionNotice
 
 	/// <summary>Gets the feat earned, for feat notices.</summary>
 	public FeatDefinition? Feat { get; init; }
+
+	/// <summary>Gets the contract finished, for contract notices.</summary>
+	public ActiveContract? Contract { get; init; }
 
 	/// <summary>Gets the challenge name, for tier notices.</summary>
 	public string? ChallengeName { get; init; }
@@ -65,4 +69,10 @@ internal sealed class ProgressionResult
 
 	/// <summary>Gets the moments worth telling the player about, in the order they happened.</summary>
 	public IList<ProgressionNotice> Notices { get; } = [];
+
+	/// <summary>Gets the kills the event made, for the map recap.</summary>
+	public int Kills { get; internal set; }
+
+	/// <summary>Gets what the event did that contracts might count. The engine empties it once they're counted.</summary>
+	internal IList<ContractSignal> Signals { get; } = [];
 }
