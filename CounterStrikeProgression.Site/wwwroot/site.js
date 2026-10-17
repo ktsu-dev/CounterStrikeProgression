@@ -991,8 +991,8 @@
 			body.id = "player-tab";
 			body.setAttribute("role", "tabpanel");
 			body.setAttribute("aria-labelledby", `tab-${tab}`);
-			const renderers = { next: renderNext, weapons: renderWeapons, feats: renderFeats, feed: renderFeed };
-			body.append(renderers[tab](player));
+			const renderers = new Map([["next", renderNext], ["weapons", renderWeapons], ["feats", renderFeats], ["feed", renderFeed]]);
+			body.append((renderers.get(tab) ?? renderNext)(player));
 
 			panel.replaceChildren(head, summary, tabBar(player), body);
 		}
