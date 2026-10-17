@@ -112,9 +112,9 @@ internal sealed class AdminCommands(ProgressionServices services)
 
 	private void TellTarget(ulong steamId, string text)
 	{
-		foreach (CCSPlayerController player in Utilities.GetPlayers())
+		foreach (CCSPlayerController player in Utilities.GetPlayers().Where(p => p.SteamID == steamId))
 		{
-			if ((player.SteamID == steamId) && (services.Sessions.Get(player) is PlayerSession session))
+			if (services.Sessions.Get(player) is PlayerSession session)
 			{
 				PanelPresenter.Invalidate(session);
 				player.PrintToChat($" {ChatColors.Gold}{services.Config.ChatPrefix}{ChatColors.Default} {text}");

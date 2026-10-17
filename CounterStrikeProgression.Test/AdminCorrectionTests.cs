@@ -155,10 +155,15 @@ public sealed class AdminCorrectionTests
 		AdminCorrection grant = new(CorrectionKind.Grant, 1_000);
 
 		(CorrectionOutcome Outcome, ProgressSnapshot Rows)? applied = await grant.ApplyToStoredAsync(store, player.SteamId, engine.Ranks, TestContext.CancellationToken).ConfigureAwait(false);
-		Assert.IsNotNull(applied);
-		Assert.IsNotNull(applied.Value.Rows.Player);
-		Assert.IsEmpty(applied.Value.Rows.Weapons);
-		await grant.WriteAsync(store, applied.Value.Rows, TestContext.CancellationToken).ConfigureAwait(false);
+		if (applied is not (_, ProgressSnapshot rows))
+		{
+			Assert.Fail("The stored player wasn't found.");
+			return;
+		}
+
+		Assert.IsNotNull(rows.Player);
+		Assert.IsEmpty(rows.Weapons);
+		await grant.WriteAsync(store, rows, TestContext.CancellationToken).ConfigureAwait(false);
 
 		PlayerProgress? reloaded = await store.LoadAsync(player.SteamId, TestContext.CancellationToken).ConfigureAwait(false);
 		Assert.AreEqual(player.RankXp + 1_000, reloaded?.RankXp);
@@ -177,9 +182,14 @@ public sealed class AdminCorrectionTests
 		AdminCorrection reset = new(CorrectionKind.Reset);
 
 		(CorrectionOutcome Outcome, ProgressSnapshot Rows)? applied = await reset.ApplyToStoredAsync(store, player.SteamId, engine.Ranks, TestContext.CancellationToken).ConfigureAwait(false);
-		Assert.IsNotNull(applied);
-		Assert.AreEqual(1, applied.Value.Outcome.WeaponsCleared);
-		await reset.WriteAsync(store, applied.Value.Rows, TestContext.CancellationToken).ConfigureAwait(false);
+		if (applied is not (CorrectionOutcome outcome, ProgressSnapshot rows))
+		{
+			Assert.Fail("The stored player wasn't found.");
+			return;
+		}
+
+		Assert.AreEqual(1, outcome.WeaponsCleared);
+		await reset.WriteAsync(store, rows, TestContext.CancellationToken).ConfigureAwait(false);
 
 		PlayerProgress? reloaded = await store.LoadAsync(player.SteamId, TestContext.CancellationToken).ConfigureAwait(false);
 		Assert.AreEqual(0, reloaded?.RankXp);
