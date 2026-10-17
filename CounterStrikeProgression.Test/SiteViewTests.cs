@@ -188,13 +188,39 @@ public sealed class SiteViewTests
 		Assert.AreEqual(1, killsView.Tier);
 		Assert.AreEqual(kills.Tiers.Count, killsView.TierCount);
 		Assert.AreEqual(kills.Tiers[1], killsView.NextTarget);
+		Assert.AreEqual(ChallengeKind.Volume, killsView.Kind);
+		Assert.IsNull(killsView.Rarity);
+		Assert.IsNull(killsView.Description);
+		Assert.AreEqual(0, killsView.Progress);
 		ChallengeView hitsView = view.Challenges.Single(c => c.Id == ChallengeDefinition.HitsId);
 		Assert.AreEqual(hits.Tiers.Count, hitsView.Tier);
 		Assert.IsNull(hitsView.NextTarget);
+		Assert.AreEqual(1, hitsView.Progress);
 		ChallengeView headshots = view.Challenges.Single(c => c.Id == ChallengeDefinition.HeadshotsId);
 		Assert.AreEqual(0, headshots.Count);
 		Assert.AreEqual(0, headshots.Tier);
 		Assert.AreEqual(definitions.Single(d => d.Id == ChallengeDefinition.HeadshotsId).Tiers[0], headshots.NextTarget);
+	}
+
+	[TestMethod]
+	public void Player_SkillChallenge_CarriesRarityDescriptionAndTierProgress()
+	{
+		ProgressionSettings settings = Settings();
+		WeaponInfo ak = TestHelpers.Weapon("ak47");
+		ChallengeDefinition skill = new ChallengeCatalog(settings).For(ak).First(d => d.Kind == ChallengeKind.Skill);
+		PlayerProgress player = TestHelpers.Player();
+		WeaponProgress weapon = player.Weapon(ak.Key);
+		weapon.Kills = 1;
+		long halfway = skill.Tiers[0] + ((skill.Tiers[1] - skill.Tiers[0]) / 2);
+		weapon.Challenge(skill.Id).Count = halfway;
+
+		ChallengeView view = PlayerViewBuilder.Build(player, settings, online: false).Weapons.Single().Challenges.Single(c => c.Id == skill.Id);
+
+		Assert.AreEqual(ChallengeKind.Skill, view.Kind);
+		Assert.AreEqual(skill.Rarity, view.Rarity);
+		Assert.IsFalse(string.IsNullOrEmpty(view.Description));
+		Assert.AreEqual(1, view.Tier);
+		Assert.AreEqual((halfway - skill.Tiers[0]) / (double)(skill.Tiers[1] - skill.Tiers[0]), view.Progress, 1e-9);
 	}
 
 	[TestMethod]

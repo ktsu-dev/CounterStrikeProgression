@@ -2,7 +2,9 @@
 
 namespace ktsu.CounterStrikeProgression.Site.Views;
 
+using ktsu.CounterStrikeProgression.Core.Challenges;
 using ktsu.CounterStrikeProgression.Core.Live;
+using ktsu.CounterStrikeProgression.Core.SkillShots;
 
 /// <summary>One challenge on a weapon's ladder.</summary>
 /// <param name="Id">The challenge id.</param>
@@ -11,7 +13,21 @@ using ktsu.CounterStrikeProgression.Core.Live;
 /// <param name="Tier">The number of tiers finished.</param>
 /// <param name="TierCount">The number of tiers the challenge has.</param>
 /// <param name="NextTarget">The count needed for the next tier, or <see langword="null"/> when every tier is done.</param>
-internal sealed record ChallengeView(string Id, string Name, long Count, int Tier, int TierCount, int? NextTarget);
+/// <param name="Kind">Volume or skill.</param>
+/// <param name="Rarity">The skill shot's rarity, or <see langword="null"/> for a volume challenge.</param>
+/// <param name="Description">What the skill shot asks for, or <see langword="null"/> for a volume challenge.</param>
+/// <param name="Progress">How far the count is from the last tier to the next, from 0 to 1, or 1 when every tier is done.</param>
+internal sealed record ChallengeView(
+	string Id,
+	string Name,
+	long Count,
+	int Tier,
+	int TierCount,
+	int? NextTarget,
+	ChallengeKind Kind,
+	Rarity? Rarity,
+	string? Description,
+	double Progress);
 
 /// <summary>One weapon on a player's page.</summary>
 /// <param name="Key">The weapon key.</param>
