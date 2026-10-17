@@ -64,6 +64,18 @@ internal sealed class LiveState(SiteOptions options, FeedStore feed, TimeProvide
 		}
 	}
 
+	/// <summary>Gets the Steam IDs that have live progress rows.</summary>
+	public IReadOnlyList<ulong> OverlayIds
+	{
+		get
+		{
+			lock (gate)
+			{
+				return [.. overlays.Keys];
+			}
+		}
+	}
+
 	/// <summary>Gets the plugin's latest settings, or Core's defaults before the first batch. Replaced as a whole, never edited in place.</summary>
 	public ProgressionSettings Settings { get; private set; } = new();
 
@@ -91,7 +103,7 @@ internal sealed class LiveState(SiteOptions options, FeedStore feed, TimeProvide
 			{
 				IEnumerable<FeedEntry> added = batch.Feed.OrderByDescending(e => e.At);
 				entries = [.. added.Concat(entries).Take(options.FeedLength)];
-				feed.Save(entries);
+				SaveFeed();
 			}
 
 			return new(snapshotChanged, batch.Feed, MergeProgress(batch.Progress));
@@ -142,6 +154,18 @@ internal sealed class LiveState(SiteOptions options, FeedStore feed, TimeProvide
 		}
 
 		return changed;
+	}
+
+	private void SaveFeed()
+	{
+		try
+		{
+			feed.Save(entries);
+		}
+		catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+		{
+			// The history is only a convenience across restarts, so a failed write keeps the batch applied in memory.
+		}
 	}
 
 	private bool IsOnlineLocked() =>
