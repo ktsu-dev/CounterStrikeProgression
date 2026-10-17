@@ -82,6 +82,7 @@ public sealed class LadderTests
 		Assert.AreEqual(ChallengeDefinition.KillsId, ladder[0].Id);
 		Assert.AreEqual(ChallengeDefinition.HeadshotsId, ladder[1].Id);
 		Assert.AreEqual(ChallengeDefinition.HitsId, ladder[2].Id);
+		Assert.AreEqual(ChallengeDefinition.ChickensId, ladder[3].Id);
 		List<string> ids = [.. ladder.Select(c => c.Id)];
 		Assert.Contains("moving_target", ids);
 		Assert.Contains("spray_transfer", ids);

@@ -68,6 +68,12 @@ public sealed class ProgressionSettings
 	/// <summary>Gets or sets the hit counts for the five tiers of each weapon's Hits challenge.</summary>
 	public IReadOnlyList<int> HitTiers { get; set; } = [100, 400, 1000, 2500, 5000];
 
+	/// <summary>Gets or sets the chicken kill counts for the five tiers of each weapon's Chickens challenge.</summary>
+	public IReadOnlyList<int> ChickenTiers { get; set; } = [1, 5, 15, 40, 100];
+
+	/// <summary>Gets or sets the XP a chicken kill pays, to the weapon and to rank.</summary>
+	public int ChickenXp { get; set; } = 2;
+
 	/// <summary>Gets or sets the counts for the five tiers of a common skill shot challenge.</summary>
 	public IReadOnlyList<int> CommonSkillTiers { get; set; } = [5, 20, 50, 100, 200];
 

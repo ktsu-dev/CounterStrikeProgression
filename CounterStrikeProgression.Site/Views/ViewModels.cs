@@ -86,7 +86,7 @@ internal sealed record FeedItem(DateTime At, ulong SteamId, string PlayerName, F
 /// <param name="Count">How many times the challenge has been done.</param>
 /// <param name="Target">The count that finishes the next tier.</param>
 /// <param name="Progress">How far the player is from the last tier to the next, from 0 to 1.</param>
-/// <param name="Xp">The rank XP the next tier pays.</param>
+/// <param name="Xp">The rank XP the next tier pays, which is the tier XP times the tier number.</param>
 /// <param name="IsNew">Whether the player hasn't started the challenge.</param>
 internal sealed record SuggestionView(
 	string WeaponKey,

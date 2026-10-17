@@ -86,6 +86,27 @@ internal sealed class ProgressionEngine(ProgressionSettings settings)
 	}
 
 	/// <summary>
+	/// Credits a chicken kill: a little weapon and rank XP, and a step on the weapon's Chickens challenge.
+	/// </summary>
+	/// <param name="player">The killer's progress.</param>
+	/// <param name="weapon">The weapon the chicken was killed with.</param>
+	/// <returns>What it earned.</returns>
+	public ProgressionResult ApplyChickenKill(PlayerProgress player, WeaponInfo weapon)
+	{
+		Ensure.NotNull(player);
+		Ensure.NotNull(weapon);
+
+		ProgressionResult result = new();
+		Award award = new(weapon, vsBot: false);
+		WeaponProgress progress = player.Weapon(weapon.Key);
+		progress.IsDirty = true;
+		award.EventXp += Settings.ChickenXp;
+		Advance(progress, award, ChallengeDefinition.ChickensId, result);
+		Credit(player, progress, award, result);
+		return result;
+	}
+
+	/// <summary>
 	/// Counts a shot fired, for accuracy.
 	/// </summary>
 	/// <param name="player">The shooter's progress.</param>

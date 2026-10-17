@@ -88,6 +88,7 @@ internal static class FeedCaptions
 			"Kills" => (settings.KillTiers, "kills"),
 			"Headshots" => (settings.HeadshotTiers, "headshot kills"),
 			"Hits" => (settings.HitTiers, "hits"),
+			"Chickens" => (settings.ChickenTiers, "chickens"),
 			_ => (null, null),
 		};
 

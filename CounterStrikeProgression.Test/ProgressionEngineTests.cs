@@ -175,6 +175,24 @@ public sealed class ProgressionEngineTests
 	}
 
 	[TestMethod]
+	public void AChickenKill_PaysALittleXpAndAdvancesTheWeaponsChickens()
+	{
+		ProgressionEngine engine = TestHelpers.Engine();
+		PlayerProgress player = TestHelpers.Player();
+		WeaponInfo knife = TestHelpers.Weapon("knife");
+
+		ProgressionResult result = engine.ApplyChickenKill(player, knife);
+
+		WeaponProgress weapon = player.Weapons[knife.Key];
+		Assert.AreEqual(1, weapon.Challenges[ChallengeDefinition.ChickensId].Count);
+		Assert.AreEqual(engine.Settings.ChickenXp, weapon.Xp);
+		Assert.AreEqual(0, weapon.Kills);
+		ProgressionNotice tier = result.Notices.Single(n => n.Kind == NoticeKind.TierCompleted);
+		Assert.AreEqual("Chickens", tier.ChallengeName);
+		Assert.AreEqual(engine.Settings.ChickenXp + engine.Settings.VolumeTierXp, player.RankXp);
+	}
+
+	[TestMethod]
 	public void AStoredRankBehindTheXp_CatchesUpWithoutAnnouncing()
 	{
 		ProgressionEngine engine = TestHelpers.Engine();

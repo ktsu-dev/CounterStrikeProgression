@@ -33,6 +33,7 @@ internal sealed class CombatHandlers(ProgressionServices services)
 		plugin.RegisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
 		plugin.RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
 		plugin.RegisterEventHandler<EventPlayerBlind>(OnPlayerBlind);
+		plugin.RegisterEventHandler<EventOtherDeath>(OnOtherDeath);
 	}
 
 	private HookResult OnWeaponFire(EventWeaponFire @event, GameEventInfo info)
@@ -178,6 +179,28 @@ internal sealed class CombatHandlers(ProgressionServices services)
 	{
 		(int bulletTick, int bulletVictim, int penetrations) = session.LastBullet;
 		return (bulletTick == tick) && (bulletVictim == victimSlot) ? penetrations : null;
+	}
+
+	private HookResult OnOtherDeath(EventOtherDeath @event, GameEventInfo info)
+	{
+		if (GameState.IsWarmup || !string.Equals(@event.Othertype, "chicken", StringComparison.OrdinalIgnoreCase))
+		{
+			return HookResult.Continue;
+		}
+
+		CCSPlayerController? attacker = Utilities.GetPlayerFromUserid(@event.Attacker);
+		if ((attacker is null) || (Sessions.Get(attacker) is not { Progress: PlayerProgress progress } session))
+		{
+			return HookResult.Continue;
+		}
+
+		WeaponInfo? weapon = GameState.ResolveWeapon(@event.Weapon, GameState.PawnOf(attacker));
+		if (weapon is not null)
+		{
+			services.Apply(attacker, session, Engine.ApplyChickenKill(progress, weapon));
+		}
+
+		return HookResult.Continue;
 	}
 
 	private HookResult OnPlayerDeath(EventPlayerDeath @event, GameEventInfo info)

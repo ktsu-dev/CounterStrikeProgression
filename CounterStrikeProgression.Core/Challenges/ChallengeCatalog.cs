@@ -6,8 +6,8 @@ using ktsu.CounterStrikeProgression.Core.SkillShots;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
 /// <summary>
-/// Builds each weapon's ladder: the three volume challenges every weapon has, followed by one skill challenge
-/// for every skill shot that weapon can earn.
+/// Builds each weapon's ladder: its volume challenges (Kills, Headshots and Hits for guns, and Chickens for
+/// every weapon), followed by one skill challenge for every skill shot that weapon can earn.
 /// </summary>
 /// <param name="settings">The tier thresholds to use.</param>
 internal sealed class ChallengeCatalog(ProgressionSettings settings)
@@ -52,6 +52,8 @@ internal sealed class ChallengeCatalog(ProgressionSettings settings)
 			ladder.Add(new(ChallengeDefinition.HeadshotsId, "Headshots", ChallengeKind.Volume, Rarity.Common, settings.HeadshotTiers));
 			ladder.Add(new(ChallengeDefinition.HitsId, "Hits", ChallengeKind.Volume, Rarity.Common, settings.HitTiers));
 		}
+
+		ladder.Add(new(ChallengeDefinition.ChickensId, "Chickens", ChallengeKind.Volume, Rarity.Common, settings.ChickenTiers));
 
 		foreach (SkillShotDefinition skillShot in SkillShotCatalog.All.Where(s => s.AppliesTo(weapon)))
 		{

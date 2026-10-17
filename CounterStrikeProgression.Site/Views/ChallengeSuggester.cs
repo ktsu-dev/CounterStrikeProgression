@@ -139,7 +139,7 @@ internal static class ChallengeSuggester
 		string? description = isSkill
 			? SkillShotCatalog.All.FirstOrDefault(s => string.Equals(s.Id.WeakString, definition.Id, StringComparison.Ordinal))?.Description
 			: null;
-		int xp = isSkill ? settings.SkillTierXp : settings.VolumeTierXp;
+		int xp = (isSkill ? settings.SkillTierXp : settings.VolumeTierXp) * (tier + 1);
 
 		return new(info.Key.WeakString, info.DisplayName, definition.Id, definition.Name, description, tier + 1, count, target, fraction, xp, isNew);
 	}

@@ -32,6 +32,9 @@ internal sealed record ChallengeDefinition(string Id, string Name, ChallengeKind
 	/// <summary>Gets the id of every weapon's Hits challenge.</summary>
 	public const string HitsId = "hits";
 
+	/// <summary>Gets the id of every weapon's Chickens challenge.</summary>
+	public const string ChickensId = "chickens";
+
 	/// <summary>
 	/// Gets the tier a count has reached, where 0 means none yet.
 	/// </summary>

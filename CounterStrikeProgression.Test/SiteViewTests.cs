@@ -306,6 +306,7 @@ public sealed class SiteViewTests
 
 		Assert.AreEqual(2, kills.NextTier);
 		Assert.AreEqual(settings.KillTiers[1], kills.Target);
+		Assert.AreEqual(settings.VolumeTierXp * 2, kills.Xp);
 		Assert.AreEqual((50.0 - settings.KillTiers[0]) / (settings.KillTiers[1] - settings.KillTiers[0]), kills.Progress, 0.0001);
 	}
 
@@ -395,6 +396,7 @@ public sealed class SiteViewTests
 		Assert.AreEqual($"{settings.KillTiers[2]} kills with the AK-47", FeedCaptions.For(Tier("Kills III", "AK-47"), settings).Caption);
 		Assert.AreEqual($"{settings.HeadshotTiers[0]} headshot kills with the AWP", FeedCaptions.For(Tier("Headshots I", "AWP"), settings).Caption);
 		Assert.AreEqual("1,000 hits", FeedCaptions.For(Tier("Hits III", null), new ProgressionSettings { HitTiers = [10, 100, 1000] }).Caption);
+		Assert.AreEqual($"{settings.ChickenTiers[1]} chickens with the Knife", FeedCaptions.For(Tier("Chickens II", "Knife"), settings).Caption);
 	}
 
 	[TestMethod]
