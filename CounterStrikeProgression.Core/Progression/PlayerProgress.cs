@@ -21,6 +21,42 @@ internal sealed class ChallengeProgress
 }
 
 /// <summary>
+/// One contract's count in one day or week.
+/// </summary>
+internal sealed class ContractProgress
+{
+	/// <summary>Gets or sets how many matching things the player has done.</summary>
+	public long Count { get; set; }
+
+	/// <summary>Gets or sets a value indicating whether the contract is finished and paid.</summary>
+	public bool Completed { get; set; }
+
+	/// <summary>Gets or sets a value indicating whether the row changed since it was last saved.</summary>
+	public bool IsDirty { get; set; }
+}
+
+/// <summary>
+/// What a player did on one UTC day, for history graphs and seasons.
+/// </summary>
+internal sealed class DayProgress
+{
+	/// <summary>Gets or sets the rank XP earned that day.</summary>
+	public long Xp { get; set; }
+
+	/// <summary>Gets or sets the kills made that day.</summary>
+	public long Kills { get; set; }
+
+	/// <summary>Gets or sets the skill shots earned that day.</summary>
+	public long SkillShots { get; set; }
+
+	/// <summary>Gets or sets the player's rank XP at the end of the day, or as it stands today.</summary>
+	public long RankXp { get; set; }
+
+	/// <summary>Gets or sets a value indicating whether the row changed since it was last saved.</summary>
+	public bool IsDirty { get; set; }
+}
+
+/// <summary>
 /// A player's progress with one weapon.
 /// </summary>
 /// <param name="weapon">The weapon.</param>
@@ -100,8 +136,29 @@ internal sealed class PlayerProgress(ulong steamId)
 	/// <summary>Gets the player's weapons, keyed by weapon.</summary>
 	public Dictionary<WeaponKey, WeaponProgress> Weapons { get; } = [];
 
+	/// <summary>Gets the player's contracts, keyed by the period's key and the contract id. Only current periods are loaded.</summary>
+	public Dictionary<(string Period, string Contract), ContractProgress> Contracts { get; } = [];
+
+	/// <summary>Gets what the player did each day. Only today is loaded, and earlier days are dropped once saved.</summary>
+	public Dictionary<DateOnly, DayProgress> Days { get; } = [];
+
 	/// <summary>Gets or sets a value indicating whether the player row changed since it was last saved.</summary>
 	public bool IsDirty { get; set; }
+
+	/// <summary>
+	/// Gets a contract's progress in a period, creating it when the player hasn't started it.
+	/// </summary>
+	/// <param name="period">The period's key, such as <c>2026-10-17</c> or <c>2026-W42</c>.</param>
+	/// <param name="contract">The contract id.</param>
+	/// <returns>The contract's progress.</returns>
+	public ContractProgress Contract(string period, string contract) => Contracts.GetOrCreate((period, contract));
+
+	/// <summary>
+	/// Gets a day's progress, creating it when the player hasn't played that day yet.
+	/// </summary>
+	/// <param name="day">The UTC day.</param>
+	/// <returns>The day's progress.</returns>
+	public DayProgress Day(DateOnly day) => Days.GetOrCreate(day);
 
 	/// <summary>
 	/// Gets a weapon's progress, creating it when the player hasn't used the weapon.
