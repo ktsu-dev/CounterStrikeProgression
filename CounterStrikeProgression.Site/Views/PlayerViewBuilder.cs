@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Site.Views;
 using System.Globalization;
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Challenges;
+using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
@@ -20,8 +21,9 @@ internal static class PlayerViewBuilder
 	/// <param name="merged">The player's stored and live progress, merged.</param>
 	/// <param name="settings">The plugin's settings.</param>
 	/// <param name="online">Whether the player is on the server now.</param>
+	/// <param name="feed">The player's feed, newest first. Omitted, the page shows none.</param>
 	/// <returns>The page model.</returns>
-	public static PlayerView Build(PlayerProgress merged, ProgressionSettings settings, bool online)
+	public static PlayerView Build(PlayerProgress merged, ProgressionSettings settings, bool online, IReadOnlyList<FeedEntry>? feed = null)
 	{
 		Ensure.NotNull(merged);
 		Ensure.NotNull(settings);
@@ -56,7 +58,9 @@ internal static class PlayerViewBuilder
 			merged.FirstSeen,
 			merged.LastSeen,
 			online,
-			weapons);
+			weapons,
+			ChallengeSuggester.Suggest(merged, settings, catalog),
+			feed ?? []);
 	}
 
 	private static WeaponView BuildWeapon(WeaponProgress weapon, WeaponLevelCurve curve, ChallengeCatalog catalog)

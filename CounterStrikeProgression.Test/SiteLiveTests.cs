@@ -152,6 +152,82 @@ public sealed class SiteLiveTests
 		Assert.AreEqual(first.Feed[^1], second.Feed[^1]);
 	}
 
+	private static FeedEntry EntryFor(ulong steamId, int index) =>
+		new(Start.AddSeconds(index), steamId, "Player", FeedKind.SkillShot, $"Shot {index}", null, 10);
+
+	[TestMethod]
+	public void PlayerFeed_KeepsEachPlayersNewestEntries()
+	{
+		LiveState state = NewState(new ManualTime());
+		List<FeedEntry> entries = [.. Enumerable.Range(0, 40).Select(i => EntryFor(1, i)), EntryFor(2, 100), EntryFor(0, 101)];
+
+		state.Apply(Batch(Server(Start), entries));
+
+		Assert.HasCount(30, state.PlayerFeed(1));
+		Assert.AreEqual("Shot 39", state.PlayerFeed(1)[0].Title);
+		Assert.AreEqual("Shot 10", state.PlayerFeed(1)[^1].Title);
+		Assert.AreEqual("Shot 100", Assert.ContainsSingle(state.PlayerFeed(2)).Title);
+		Assert.IsEmpty(state.PlayerFeed(0));
+		Assert.IsEmpty(state.PlayerFeed(3));
+	}
+
+	[TestMethod]
+	public void PlayerFeed_RepeatedBatch_AddsNothingTwice()
+	{
+		LiveState state = NewState(new ManualTime());
+		List<FeedEntry> entries = [EntryFor(1, 1), EntryFor(1, 2)];
+		state.Apply(Batch(Server(Start), entries));
+
+		state.Apply(Batch(Server(Start.AddSeconds(2)), entries));
+
+		Assert.HasCount(2, state.PlayerFeed(1));
+	}
+
+	[TestMethod]
+	public void PlayerFeed_SurvivesRestart()
+	{
+		LiveState first = NewState(new ManualTime());
+		first.Apply(Batch(Server(Start), [EntryFor(1, 1), EntryFor(2, 2)]));
+		first.Apply(Batch(Server(Start.AddSeconds(2)), [EntryFor(1, 3)]));
+
+		LiveState second = NewState(new ManualTime());
+
+		string[] expected = ["Shot 3", "Shot 1"];
+		CollectionAssert.AreEqual(expected, second.PlayerFeed(1).Select(e => e.Title).ToArray());
+		Assert.HasCount(1, second.PlayerFeed(2));
+	}
+
+	[TestMethod]
+	public void PlayerFeed_PastTheLimit_DropsThePlayersSeenLeastRecently()
+	{
+		SiteOptions options = new() { PlayerFeedPlayers = 2 };
+		LiveState state = NewState(new ManualTime(), options);
+		state.Apply(Batch(Server(Start), [EntryFor(1, 1), EntryFor(2, 2)]));
+		state.Apply(Batch(Server(Start.AddSeconds(2)), [EntryFor(1, 3)]));
+
+		state.Apply(Batch(Server(Start.AddSeconds(4)), [EntryFor(3, 4)]));
+
+		Assert.IsEmpty(state.PlayerFeed(2));
+		Assert.HasCount(2, state.PlayerFeed(1));
+		Assert.HasCount(1, state.PlayerFeed(3));
+		string[] files = [.. Directory.GetFiles(Path.Combine(directory, "players")).Select(f => Path.GetFileName(f)).Order(StringComparer.Ordinal)];
+		string[] expectedFiles = ["1.json", "3.json"];
+		CollectionAssert.AreEqual(expectedFiles, files);
+	}
+
+	[TestMethod]
+	public void FeedStore_LoadPlayers_SkipsFilesNotNamedForASteamIdAndUnreadableOnes()
+	{
+		FeedStore store = new(FeedPath);
+		store.SavePlayer(7, [EntryFor(7, 1)]);
+		File.WriteAllText(Path.Combine(store.PlayersPath, "notes.json"), "[]");
+		File.WriteAllText(Path.Combine(store.PlayersPath, "8.json"), "{ not json");
+
+		Dictionary<ulong, IReadOnlyList<FeedEntry>> players = store.LoadPlayers();
+
+		Assert.AreEqual(7UL, Assert.ContainsSingle(players).Key);
+	}
+
 	[TestMethod]
 	public void FeedStore_MissingOrCorruptFile_LoadsEmpty()
 	{

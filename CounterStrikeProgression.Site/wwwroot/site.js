@@ -247,6 +247,29 @@
 		}
 	}
 
+	// The player page leaves the name out, because every line is the same player.
+	function feedItem(entry, showPlayer = true) {
+		const li = el("li", GOLD_KINDS.has(entry.kind) ? "gold" : null);
+		const what = el("span", "what");
+		if (showPlayer) {
+			what.append(playerLink(entry.steamId, entry.playerName), " · ");
+		}
+		what.append(entry.title);
+		// A weapon level-up's title already names the weapon.
+		if (entry.weapon && entry.kind !== "WeaponLevelUp") {
+			what.append(` · ${entry.weapon}`);
+		}
+		const side = el("span", "side");
+		if (Number(entry.xp) > 0) {
+			side.append(el("span", "xp", `+${formatXp(entry.xp)}`));
+		}
+		const when = el("time", "when", ago(entry.at));
+		when.dateTime = String(entry.at);
+		side.append(when);
+		li.append(what, side);
+		return li;
+	}
+
 	function initLive(root) {
 		const top = el("div", "top");
 		const grid = el("div", "live-grid");
@@ -306,25 +329,6 @@
 
 		function feedKey(entry) {
 			return `${entry.at}|${entry.steamId}|${entry.kind}|${entry.title}`;
-		}
-
-		function feedItem(entry) {
-			const li = el("li", GOLD_KINDS.has(entry.kind) ? "gold" : null);
-			const what = el("span", "what");
-			what.append(playerLink(entry.steamId, entry.playerName), ` · ${entry.title}`);
-			// A weapon level-up's title already names the weapon.
-			if (entry.weapon && entry.kind !== "WeaponLevelUp") {
-				what.append(` · ${entry.weapon}`);
-			}
-			const side = el("span", "side");
-			if (Number(entry.xp) > 0) {
-				side.append(el("span", "xp", `+${formatXp(entry.xp)}`));
-			}
-			const when = el("time", "when", ago(entry.at));
-			when.dateTime = String(entry.at);
-			side.append(when);
-			li.append(what, side);
-			return li;
 		}
 
 		function renderFeed() {
@@ -473,6 +477,21 @@
 		load();
 	}
 
+	function suggestionCard(suggestion) {
+		const card = el("div", suggestion.isNew ? "suggestion new" : "suggestion");
+		const head = el("div", "head");
+		const tier = ROMAN[suggestion.nextTier] ?? suggestion.nextTier;
+		head.append(el("b", null, `${suggestion.challengeName} ${tier}`), el("span", "xp", `+${formatXp(suggestion.xp)}`));
+		const weapon = el("div", "muted", suggestion.isNew ? `Try something new · ${suggestion.weaponName}` : suggestion.weaponName);
+		card.append(head, weapon);
+		if (suggestion.description) {
+			card.append(el("div", "muted", suggestion.description));
+		}
+		const left = Math.max(0, Number(suggestion.target) - Number(suggestion.count));
+		card.append(bar(suggestion.progress), el("div", "muted", `${formatXp(suggestion.count)}/${formatXp(suggestion.target)} · ${formatXp(left)} to go`));
+		return card;
+	}
+
 	function challengeChip(challenge) {
 		const finished = Number(challenge.tier) || 0;
 		let label = challenge.name;
@@ -520,6 +539,25 @@
 
 			const weapons = Array.isArray(player.weapons) ? player.weapons : [];
 			const parts = [head, summary];
+
+			const suggestions = Array.isArray(player.suggestions) ? player.suggestions : [];
+			if (suggestions.length > 0) {
+				const next = el("div", "pad");
+				const cards = el("div", "suggestions");
+				cards.append(...suggestions.map(suggestionCard));
+				next.append(el("h2", "section-title", "Next challenges"), cards);
+				parts.push(next);
+			}
+
+			const feed = Array.isArray(player.feed) ? player.feed : [];
+			const feedBox = el("div", "pad");
+			const feedList = el("ul", "feed");
+			if (feed.length === 0) {
+				feedList.append(el("li", null, "Nothing yet. Skill shots, rank ups, and tiers show up here as they happen."));
+			} else {
+				feedList.append(...feed.map((entry) => feedItem(entry, false)));
+			}
+			feedBox.append(el("h2", "section-title", "XP feed"), feedList);
 			if (weapons.length === 0) {
 				parts.push(message("No weapon progress yet."));
 			} else {
@@ -553,6 +591,7 @@
 					parts.push(ladders);
 				}
 			}
+			parts.splice(suggestions.length > 0 ? 3 : 2, 0, feedBox);
 			panel.replaceChildren(...parts);
 		}
 

@@ -27,6 +27,7 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 	private readonly Lock gate = new();
 	private readonly Dictionary<ulong, ProgressSnapshot> overlays = [];
 	private List<FeedEntry> entries = [.. feed.Load().Take(options.FeedLength)];
+	private readonly Dictionary<ulong, List<FeedEntry>> playerFeeds = LoadPlayerFeeds(feed, options);
 	private ServerSnapshot? snapshot;
 	private DateTimeOffset lastBatchAt;
 	private bool feedSaveFailing;
@@ -64,6 +65,19 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 			{
 				return [.. entries];
 			}
+		}
+	}
+
+	/// <summary>
+	/// Gets one player's feed.
+	/// </summary>
+	/// <param name="steamId">The 64-bit Steam ID.</param>
+	/// <returns>The player's entries, newest first, or an empty list when none were seen.</returns>
+	public IReadOnlyList<FeedEntry> PlayerFeed(ulong steamId)
+	{
+		lock (gate)
+		{
+			return playerFeeds.TryGetValue(steamId, out List<FeedEntry>? playerFeed) ? [.. playerFeed] : [];
 		}
 	}
 
@@ -106,7 +120,7 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 			{
 				IEnumerable<FeedEntry> added = batch.Feed.OrderByDescending(e => e.At);
 				entries = [.. added.Concat(entries).Take(options.FeedLength)];
-				SaveFeed();
+				SaveFeed(AddToPlayerFeeds(batch.Feed));
 			}
 
 			return new(snapshotChanged, batch.Feed, MergeProgress(batch.Progress));
@@ -159,11 +173,64 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 		return changed;
 	}
 
-	private void SaveFeed()
+	private static Dictionary<ulong, List<FeedEntry>> LoadPlayerFeeds(FeedStore feed, SiteOptions options) =>
+		feed.LoadPlayers()
+			.OrderByDescending(p => p.Value.Max(e => e.At))
+			.Take(options.PlayerFeedPlayers)
+			.ToDictionary(p => p.Key, p => p.Value.OrderByDescending(e => e.At).Take(options.PlayerFeedLength).ToList());
+
+	/// <summary>
+	/// Adds a batch's entries to each player's feed, and drops the players whose newest entry is oldest once
+	/// more than <see cref="SiteOptions.PlayerFeedPlayers"/> have one.
+	/// </summary>
+	/// <returns>The players whose feed changed, and the players dropped.</returns>
+	private (List<ulong> Changed, List<ulong> Dropped) AddToPlayerFeeds(IReadOnlyList<FeedEntry> added)
+	{
+		List<ulong> changed = [];
+		foreach (IGrouping<ulong, FeedEntry> group in added.Where(e => e.SteamId != 0).GroupBy(e => e.SteamId))
+		{
+			// A batch the plugin sends again after a timeout carries entries this feed already has.
+			List<FeedEntry> existing = playerFeeds.GetValueOrDefault(group.Key) ?? [];
+			List<FeedEntry> fresh = [.. group.Distinct().Where(e => !existing.Contains(e))];
+			if (fresh.Count == 0)
+			{
+				continue;
+			}
+
+			playerFeeds[group.Key] = [.. fresh.Concat(existing).OrderByDescending(e => e.At).Take(options.PlayerFeedLength)];
+			changed.Add(group.Key);
+		}
+
+		List<ulong> dropped = [];
+		if (playerFeeds.Count > options.PlayerFeedPlayers)
+		{
+			dropped = [.. playerFeeds.OrderBy(p => p.Value[0].At).Take(playerFeeds.Count - options.PlayerFeedPlayers).Select(p => p.Key)];
+			foreach (ulong steamId in dropped)
+			{
+				playerFeeds.Remove(steamId);
+			}
+
+			changed.RemoveAll(dropped.Contains);
+		}
+
+		return (changed, dropped);
+	}
+
+	private void SaveFeed((List<ulong> Changed, List<ulong> Dropped) players)
 	{
 		try
 		{
 			feed.Save(entries);
+			foreach (ulong steamId in players.Changed)
+			{
+				feed.SavePlayer(steamId, playerFeeds[steamId]);
+			}
+
+			foreach (ulong steamId in players.Dropped)
+			{
+				feed.DeletePlayer(steamId);
+			}
+
 			if (feedSaveFailing)
 			{
 				feedSaveFailing = false;

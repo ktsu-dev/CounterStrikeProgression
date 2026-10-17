@@ -23,4 +23,10 @@ internal sealed class SiteOptions
 
 	/// <summary>Gets or sets how many feed entries to keep and show.</summary>
 	public int FeedLength { get; set; } = 50;
+
+	/// <summary>Gets or sets how many feed entries to keep and show for each player.</summary>
+	public int PlayerFeedLength { get; set; } = 30;
+
+	/// <summary>Gets or sets how many players' feeds to keep. Past this, the players seen least recently are dropped.</summary>
+	public int PlayerFeedPlayers { get; set; } = 1000;
 }

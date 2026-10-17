@@ -2,6 +2,8 @@
 
 namespace ktsu.CounterStrikeProgression.Site.Views;
 
+using ktsu.CounterStrikeProgression.Core.Live;
+
 /// <summary>One challenge on a weapon's ladder.</summary>
 /// <param name="Id">The challenge id.</param>
 /// <param name="Name">The name players see.</param>
@@ -45,6 +47,8 @@ internal sealed record WeaponView(
 /// <param name="LastSeen">When the player was last seen, in UTC.</param>
 /// <param name="Online">Whether the player is on the server now.</param>
 /// <param name="Weapons">The player's weapons, most XP first.</param>
+/// <param name="Suggestions">The challenges to try next, closest to a tier first.</param>
+/// <param name="Feed">The player's feed, newest first.</param>
 internal sealed record PlayerView(
 	string SteamId,
 	string Name,
@@ -57,7 +61,34 @@ internal sealed record PlayerView(
 	DateTime FirstSeen,
 	DateTime LastSeen,
 	bool Online,
-	IReadOnlyList<WeaponView> Weapons);
+	IReadOnlyList<WeaponView> Weapons,
+	IReadOnlyList<SuggestionView> Suggestions,
+	IReadOnlyList<FeedEntry> Feed);
+
+/// <summary>One suggested next challenge on a player's page.</summary>
+/// <param name="WeaponKey">The weapon key.</param>
+/// <param name="WeaponName">The weapon's display name.</param>
+/// <param name="ChallengeId">The challenge id.</param>
+/// <param name="ChallengeName">The name players see.</param>
+/// <param name="Description">For a skill challenge, what the player has to do, otherwise <see langword="null"/>.</param>
+/// <param name="NextTier">The tier the suggestion works toward, from 1.</param>
+/// <param name="Count">How many times the challenge has been done.</param>
+/// <param name="Target">The count that finishes the next tier.</param>
+/// <param name="Progress">How far the player is from the last tier to the next, from 0 to 1.</param>
+/// <param name="Xp">The rank XP the next tier pays.</param>
+/// <param name="IsNew">Whether the player hasn't started the challenge.</param>
+internal sealed record SuggestionView(
+	string WeaponKey,
+	string WeaponName,
+	string ChallengeId,
+	string ChallengeName,
+	string? Description,
+	int NextTier,
+	long Count,
+	int Target,
+	double Progress,
+	int Xp,
+	bool IsNew);
 
 /// <summary>One row of the server ranks page.</summary>
 /// <param name="Position">The place on the ranks, from 1.</param>

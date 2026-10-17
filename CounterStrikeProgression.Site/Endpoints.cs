@@ -154,7 +154,7 @@ internal static class Endpoints
 		}
 
 		PlayerProgress merged = ProgressMerge.Merge(stored, overlay);
-		return TypedResults.Ok(PlayerViewBuilder.Build(merged, live.Settings, live.IsPlaying(steamId)));
+		return TypedResults.Ok(PlayerViewBuilder.Build(merged, live.Settings, live.IsPlaying(steamId), live.PlayerFeed(steamId)));
 	}
 
 	/// <summary>

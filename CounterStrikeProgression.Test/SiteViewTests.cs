@@ -6,7 +6,9 @@ using System.Globalization;
 using System.Text.Json;
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Challenges;
+using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.SkillShots;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 using ktsu.CounterStrikeProgression.Site.Live;
@@ -261,5 +263,109 @@ public sealed class SiteViewTests
 		Assert.AreEqual(DateTimeKind.Utc, view.FirstSeen.Kind);
 		Assert.Contains("\"lastSeen\":\"2026-10-17T12:00:00Z\"", json);
 		Assert.Contains("\"firstSeen\":\"2026-10-14T12:00:00Z\"", json);
+	}
+
+	[TestMethod]
+	public void Suggest_ClosestToNextTierFirst_AtMostTwoPerWeapon_ThenOneNew()
+	{
+		ProgressionSettings settings = Settings();
+		PlayerProgress player = TestHelpers.Player();
+		WeaponProgress ak = player.Weapon(TestHelpers.Weapon("ak47").Key);
+		ak.Xp = 100;
+		ak.Challenge(ChallengeDefinition.KillsId).Count = settings.KillTiers[0] - 5;
+		ak.Challenge(ChallengeDefinition.HeadshotsId).Count = settings.HeadshotTiers[0] / 2;
+		ak.Challenge(ChallengeDefinition.HitsId).Count = 1;
+
+		IReadOnlyList<SuggestionView> suggestions = PlayerViewBuilder.Build(player, settings, online: false).Suggestions;
+
+		Assert.HasCount(3, suggestions);
+		Assert.AreEqual(ChallengeDefinition.KillsId, suggestions[0].ChallengeId);
+		Assert.AreEqual(1, suggestions[0].NextTier);
+		Assert.AreEqual(settings.KillTiers[0], suggestions[0].Target);
+		Assert.AreEqual(settings.VolumeTierXp, suggestions[0].Xp);
+		Assert.IsFalse(suggestions[0].IsNew);
+		Assert.AreEqual(ChallengeDefinition.HeadshotsId, suggestions[1].ChallengeId);
+		SuggestionView fresh = suggestions[2];
+		Assert.IsTrue(fresh.IsNew);
+		Assert.AreEqual("ak47", fresh.WeaponKey);
+		Assert.AreEqual(0, fresh.Count);
+		Assert.AreEqual(settings.SkillTierXp, fresh.Xp);
+		Assert.IsNotNull(fresh.Description);
+		Assert.AreEqual(Rarity.Common, SkillShotCatalog.All.Single(s => s.Id.WeakString == fresh.ChallengeId).Rarity);
+	}
+
+	[TestMethod]
+	public void Suggest_ProgressIsMeasuredFromTheLastTier()
+	{
+		ProgressionSettings settings = Settings();
+		PlayerProgress player = TestHelpers.Player();
+		WeaponProgress ak = player.Weapon(TestHelpers.Weapon("ak47").Key);
+		ak.Challenge(ChallengeDefinition.KillsId).Count = 50;
+
+		SuggestionView kills = PlayerViewBuilder.Build(player, settings, online: false).Suggestions[0];
+
+		Assert.AreEqual(2, kills.NextTier);
+		Assert.AreEqual(settings.KillTiers[1], kills.Target);
+		Assert.AreEqual((50.0 - settings.KillTiers[0]) / (settings.KillTiers[1] - settings.KillTiers[0]), kills.Progress, 0.0001);
+	}
+
+	[TestMethod]
+	public void Suggest_WeaponsUsedMoreRankHigher()
+	{
+		ProgressionSettings settings = Settings();
+		PlayerProgress player = TestHelpers.Player();
+		WeaponProgress ak = player.Weapon(TestHelpers.Weapon("ak47").Key);
+		ak.Xp = 1000;
+		ak.Challenge(ChallengeDefinition.KillsId).Count = 15;
+		WeaponProgress awp = player.Weapon(TestHelpers.Weapon("awp").Key);
+		awp.Xp = 10;
+		awp.Challenge(ChallengeDefinition.KillsId).Count = 20;
+
+		IReadOnlyList<SuggestionView> suggestions = PlayerViewBuilder.Build(player, settings, online: false).Suggestions;
+
+		Assert.AreEqual("ak47", suggestions[0].WeaponKey);
+		Assert.AreEqual("awp", suggestions[1].WeaponKey);
+	}
+
+	[TestMethod]
+	public void Suggest_FinishedChallengesAreLeftOut()
+	{
+		ProgressionSettings settings = Settings();
+		PlayerProgress player = TestHelpers.Player();
+		WeaponProgress ak = player.Weapon(TestHelpers.Weapon("ak47").Key);
+		ak.Challenge(ChallengeDefinition.KillsId).Count = settings.KillTiers[^1] + 10;
+		ak.Challenge(ChallengeDefinition.HitsId).Count = 1;
+
+		IReadOnlyList<SuggestionView> suggestions = PlayerViewBuilder.Build(player, settings, online: false).Suggestions;
+
+		Assert.IsFalse(suggestions.Any(s => s.ChallengeId == ChallengeDefinition.KillsId));
+		Assert.AreEqual(ChallengeDefinition.HitsId, suggestions[0].ChallengeId);
+	}
+
+	[TestMethod]
+	public void Suggest_NoWeapons_SuggestsKillsWithTheFirstWeapon()
+	{
+		ProgressionSettings settings = Settings();
+
+		SuggestionView only = Assert.ContainsSingle(PlayerViewBuilder.Build(TestHelpers.Player(), settings, online: false).Suggestions);
+
+		Assert.IsTrue(only.IsNew);
+		Assert.AreEqual(WeaponCatalog.All[0].Key.WeakString, only.WeaponKey);
+		Assert.AreEqual(ChallengeDefinition.KillsId, only.ChallengeId);
+		Assert.AreEqual(settings.KillTiers[0], only.Target);
+		Assert.IsNull(only.Description);
+	}
+
+	[TestMethod]
+	public void Player_FeedIsShownAsGiven()
+	{
+		FeedEntry entry = new(Seen, TestHelpers.SteamId, "Tester", FeedKind.SkillShot, "Mid-air", "AK-47", 25);
+
+		PlayerView view = PlayerViewBuilder.Build(TestHelpers.Player(), Settings(), online: false, [entry]);
+		string json = JsonSerializer.Serialize(view, SiteJson.Options);
+
+		Assert.AreEqual(entry, Assert.ContainsSingle(view.Feed));
+		Assert.Contains($"\"steamId\":\"{TestHelpers.SteamId}\"", json);
+		Assert.Contains("\"kind\":\"SkillShot\"", json);
 	}
 }

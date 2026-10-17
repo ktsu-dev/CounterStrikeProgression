@@ -284,6 +284,34 @@ td.name {
 	margin-bottom: 10px;
 }
 
+.suggestions {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: 8px;
+}
+
+.suggestion {
+	background: var(--bg);
+	border-left: 3px solid var(--orange);
+	padding: 8px 10px;
+	min-width: 0;
+}
+
+.suggestion.new {
+	border-left-color: var(--green);
+}
+
+.suggestion .head {
+	display: flex;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.suggestion .xp {
+	color: var(--gold);
+	white-space: nowrap;
+}
+
 .tiers span {
 	display: inline-block;
 	background: var(--line);
