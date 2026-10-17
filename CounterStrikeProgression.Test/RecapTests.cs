@@ -188,4 +188,42 @@ public sealed class RecapTests
 		Assert.AreEqual("Wallbang with the AK-47", view.LastSession.Best);
 		Assert.IsNull(PlayerViewBuilder.Build(TestHelpers.Player(), new ProgressionSettings(), online: false).LastSession);
 	}
+
+	[TestMethod]
+	public void Tracker_TryFinish_NothingEarned_RestartsWithoutARecap()
+	{
+		RecapTracker tracker = new(Start);
+
+		Assert.IsNull(tracker.TryFinish(1, "a", "m", 3, 2, Start.AddMinutes(4)));
+		Assert.AreEqual(Start.AddMinutes(4), tracker.StartedAt);
+
+		tracker.Add(Result(2));
+		Assert.AreEqual(2, tracker.TryFinish(1, "a", "m", 3, 2, Start.AddMinutes(6))?.Xp);
+	}
+
+	[TestMethod]
+	public void LiveState_KeepsRecapsForTheNewestPlayersOnly()
+	{
+		LiveState state = new(new SiteOptions { PlayerFeedPlayers = 2 }, new FeedStore(Path.Combine(directory, "feed.json")), new ManualTime(), NullLogger<LiveState>.Instance);
+
+		LiveChanges changes = state.Apply(Batch(Recap(Start, steamId: 1), Recap(Start.AddMinutes(1), steamId: 2), Recap(Start.AddMinutes(2), steamId: 3)));
+
+		Assert.IsNull(state.LastSession(1));
+		Assert.IsNotNull(state.LastSession(2));
+		Assert.IsNotNull(state.LastSession(3));
+		Assert.DoesNotContain(1UL, changes.ChangedPlayers);
+	}
+
+	[TestMethod]
+	public void LiveState_RecapWriteFails_KeepsItInMemory()
+	{
+		string blocker = Path.Combine(directory, "blocker");
+		File.WriteAllText(blocker, "a file where the data folder should be");
+		LiveState state = new(new SiteOptions(), new FeedStore(Path.Combine(blocker, "feed.json")), new ManualTime(), NullLogger<LiveState>.Instance);
+
+		state.Apply(Batch(Recap(Start)));
+		state.Apply(Batch(Recap(Start.AddMinutes(1), xp: 7)));
+
+		Assert.AreEqual(7, state.LastSession(TestHelpers.SteamId)?.Xp);
+	}
 }

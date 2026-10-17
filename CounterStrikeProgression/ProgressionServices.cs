@@ -6,7 +6,6 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using ktsu.CounterStrikeProgression.Core.Floaties;
 using ktsu.CounterStrikeProgression.Core.Progression;
-using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.Tracking;
 using ktsu.CounterStrikeProgression.Panel;
 using ktsu.CounterStrikeProgression.Site;
@@ -88,21 +87,18 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	public void FinishRecap(PlayerSession session, CCSPlayerController? player, string map, bool announce)
 	{
 		Ensure.NotNull(session);
-		DateTime now = DateTime.UtcNow;
-		if (session.Recap.IsEmpty)
+		CCSPlayerController? valid = player is { IsValid: true } ? player : null;
+		CSMatchStats_t? stats = valid?.ActionTrackingServices?.MatchStats;
+		string name = valid?.PlayerName ?? session.Progress?.Name ?? string.Empty;
+		if (session.Recap.TryFinish(session.SteamId, name, map, stats?.Kills ?? 0, stats?.Deaths ?? 0, DateTime.UtcNow) is not { } recap)
 		{
-			session.Recap.Restart(now);
 			return;
 		}
 
-		bool valid = player is { IsValid: true };
-		CSMatchStats_t? stats = valid ? player!.ActionTrackingServices?.MatchStats : null;
-		string name = (valid ? player!.PlayerName : null) ?? session.Progress?.Name ?? string.Empty;
-		MapRecap recap = session.Recap.Finish(session.SteamId, name, map, stats?.Kills ?? 0, stats?.Deaths ?? 0, now);
 		Site?.Record(recap);
-		if (announce && valid)
+		if (announce && (valid is not null))
 		{
-			announcer.AnnounceRecap(player!, recap);
+			announcer.AnnounceRecap(valid, recap);
 		}
 	}
 

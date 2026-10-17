@@ -99,6 +99,27 @@ internal sealed class RecapTracker(DateTime startedAt)
 	}
 
 	/// <summary>
+	/// Ends the session when anything was earned, and starts the next one empty either way.
+	/// </summary>
+	/// <param name="steamId">The player's 64-bit Steam ID.</param>
+	/// <param name="playerName">The player's name.</param>
+	/// <param name="map">The map played.</param>
+	/// <param name="kills">Kills on the scoreboard.</param>
+	/// <param name="deaths">Deaths on the scoreboard.</param>
+	/// <param name="at">When the session ended, in UTC, which is also when the next one starts.</param>
+	/// <returns>The recap, or <see langword="null"/> when nothing was earned.</returns>
+	public MapRecap? TryFinish(ulong steamId, string playerName, string map, int kills, int deaths, DateTime at)
+	{
+		if (IsEmpty)
+		{
+			Restart(at);
+			return null;
+		}
+
+		return Finish(steamId, playerName, map, kills, deaths, at);
+	}
+
+	/// <summary>
 	/// Forgets what was earned and starts a new session.
 	/// </summary>
 	/// <param name="at">When the new session starts, in UTC.</param>
