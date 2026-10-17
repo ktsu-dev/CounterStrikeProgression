@@ -52,6 +52,7 @@ Nothing goes to NuGet. ktsu.Sdk marks every library packable from its targets, a
 - **`Core/Storage/`:** `ProgressSnapshot` (dirty rows copied on the game thread), `MySqlProgressionStore`, and `InMemoryProgressionStore`.
 - **`Core/Discord/`:** `DiscordMessages` picks the feats, epic skill shots, and rank-ups worth posting, and `DiscordSender` posts them to the optional webhook from the thread pool.
 - **`Core/Panel/`:** `PanelBuilder` builds the pages, and `PanelFormatter` renders plain text, center HTML, or chat.
+- **`Core/Recap/`:** `RecapTracker` adds up what each player earns over a map, and `MapRecap` is the result: a chat line at the win panel (`PanelFormatter.ToRecapChat`), and the "Last session" the site keeps per player in `recaps.json`.
 - **`CounterStrikeProgression/CombatHandlers.cs`:** the combat events that become `CombatEvent` snapshots.
 - **`CounterStrikeProgression/LifecycleHandlers.cs`:** connects, spawns, rounds, the per-tick tracking, and the transmit filter.
 - **`CounterStrikeProgression/Panel/WorldTextPanel.cs`:** the side panel, a `point_worldtext` moved in front of the eyes every tick.

@@ -185,6 +185,18 @@ public sealed class SiteSettings
 }
 
 /// <summary>
+/// Where each player's rank, such as <c>[GN III]</c>, is shown to everyone else.
+/// </summary>
+public sealed class RankTagSettings
+{
+	/// <summary>Gets or sets a value indicating whether the rank replaces the player's clan tag on the scoreboard.</summary>
+	public bool ClanTag { get; set; } = true;
+
+	/// <summary>Gets or sets a value indicating whether the rank appears before the player's name in chat.</summary>
+	public bool ChatPrefix { get; set; } = true;
+}
+
+/// <summary>
 /// The plugin's config file, <c>configs/plugins/CounterStrikeProgression/CounterStrikeProgression.json</c>.
 /// </summary>
 public sealed class PluginConfig : BasePluginConfig
@@ -207,6 +219,9 @@ public sealed class PluginConfig : BasePluginConfig
 	/// <summary>Gets or sets the Discord webhook big moments are posted to. With an empty URL, nothing is posted.</summary>
 	public DiscordSettings Discord { get; set; } = new();
 
+	/// <summary>Gets or sets where each player's rank is shown to everyone else.</summary>
+	public RankTagSettings RankTags { get; set; } = new();
+
 	/// <summary>Gets or sets how often, in seconds, changed progress is saved.</summary>
 	public float SaveIntervalSeconds { get; set; } = 60;
 
@@ -215,4 +230,7 @@ public sealed class PluginConfig : BasePluginConfig
 
 	/// <summary>Gets or sets a value indicating whether common skill shots are announced to the player who earned them.</summary>
 	public bool AnnounceCommonSkillShots { get; set; }
+
+	/// <summary>Gets or sets a value indicating whether each player gets a one-line recap of what they earned when the map ends.</summary>
+	public bool AnnounceMapRecap { get; set; } = true;
 }
