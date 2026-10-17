@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Challenges;
 using ktsu.CounterStrikeProgression.Core.Events;
 using ktsu.CounterStrikeProgression.Core.Feats;
+using ktsu.CounterStrikeProgression.Core.Rotation;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
@@ -14,13 +15,32 @@ using ktsu.CounterStrikeProgression.Core.Weapons;
 /// <remarks>
 /// Rank XP from anything done to a bot is scaled by <see cref="ProgressionSettings.BotXpMultiplier"/>, but
 /// weapon XP and ladder counts aren't, so practice against bots still moves a weapon forward. Tier and
-/// level-up bonuses are paid in full, because they reward the ladder rather than one event.
+/// level-up bonuses are paid in full, because they reward the ladder rather than one event. Every point of rank
+/// XP also counts toward the current season, which starts again from 0 when the next season begins.
 /// </remarks>
 /// <param name="settings">The XP values and thresholds.</param>
-internal sealed class ProgressionEngine(ProgressionSettings settings)
+/// <param name="time">The clock that decides the season, or the system clock when omitted.</param>
+internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvider? time = null)
 {
 	/// <summary>Gets the settings in use.</summary>
 	public ProgressionSettings Settings { get; } = settings;
+
+	/// <summary>Gets the clock that decides the season.</summary>
+	public TimeProvider Time { get; } = time ?? TimeProvider.System;
+
+	/// <summary>Gets the season running now.</summary>
+	public Season CurrentSeason => Season.For(DateOnly.FromDateTime(Time.GetUtcNow().UtcDateTime), Settings.SeasonMonths);
+
+	/// <summary>
+	/// Gets the rank XP a player has earned in the current season.
+	/// </summary>
+	/// <param name="player">The player's progress.</param>
+	/// <returns>The XP, or 0 when the player's latest season has ended.</returns>
+	public long SeasonXp(PlayerProgress player)
+	{
+		Ensure.NotNull(player);
+		return player.SeasonStart == CurrentSeason.Start ? player.SeasonXp : 0;
+	}
 
 	/// <summary>Gets the rank thresholds.</summary>
 	public RankLadder Ranks { get; } = new(settings.FirstRankXp, settings.RankGrowth);
@@ -411,6 +431,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings)
 		player.RankXp += whole;
 		player.IsDirty = true;
 		result.XpGained += whole;
+		CreditSeasonXp(player, whole);
 
 		int rank = Ranks.RankFor(player.RankXp);
 		player.Rank = Math.Max(before, rank);
@@ -418,6 +439,24 @@ internal sealed class ProgressionEngine(ProgressionSettings settings)
 		{
 			result.Notices.Add(new() { Kind = NoticeKind.RankUp, Value = rank, Broadcast = true });
 		}
+	}
+
+	private void CreditSeasonXp(PlayerProgress player, long xp)
+	{
+		DateOnly start = CurrentSeason.Start;
+		if (player.SeasonStart != start)
+		{
+			if (player.IsSeasonDirty && (player.SeasonStart is { } ended))
+			{
+				player.EndedSeason = (ended, player.SeasonXp);
+			}
+
+			player.SeasonStart = start;
+			player.SeasonXp = 0;
+		}
+
+		player.SeasonXp += xp;
+		player.IsSeasonDirty = true;
 	}
 
 	private double ScaleForBots(double xp, bool vsBot) => vsBot ? xp * Settings.BotXpMultiplier : xp;

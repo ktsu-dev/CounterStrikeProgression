@@ -166,4 +166,7 @@ public sealed class ProgressionSettings
 
 	/// <summary>Gets or sets the level interval announced to the whole server. Levels in between are told to the player only.</summary>
 	public int AnnounceWeaponLevelEvery { get; set; } = 5;
+
+	/// <summary>Gets or sets how long each season lasts, in months. Seasons start on 1 January and every this many months after.</summary>
+	public int SeasonMonths { get; set; } = 3;
 }

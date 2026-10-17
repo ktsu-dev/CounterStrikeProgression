@@ -1,0 +1,295 @@
+// Copyright (c) 2023-2026 ktsu-dev contributors
+
+namespace ktsu.CounterStrikeProgression.Test;
+
+using System.Globalization;
+using System.Text.Json;
+using ktsu.CounterStrikeProgression.Core;
+using ktsu.CounterStrikeProgression.Core.Live;
+using ktsu.CounterStrikeProgression.Core.Panel;
+using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Rotation;
+using ktsu.CounterStrikeProgression.Core.Storage;
+using ktsu.CounterStrikeProgression.Site;
+using ktsu.CounterStrikeProgression.Site.Data;
+using ktsu.CounterStrikeProgression.Site.Live;
+using ktsu.CounterStrikeProgression.Site.Views;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Extensions.Logging.Abstractions;
+
+[TestClass]
+public sealed class SeasonTests
+{
+	private static readonly DateOnly October = new(2026, 10, 1);
+	private static readonly DateOnly July = new(2026, 7, 1);
+
+	private string directory = string.Empty;
+
+	public TestContext TestContext { get; set; } = null!;
+
+	[TestInitialize]
+	public void Initialize()
+	{
+		directory = Path.Combine(Path.GetTempPath(), "csp-seasons-" + Guid.NewGuid().ToString("N"));
+		Directory.CreateDirectory(directory);
+	}
+
+	[TestCleanup]
+	public void Cleanup() => Directory.Delete(directory, recursive: true);
+
+	[TestMethod]
+	public void SeasonsAreQuartersByDefault()
+	{
+		Season season = Season.For(new DateOnly(2026, 11, 30), 3);
+
+		Assert.AreEqual(October, season.Start);
+		Assert.AreEqual(new DateOnly(2027, 1, 1), season.End);
+		Assert.AreEqual("Oct–Dec 2026", season.Name);
+		Assert.AreEqual(July, season.Previous(3).Start);
+	}
+
+	[TestMethod]
+	public void SeasonLengthsThatDoNotDivideTheYearCountAsQuarters()
+	{
+		Assert.AreEqual(Season.For(new DateOnly(2026, 5, 2), 3), Season.For(new DateOnly(2026, 5, 2), 5));
+		Assert.AreEqual(new DateOnly(2026, 5, 1), Season.For(new DateOnly(2026, 5, 31), 1).Start);
+	}
+
+	[TestMethod]
+	public void RankXpCountsTowardTheCurrentSeason()
+	{
+		ProgressionEngine engine = new(new ProgressionSettings(), new ManualTime());
+		PlayerProgress player = TestHelpers.Player();
+
+		engine.ApplyCombat(player, TestHelpers.Kill("ak47"));
+
+		Assert.AreEqual(October, player.SeasonStart);
+		Assert.AreEqual(player.RankXp, player.SeasonXp);
+		Assert.AreEqual(player.RankXp, engine.SeasonXp(player));
+		Assert.IsTrue(player.IsSeasonDirty);
+	}
+
+	[TestMethod]
+	public void BotXpCountsAtTheBotRateForTheSeasonToo()
+	{
+		ProgressionEngine engine = new(new ProgressionSettings(), new ManualTime());
+		PlayerProgress player = TestHelpers.Player();
+
+		for (int i = 0; i < 4; i++)
+		{
+			engine.ApplyCombat(player, TestHelpers.Kill("ak47") with { VictimIsBot = true });
+		}
+
+		Assert.IsGreaterThan(0L, player.SeasonXp);
+		Assert.AreEqual(player.RankXp, player.SeasonXp);
+	}
+
+	[TestMethod]
+	public void ANewSeasonStartsFromZeroAndKeepsTheEndedSeasonForTheNextSave()
+	{
+		ManualTime time = new();
+		ProgressionEngine engine = new(new ProgressionSettings(), time);
+		PlayerProgress player = TestHelpers.Player();
+		engine.ApplyCombat(player, TestHelpers.Kill("ak47"));
+		long octoberXp = player.SeasonXp;
+
+		time.Advance(TimeSpan.FromDays(90));
+		Assert.AreEqual(0, engine.SeasonXp(player));
+		engine.ApplyCombat(player, TestHelpers.Kill("ak47"));
+
+		Assert.AreEqual(new DateOnly(2027, 1, 1), player.SeasonStart);
+		Assert.IsLessThan(player.RankXp, player.SeasonXp);
+
+		ProgressSnapshot snapshot = ProgressSnapshot.Capture(player);
+		Assert.HasCount(2, snapshot.Seasons);
+		Assert.AreEqual(octoberXp, snapshot.Seasons.Single(s => s.Start == Midnight(October)).Xp);
+		Assert.IsNull(player.EndedSeason);
+		Assert.IsTrue(ProgressSnapshot.Capture(player).IsEmpty);
+	}
+
+	[TestMethod]
+	public void RestoreFlagsBothSeasonRowsAfterAFailedSave()
+	{
+		ManualTime time = new();
+		ProgressionEngine engine = new(new ProgressionSettings(), time);
+		PlayerProgress player = TestHelpers.Player();
+		engine.ApplyCombat(player, TestHelpers.Kill("ak47"));
+		time.Advance(TimeSpan.FromDays(90));
+		engine.ApplyCombat(player, TestHelpers.Kill("ak47"));
+
+		ProgressSnapshot failed = ProgressSnapshot.Capture(player);
+		failed.Restore(player);
+		ProgressSnapshot retry = ProgressSnapshot.Capture(player);
+
+		CollectionAssert.AreEquivalent(failed.Seasons.ToList(), retry.Seasons.ToList());
+	}
+
+	[TestMethod]
+	public async Task TheStoreKeepsEverySeasonAndLoadsTheLatest()
+	{
+		InMemoryProgressionStore store = new();
+		await SaveAsync(store, 1, "One", July, 900).ConfigureAwait(false);
+		await SaveAsync(store, 1, "One", October, 40).ConfigureAwait(false);
+
+		PlayerProgress? loaded = await store.LoadAsync(1, TestContext.CancellationToken).ConfigureAwait(false);
+
+		Assert.IsNotNull(loaded);
+		Assert.AreEqual(October, loaded.SeasonStart);
+		Assert.AreEqual(40, loaded.SeasonXp);
+		Assert.IsFalse(loaded.IsSeasonDirty);
+	}
+
+	[TestMethod]
+	public async Task StandingsAndResultsRankBySeasonXp()
+	{
+		InMemoryProgressionStore store = new();
+		await SaveAsync(store, 1, "One", July, 900).ConfigureAwait(false);
+		await SaveAsync(store, 2, "Two", July, 1500).ConfigureAwait(false);
+		await SaveAsync(store, 3, "Three", July, 100).ConfigureAwait(false);
+		await SaveAsync(store, 1, "One", October, 40).ConfigureAwait(false);
+
+		IReadOnlyList<SeasonStanding> july = await store.SeasonStandingsAsync(July, 10, TestContext.CancellationToken).ConfigureAwait(false);
+		Assert.AreEqual("Two,One,Three", string.Join(',', july.Select(s => s.Name)));
+
+		IReadOnlyList<SeasonResult> results = await store.SeasonResultsAsync(1, TestContext.CancellationToken).ConfigureAwait(false);
+		Assert.HasCount(2, results);
+		Assert.AreEqual(new SeasonResult(Midnight(October), 40, 1, 1), results[0]);
+		Assert.AreEqual(new SeasonResult(Midnight(July), 900, 2, 3), results[1]);
+	}
+
+	[TestMethod]
+	public void ChangeTrackerSendsTheSeasonRowOnlyWhenItChanges()
+	{
+		ProgressionEngine engine = new(new ProgressionSettings(), new ManualTime());
+		PlayerProgress player = TestHelpers.Player();
+		ProgressChangeTracker tracker = new();
+		engine.ApplyCombat(player, TestHelpers.Kill("ak47"));
+
+		ProgressSnapshot? first = tracker.Changes(player);
+		Assert.IsNotNull(first);
+		Assert.HasCount(1, first.Seasons);
+		Assert.IsNull(tracker.Changes(player));
+	}
+
+	[TestMethod]
+	public void SeasonRowsSurviveTheLiveBatchJson()
+	{
+		ProgressSnapshot rows = new(null, [], []) { Seasons = [new SeasonRow(TestHelpers.SteamId, Midnight(October), 75)] };
+
+		string json = JsonSerializer.Serialize(rows, LiveJson.Options);
+		ProgressSnapshot? back = JsonSerializer.Deserialize<ProgressSnapshot>(json, LiveJson.Options);
+
+		Assert.IsNotNull(back);
+		Assert.HasCount(1, back.Seasons);
+		Assert.AreEqual(rows.Seasons[0], back.Seasons[0]);
+	}
+
+	[TestMethod]
+	public void MergeTakesTheLaterSeasonAndTheLargerXp()
+	{
+		PlayerProgress stored = TestHelpers.Player();
+		stored.SeasonStart = July;
+		stored.SeasonXp = 900;
+
+		ProgressSnapshot october = new(null, [], []) { Seasons = [new SeasonRow(TestHelpers.SteamId, Midnight(October), 30)] };
+		PlayerProgress merged = ProgressMerge.Merge(stored, october);
+		Assert.AreEqual(October, merged.SeasonStart);
+		Assert.AreEqual(30, merged.SeasonXp);
+
+		ProgressSnapshot combined = ProgressMerge.Combine(october, new(null, [], []) { Seasons = [new SeasonRow(TestHelpers.SteamId, Midnight(October), 20)] });
+		Assert.AreEqual(30, combined.Seasons.Single().Xp);
+	}
+
+	[TestMethod]
+	public void PanelOverviewShowsTheSeason()
+	{
+		ProgressionEngine engine = new(new ProgressionSettings(), new ManualTime());
+		PlayerProgress player = TestHelpers.Player();
+		engine.ApplyCombat(player, TestHelpers.Kill("ak47"));
+
+		PanelPage page = new PanelBuilder(engine).Overview(player);
+
+		PanelLine line = page.Lines.Single(l => l.Label == "Season Oct–Dec 2026");
+		Assert.AreEqual($"{player.SeasonXp} XP", line.Detail);
+	}
+
+	[TestMethod]
+	public async Task SeasonsEndpoint_LaysLiveXpOverTheCurrentSeason()
+	{
+		InMemoryProgressionStore store = new();
+		await SaveAsync(store, TestHelpers.SteamId, "Tester", October, 100).ConfigureAwait(false);
+		await SaveAsync(store, TestHelpers.SteamId + 1, "Other", October, 150).ConfigureAwait(false);
+		using ProgressReader reader = new(store);
+		ManualTime time = new();
+		LiveState live = NewState(time);
+		live.Apply(Batch([new(null, [], []) { Seasons = [new SeasonRow(TestHelpers.SteamId, Midnight(October), 400)] }]));
+
+		IResult result = await Endpoints.SeasonsAsync(null, reader, live, time, CancellationToken.None).ConfigureAwait(false);
+
+		SeasonView view = Assert.IsInstanceOfType<Ok<SeasonView>>(result).Value!;
+		Assert.IsTrue(view.Current);
+		Assert.IsNull(view.Next);
+		Assert.AreEqual(July, view.Previous);
+		Assert.AreEqual("Tester", view.Rows[0].Name);
+		Assert.AreEqual(400, view.Rows[0].Xp);
+		Assert.AreEqual(2, view.Rows[1].Position);
+	}
+
+	[TestMethod]
+	public async Task SeasonsEndpoint_RejectsDaysThatDoNotStartAPastSeason()
+	{
+		using ProgressReader reader = new(new InMemoryProgressionStore());
+		ManualTime time = new();
+		LiveState live = NewState(time);
+
+		Assert.IsInstanceOfType<NotFound>(await Endpoints.SeasonsAsync("2026-08-01", reader, live, time, CancellationToken.None).ConfigureAwait(false));
+		Assert.IsInstanceOfType<NotFound>(await Endpoints.SeasonsAsync("2027-01-01", reader, live, time, CancellationToken.None).ConfigureAwait(false));
+		Assert.IsInstanceOfType<NotFound>(await Endpoints.SeasonsAsync("july", reader, live, time, CancellationToken.None).ConfigureAwait(false));
+
+		SeasonView july = Assert.IsInstanceOfType<Ok<SeasonView>>(await Endpoints.SeasonsAsync("2026-07-01", reader, live, time, CancellationToken.None).ConfigureAwait(false)).Value!;
+		Assert.IsFalse(july.Current);
+		Assert.AreEqual(October, july.Next);
+	}
+
+	[TestMethod]
+	public async Task PlayerSeasonsEndpoint_GivesThisSeasonAndTopThreeFinishes()
+	{
+		InMemoryProgressionStore store = new();
+		ulong me = TestHelpers.SteamId;
+		await SaveAsync(store, me, "Tester", new DateOnly(2026, 1, 1), 50).ConfigureAwait(false);
+		await SaveAsync(store, me + 1, "Other", new DateOnly(2026, 1, 1), 60).ConfigureAwait(false);
+		await SaveAsync(store, me + 2, "Third", new DateOnly(2026, 1, 1), 70).ConfigureAwait(false);
+		await SaveAsync(store, me + 3, "Fourth", new DateOnly(2026, 1, 1), 80).ConfigureAwait(false);
+		await SaveAsync(store, me, "Tester", July, 900).ConfigureAwait(false);
+		await SaveAsync(store, me + 1, "Other", July, 1500).ConfigureAwait(false);
+		await SaveAsync(store, me, "Tester", October, 10).ConfigureAwait(false);
+		using ProgressReader reader = new(store);
+		ManualTime time = new();
+
+		IResult result = await Endpoints.PlayerSeasonsAsync(me.ToString(CultureInfo.InvariantCulture), reader, NewState(time), time, CancellationToken.None).ConfigureAwait(false);
+
+		PlayerSeasonsView view = Assert.IsInstanceOfType<Ok<PlayerSeasonsView>>(result).Value!;
+		Assert.AreEqual("Oct–Dec 2026", view.Season);
+		Assert.AreEqual(10, view.Xp);
+		Assert.AreEqual(1L, view.Place);
+		Assert.HasCount(2, view.Badges);
+		Assert.IsTrue(view.Badges[0].Current);
+		Assert.AreEqual(new SeasonBadge("Jul–Sep 2026", July, 2, 2, 900, false), view.Badges[1]);
+	}
+
+	private static DateTime Midnight(DateOnly day) => day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+
+	private static LiveBatch Batch(IReadOnlyList<ProgressSnapshot> progress) =>
+		new(new ServerSnapshot(DateTime.UtcNow, "de_dust2", "Deathmatch", 16, []), [], progress, new ProgressionSettings());
+
+	private LiveState NewState(TimeProvider time) =>
+		new(new SiteOptions(), new FeedStore(Path.Combine(directory, "feed.json")), time, NullLogger<LiveState>.Instance);
+
+	private async Task SaveAsync(InMemoryProgressionStore store, ulong steamId, string name, DateOnly season, long xp)
+	{
+		DateTime seen = Midnight(season);
+		ProgressSnapshot rows = new(new PlayerRow(steamId, name, xp, 0, seen, seen), [], []) { Seasons = [new SeasonRow(steamId, seen, xp)] };
+		await store.SaveAsync(rows, TestContext.CancellationToken).ConfigureAwait(false);
+	}
+}

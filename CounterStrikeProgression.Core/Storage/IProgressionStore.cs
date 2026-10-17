@@ -23,6 +23,24 @@ internal sealed record LeaderboardEntry(string Name, long RankXp, int Rank);
 internal sealed record RankingEntry(ulong SteamId, string Name, long RankXp, int Rank, DateTime LastSeen);
 
 /// <summary>
+/// One row of a season's standings.
+/// </summary>
+/// <param name="SteamId">The 64-bit Steam ID.</param>
+/// <param name="Name">The player's last known name.</param>
+/// <param name="Rank">Their lifetime rank index.</param>
+/// <param name="Xp">The rank XP they earned in the season.</param>
+internal sealed record SeasonStanding(ulong SteamId, string Name, int Rank, long Xp);
+
+/// <summary>
+/// Where a player finished in one season.
+/// </summary>
+/// <param name="Start">The season's first day, at midnight UTC.</param>
+/// <param name="Xp">The rank XP they earned in the season.</param>
+/// <param name="Place">Their place in the season, from 1. Players on the same XP share a place.</param>
+/// <param name="Players">How many players earned XP in the season.</param>
+internal sealed record SeasonResult(DateTime Start, long Xp, long Place, long Players);
+
+/// <summary>
 /// Loads and saves player progress. Calls run off the game thread.
 /// </summary>
 internal interface IProgressionStore
@@ -65,4 +83,21 @@ internal interface IProgressionStore
 	/// <param name="cancellationToken">Cancels the operation.</param>
 	/// <returns>The rankings, highest first.</returns>
 	public Task<IReadOnlyList<RankingEntry>> RankingsAsync(int count, CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Gets the players who earned the most rank XP in one season, ordered by that XP and then Steam ID.
+	/// </summary>
+	/// <param name="start">The season's first day.</param>
+	/// <param name="count">How many to return.</param>
+	/// <param name="cancellationToken">Cancels the operation.</param>
+	/// <returns>The standings, highest first.</returns>
+	public Task<IReadOnlyList<SeasonStanding>> SeasonStandingsAsync(DateOnly start, int count, CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Gets where a player finished in every season they earned XP in.
+	/// </summary>
+	/// <param name="steamId">The 64-bit Steam ID.</param>
+	/// <param name="cancellationToken">Cancels the operation.</param>
+	/// <returns>The results, latest season first.</returns>
+	public Task<IReadOnlyList<SeasonResult>> SeasonResultsAsync(ulong steamId, CancellationToken cancellationToken);
 }
