@@ -94,10 +94,10 @@ public sealed class FloatieSettings
 
 	/// <summary>
 	/// Gets or sets how far from the player's eyes floaties are drawn, in units. A floatie lands in the same spot
-	/// on screen at any distance, so drawing it this close keeps walls from clipping it. 0 draws it at its real
-	/// position in the world.
+	/// on screen at any distance, so drawing it close (about 20) keeps walls from clipping it, at the cost of a
+	/// slight wobble while the player moves. The default, 0, draws it at its real position in the world.
 	/// </summary>
-	public double DrawDistance { get; set; } = 20;
+	public double DrawDistance { get; set; }
 
 	/// <summary>Gets or sets how thick the outline around floatie text is, in pixels. 0 turns it off.</summary>
 	public double StrokeWidthPixels { get; set; } = 2;

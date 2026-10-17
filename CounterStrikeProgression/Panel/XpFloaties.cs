@@ -14,8 +14,9 @@ using ktsu.CounterStrikeProgression.Core.Progression;
 /// Draws "+XP" text in the world where a player earned it: above the target for hits and kills, and just in
 /// front of the player for XP with no target. Only the player who earned it can see it. Each floatie rises
 /// and fades, and gains on the same target close together add up in one floatie. Floaties are rescaled
-/// every tick by their distance from the player, so they keep the same size on screen, and drawn just in front
-/// of the player on their line of sight, so walls don't clip them.
+/// every tick by their distance from the player, so they keep the same size on screen. With a
+/// <see cref="FloatieSettings.DrawDistance"/> set, they're drawn that close on the player's line of sight, so
+/// walls don't clip them.
 /// </summary>
 /// <remarks>
 /// World text has no outline, so the stroke is four copies of the text in the stroke color, nudged
