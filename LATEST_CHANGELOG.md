@@ -1,6 +1,7 @@
-## v1.3.0 (minor)
+## v1.4.0 (minor)
 
-Changes since v1.2.0:
+Changes since v1.3.0:
 
-- [minor] Add a player XP feed and next challenge suggestions to the player page (matt-edmondson)
+- [minor] Split each rank into five stages, raise the rank XP, and show rank badges (matt-edmondson)
+- [patch] Caption feed lines with how the moment was earned (matt-edmondson)
 
