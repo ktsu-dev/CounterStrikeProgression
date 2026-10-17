@@ -6,6 +6,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using CounterStrikeSharp.API.Core;
 using ktsu.CounterStrikeProgression.Core;
+using ktsu.CounterStrikeProgression.Core.Discord;
 using ktsu.CounterStrikeProgression.Core.Storage;
 
 /// <summary>
@@ -202,6 +203,9 @@ public sealed class PluginConfig : BasePluginConfig
 
 	/// <summary>Gets or sets the progression site. With an empty URL, nothing is sent.</summary>
 	public SiteSettings Site { get; set; } = new();
+
+	/// <summary>Gets or sets the Discord webhook big moments are posted to. With an empty URL, nothing is posted.</summary>
+	public DiscordSettings Discord { get; set; } = new();
 
 	/// <summary>Gets or sets how often, in seconds, changed progress is saved.</summary>
 	public float SaveIntervalSeconds { get; set; } = 60;

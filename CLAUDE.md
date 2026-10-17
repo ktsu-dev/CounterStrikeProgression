@@ -50,6 +50,7 @@ Nothing goes to NuGet. ktsu.Sdk marks every library packable from its targets, a
 - **`Core/Weapons/WeaponCatalog.cs`:** every tracked weapon, and the normalization of CS2's weapon names (prefixes, knife skins, grenade aliases, and alternates told apart by definition index).
 - **`Core/Tracking/`:** `RoundTracker` (opening kills, multi-kills, collaterals, trades, clutches), `PlayerCombatTracker` (landing, scope, weapon switch, reload, flick), and `LifeTracker` (per-life accuracy).
 - **`Core/Storage/`:** `ProgressSnapshot` (dirty rows copied on the game thread), `MySqlProgressionStore`, and `InMemoryProgressionStore`.
+- **`Core/Discord/`:** `DiscordMessages` picks the feats, epic skill shots, and rank-ups worth posting, and `DiscordSender` posts them to the optional webhook from the thread pool.
 - **`Core/Panel/`:** `PanelBuilder` builds the pages, and `PanelFormatter` renders plain text, center HTML, or chat.
 - **`CounterStrikeProgression/CombatHandlers.cs`:** the combat events that become `CombatEvent` snapshots.
 - **`CounterStrikeProgression/LifecycleHandlers.cs`:** connects, spawns, rounds, the per-tick tracking, and the transmit filter.

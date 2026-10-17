@@ -4,6 +4,7 @@ namespace ktsu.CounterStrikeProgression;
 
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
+using ktsu.CounterStrikeProgression.Core.Discord;
 using ktsu.CounterStrikeProgression.Core.Floaties;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Tracking;
@@ -22,6 +23,11 @@ using Microsoft.Extensions.Logging;
 /// <param name="logger">Where failures are reported.</param>
 internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine engine, SessionManager sessions, PanelPresenter panel, Announcer announcer, ILogger logger)
 {
+	private static readonly TimeSpan DiscordTimeout = TimeSpan.FromSeconds(5);
+
+	// Discord allows a webhook about five posts every two seconds, and lines that arrive meanwhile join the next post.
+	private static readonly TimeSpan DiscordPostGap = TimeSpan.FromSeconds(1);
+
 	/// <summary>Gets the plugin config.</summary>
 	public PluginConfig Config { get; } = config;
 
@@ -46,9 +52,12 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	/// <summary>Gets the progression site reporter, which is <see langword="null"/> when no site is configured.</summary>
 	public SiteReporter? Site { get; } = SiteReporter.Create(config, sessions, logger);
 
+	/// <summary>Gets the Discord poster, which is <see langword="null"/> when no webhook is configured.</summary>
+	public DiscordSender? Discord { get; } = CreateDiscord(config, logger);
+
 	/// <summary>
-	/// Refreshes a player's panel, shows a floatie, announces what they earned, and adds it to this map's XP
-	/// and the site's feed.
+	/// Refreshes a player's panel, shows a floatie, announces what they earned, and adds it to this map's XP,
+	/// the site's feed, and Discord.
 	/// </summary>
 	/// <param name="player">The player.</param>
 	/// <param name="session">The player's session.</param>
@@ -70,6 +79,13 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 
 		session.MapXp += result.XpEarned;
 		Site?.Record(session, player.PlayerName ?? string.Empty, result);
+		if (Discord is { } discord)
+		{
+			foreach (string line in DiscordMessages.From(result, player.PlayerName ?? string.Empty, Config.Discord))
+			{
+				discord.TryEnqueue(line);
+			}
+		}
 		PanelPresenter.Invalidate(session);
 		Floaties.Show(player, result, floatieKey, at);
 		announcer.Announce(player, session, result);
@@ -86,5 +102,23 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 		Ensure.NotNull(attacker);
 		Ensure.NotNull(victim);
 		return !GameState.TeammatesAreEnemies && (attacker.TeamNum == victim.TeamNum);
+	}
+
+	private static DiscordSender? CreateDiscord(PluginConfig config, ILogger logger)
+	{
+		DiscordSettings settings = config.Discord ?? new();
+		if (string.IsNullOrWhiteSpace(settings.WebhookUrl))
+		{
+			return null;
+		}
+
+		// The URL holds the webhook's secret token, so it is never logged.
+		if (DiscordSender.ParseUrl(settings.WebhookUrl) is not { } webhook)
+		{
+			Log.DiscordUrlInvalid(logger);
+			return null;
+		}
+
+		return new DiscordSender(webhook, settings.Username ?? string.Empty, settings.QueueLimit, DiscordTimeout, DiscordPostGap, exception => Log.DiscordFailed(logger, exception));
 	}
 }
