@@ -176,6 +176,18 @@ internal sealed class MySqlProgressionStore : IProgressionStore
 		return [.. top];
 	}
 
+	/// <inheritdoc/>
+	public async Task<IReadOnlyList<RankingEntry>> RankingsAsync(int count, CancellationToken cancellationToken)
+	{
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		IEnumerable<RankingEntry> rankings = await connection.QueryAsync<RankingEntry>(new CommandDefinition(
+			"SELECT steam_id AS SteamId, name AS Name, rank_xp AS RankXp, rank_index AS `Rank`, last_seen AS LastSeen FROM csp_players ORDER BY rank_xp DESC, steam_id ASC LIMIT @count",
+			new { count },
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+		return [.. rankings.Select(r => r with { LastSeen = DateTime.SpecifyKind(r.LastSeen, DateTimeKind.Utc) })];
+	}
+
 	private async Task<MySqlConnection> OpenAsync(CancellationToken cancellationToken)
 	{
 		MySqlConnection connection = new(connectionString);

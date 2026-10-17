@@ -13,6 +13,16 @@ using ktsu.CounterStrikeProgression.Core.Progression;
 internal sealed record LeaderboardEntry(string Name, long RankXp, int Rank);
 
 /// <summary>
+/// One row of the server rankings.
+/// </summary>
+/// <param name="SteamId">The 64-bit Steam ID.</param>
+/// <param name="Name">The player's last known name.</param>
+/// <param name="RankXp">Their rank XP.</param>
+/// <param name="Rank">Their rank index.</param>
+/// <param name="LastSeen">When they last played, in UTC.</param>
+internal sealed record RankingEntry(ulong SteamId, string Name, long RankXp, int Rank, DateTime LastSeen);
+
+/// <summary>
 /// Loads and saves player progress. Calls run off the game thread.
 /// </summary>
 internal interface IProgressionStore
@@ -47,4 +57,12 @@ internal interface IProgressionStore
 	/// <param name="cancellationToken">Cancels the operation.</param>
 	/// <returns>The leaderboard, highest first.</returns>
 	public Task<IReadOnlyList<LeaderboardEntry>> TopAsync(int count, CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Gets every player's standing, ordered by rank XP and then Steam ID.
+	/// </summary>
+	/// <param name="count">How many to return.</param>
+	/// <param name="cancellationToken">Cancels the operation.</param>
+	/// <returns>The rankings, highest first.</returns>
+	public Task<IReadOnlyList<RankingEntry>> RankingsAsync(int count, CancellationToken cancellationToken);
 }

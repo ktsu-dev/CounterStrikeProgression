@@ -66,4 +66,15 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 		IReadOnlyList<LeaderboardEntry> top = [.. players.Values.OrderByDescending(p => p.RankXp).Take(count).Select(p => new LeaderboardEntry(p.Name, p.RankXp, p.Rank))];
 		return Task.FromResult(top);
 	}
+
+	/// <inheritdoc/>
+	public Task<IReadOnlyList<RankingEntry>> RankingsAsync(int count, CancellationToken cancellationToken)
+	{
+		IReadOnlyList<RankingEntry> rankings = [.. players.Values
+			.OrderByDescending(p => p.RankXp)
+			.ThenBy(p => p.SteamId)
+			.Take(count)
+			.Select(p => new RankingEntry(p.SteamId, p.Name, p.RankXp, p.Rank, p.LastSeen))];
+		return Task.FromResult(rankings);
+	}
 }

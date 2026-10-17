@@ -108,4 +108,25 @@ public sealed class StorageTests
 		Assert.AreEqual("High", top[0].Name);
 		Assert.AreEqual("Low", top[1].Name);
 	}
+
+	[TestMethod]
+	public async Task InMemory_Rankings_OrderedByXpThenSteamId()
+	{
+		InMemoryProgressionStore store = new();
+		DateTime seen = new(2026, 10, 1, 12, 0, 0, DateTimeKind.Utc);
+		await store.SaveAsync(new ProgressSnapshot(new PlayerRow(30, "Tied B", 500, 1, seen, seen), [], []), TestContext.CancellationToken).ConfigureAwait(false);
+		await store.SaveAsync(new ProgressSnapshot(new PlayerRow(20, "Tied A", 500, 1, seen, seen.AddHours(1)), [], []), TestContext.CancellationToken).ConfigureAwait(false);
+		await store.SaveAsync(new ProgressSnapshot(new PlayerRow(10, "Top", 9000, 4, seen, seen), [], []), TestContext.CancellationToken).ConfigureAwait(false);
+
+		IReadOnlyList<RankingEntry> all = await store.RankingsAsync(10, TestContext.CancellationToken).ConfigureAwait(false);
+		Assert.HasCount(3, all);
+		Assert.AreEqual(10UL, all[0].SteamId);
+		Assert.AreEqual(20UL, all[1].SteamId);
+		Assert.AreEqual(30UL, all[2].SteamId);
+		Assert.AreEqual("Tied A", all[1].Name);
+		Assert.AreEqual(seen.AddHours(1), all[1].LastSeen);
+
+		IReadOnlyList<RankingEntry> capped = await store.RankingsAsync(2, TestContext.CancellationToken).ConfigureAwait(false);
+		Assert.HasCount(2, capped);
+	}
 }
