@@ -175,6 +175,20 @@ public sealed class ProgressionEngineTests
 	}
 
 	[TestMethod]
+	public void AStoredRankBehindTheXp_CatchesUpWithoutAnnouncing()
+	{
+		ProgressionEngine engine = TestHelpers.Engine();
+		PlayerProgress player = TestHelpers.Player();
+		player.RankXp = engine.Ranks.ThresholdFor(5);
+		player.Rank = 0;
+
+		ProgressionResult result = engine.ApplyCombat(player, TestHelpers.Kill("ak47"));
+
+		Assert.AreEqual(5, player.Rank);
+		Assert.IsFalse(result.Notices.Any(n => n.Kind == NoticeKind.RankUp));
+	}
+
+	[TestMethod]
 	public void RanksNeverGoDown()
 	{
 		ProgressionEngine engine = TestHelpers.Engine();

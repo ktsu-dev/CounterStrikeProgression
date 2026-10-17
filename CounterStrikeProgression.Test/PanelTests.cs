@@ -12,14 +12,18 @@ public sealed class PanelTests
 	[TestMethod]
 	public void TheOverviewShowsTheRankAndXp()
 	{
-		ProgressionEngine engine = TestHelpers.Engine();
+		ProgressionEngine engine = TestHelpers.Engine(s =>
+		{
+			s.FirstRankXp = 1000;
+			s.RankGrowth = 1.25;
+		});
 		PlayerProgress player = TestHelpers.Player();
 		player.RankXp = 1500;
 		player.Rank = 1;
 
 		PanelPage page = new PanelBuilder(engine).Overview(player);
 
-		Assert.AreEqual("Silver II", page.Title);
+		Assert.AreEqual("Silver I · II", page.Title);
 		Assert.AreEqual("1,500 / 2,250 XP", page.ProgressLabel);
 		Assert.AreEqual(500.0 / 1250, page.Progress, 1e-9);
 	}

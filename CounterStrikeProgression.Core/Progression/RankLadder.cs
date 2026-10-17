@@ -3,14 +3,17 @@
 namespace ktsu.CounterStrikeProgression.Core.Progression;
 
 /// <summary>
-/// The matchmaking-style rank names and the XP each one needs. Ranks only ever go up.
+/// The matchmaking-style ranks, each split into stages, and the XP each stage needs. Ranks only ever go up.
 /// </summary>
 internal sealed class RankLadder
 {
+	/// <summary>The number of stages in each rank.</summary>
+	public const int StagesPerRank = 5;
+
 	/// <summary>
-	/// The rank names, lowest first.
+	/// The matchmaking rank names, lowest first. Each has <see cref="StagesPerRank"/> stages in <see cref="Names"/>.
 	/// </summary>
-	public static IReadOnlyList<string> Names { get; } =
+	public static IReadOnlyList<string> RankNames { get; } =
 	[
 		"Silver I",
 		"Silver II",
@@ -31,6 +34,15 @@ internal sealed class RankLadder
 		"Supreme Master First Class",
 		"Global Elite",
 	];
+
+	// Declared before Names, because static initializers run in order.
+	private static readonly string[] StageNumerals = ["I", "II", "III", "IV", "V"];
+
+	/// <summary>
+	/// The name of every stage, lowest first, such as <c>Silver II · III</c>. A player's rank is an index into this list.
+	/// </summary>
+	public static IReadOnlyList<string> Names { get; } =
+		[.. RankNames.SelectMany(name => StageNumerals.Select(stage => $"{name} · {stage}"))];
 
 	private readonly long[] thresholds;
 

@@ -91,7 +91,7 @@ internal sealed class PlayerCommands(ProgressionServices services, string module
 			for (int i = 0; i < top.Count; i++)
 			{
 				LeaderboardEntry entry = top[i];
-				string rank = RankLadder.Names[Math.Clamp(entry.Rank, 0, RankLadder.TopRank)];
+				string rank = RankLadder.Names[Math.Clamp(Math.Max(entry.Rank, services.Engine.Ranks.RankFor(entry.RankXp)), 0, RankLadder.TopRank)];
 				viewer.PrintToChat(string.Format(
 					CultureInfo.InvariantCulture,
 					" {0}{1}.{2} {3} {4}{5}{2} ({6:N0} XP)",

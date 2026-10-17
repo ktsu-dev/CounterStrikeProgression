@@ -336,14 +336,17 @@ internal sealed class ProgressionEngine(ProgressionSettings settings)
 			return;
 		}
 
+		// A stored rank can trail the XP already held, such as after the ladder changes. That gap is closed
+		// quietly, so only the ranks this XP reaches are announced.
+		int before = Math.Max(player.Rank, Ranks.RankFor(player.RankXp));
 		player.RankXp += whole;
 		player.IsDirty = true;
 		result.XpGained += whole;
 
 		int rank = Ranks.RankFor(player.RankXp);
-		if (rank > player.Rank)
+		player.Rank = Math.Max(before, rank);
+		if (rank > before)
 		{
-			player.Rank = rank;
 			result.Notices.Add(new() { Kind = NoticeKind.RankUp, Value = rank, Broadcast = true });
 		}
 	}

@@ -13,8 +13,11 @@ using MySqlConnector;
 /// <param name="settings">Where the database is.</param>
 internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgressionStore
 {
-	/// <summary>The schema version these statements create and expect.</summary>
-	public const int SchemaVersion = 1;
+	/// <summary>
+	/// The schema version these statements create and expect. Version 2 counts ranks in stages, so a version 1
+	/// database has its rank indexes cleared once, and each player's rank comes back from their XP.
+	/// </summary>
+	public const int SchemaVersion = 2;
 
 	private const string CreateTables = """
 		CREATE TABLE IF NOT EXISTS csp_schema (
@@ -54,6 +57,11 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 		INSERT IGNORE INTO csp_schema (id, version) VALUES (1, @version);
+		""";
+
+	private const string MigrateToStagedRanks = """
+		UPDATE csp_players SET rank_index = 0 WHERE (SELECT version FROM csp_schema WHERE id = 1) < 2;
+		UPDATE csp_schema SET version = 2 WHERE id = 1 AND version < 2;
 		""";
 
 	private const string UpsertPlayer = """
@@ -105,6 +113,11 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
 		await connection.ExecuteAsync(new CommandDefinition(CreateTables, new { version = SchemaVersion }, cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+		MySqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable transactionScope = transaction.ConfigureAwait(false);
+		await connection.ExecuteAsync(new CommandDefinition(MigrateToStagedRanks, transaction: transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+		await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 	}
 
 	/// <inheritdoc/>

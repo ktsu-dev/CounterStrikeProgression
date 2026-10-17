@@ -45,10 +45,10 @@ public sealed class ProgressionSettings
 	public double BotXpMultiplier { get; set; } = 0.25;
 
 	/// <summary>Gets or sets the XP needed to go from the lowest rank to the next.</summary>
-	public long FirstRankXp { get; set; } = 1000;
+	public long FirstRankXp { get; set; } = 5000;
 
 	/// <summary>Gets or sets how much more each rank costs than the one before, as a multiplier.</summary>
-	public double RankGrowth { get; set; } = 1.25;
+	public double RankGrowth { get; set; } = 1.0436;
 
 	/// <summary>Gets or sets the weapon XP needed to go from level 1 to level 2.</summary>
 	public long WeaponLevelBaseXp { get; set; } = 300;

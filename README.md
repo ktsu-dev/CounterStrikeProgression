@@ -16,7 +16,7 @@ Players climb an up-only rank ladder from Silver I to Global Elite. Every weapon
 
 ## Features
 
-- **Up-only ranks**: 18 matchmaking-style ranks. Each rank costs 25% more XP than the one before, and nobody loses progress for a bad night.
+- **Up-only ranks**: 18 matchmaking-style ranks with five stages each, from Silver I · I to Global Elite · V. The first stage takes 5,000 XP, each one after costs about 4% more, and Global Elite · V takes about 5 million XP in total. Nobody loses progress for a bad night.
 - **Weapon levels**: every weapon, grenade, the knife, and the Zeus levels up to 40, and each level-up pays rank XP.
 - **Weapon ladders**: Kills, Headshots, and Hits, plus one challenge for every skill shot the weapon can earn, each with five tiers. Skill tiers pay more than volume tiers.
 - **Skill shots**: about 50, covering movement, distance, wallbangs and smokes, scopes, utility and melee, timing and aim, multi-kills, and round situations.
@@ -119,7 +119,7 @@ Sending runs on the thread pool with a 3 second timeout, and a failure is logged
 
 #### The site
 
-The site is a small ASP.NET Core app, published as the image `ghcr.io/ktsu-dev/counterstrikeprogression-site:<version>` with each release (and as `latest`). It shows the live scoreboard and feed on `/`, the rank ladder on `/ranks`, and each player's profile on `/players/{steamId}` (a SteamID64). Pages update live over server-sent events, and a server counts as offline after a few seconds without a batch.
+The site is a small ASP.NET Core app, published as the image `ghcr.io/ktsu-dev/counterstrikeprogression-site:<version>` with each release (and as `latest`). It shows the live scoreboard and feed on `/`, the rank ladder on `/ranks`, and each player's profile on `/players/{steamId}` (a SteamID64), with their XP feed and suggested next challenges. Ranks show as badges: the color and emblem mark the rank's family, and the pips along the bottom fill with the stage. Pages update live over server-sent events, and a server counts as offline after a few seconds without a batch.
 
 The image listens on two ports:
 

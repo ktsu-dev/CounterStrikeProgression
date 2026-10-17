@@ -3,8 +3,9 @@
 (() => {
 	const SERVER_NAME = "ktsu.dev CS2";
 
-	// Matches RankLadder.Names in CounterStrikeProgression.Core, because the live snapshot sends only the index.
-	const RANK_NAMES = [
+	// Matches RankLadder.RankNames and RankLadder.Names in CounterStrikeProgression.Core, because the live
+	// snapshot sends only the rank index.
+	const RANK_BASE_NAMES = [
 		"Silver I",
 		"Silver II",
 		"Silver III",
@@ -23,6 +24,19 @@
 		"Legendary Eagle Master",
 		"Supreme Master First Class",
 		"Global Elite",
+	];
+	const STAGES_PER_RANK = 5;
+	const STAGE_NUMERALS = ["I", "II", "III", "IV", "V"];
+	const RANK_NAMES = RANK_BASE_NAMES.flatMap((name) => STAGE_NUMERALS.map((stage) => `${name} · ${stage}`));
+
+	// Each family of ranks shares a badge color and emblem, and marks on the badge count the rank within it.
+	const RANK_FAMILIES = [
+		{ from: 0, color: "#b9c3cd", emblem: "star" },
+		{ from: 6, color: "#f2c94c", emblem: "star" },
+		{ from: 10, color: "#5fa8ff", emblem: "shield" },
+		{ from: 14, color: "#c77dff", emblem: "wings" },
+		{ from: 16, color: "#ff8a3d", emblem: "wings" },
+		{ from: 17, color: "#ff4d6d", emblem: "globe" },
 	];
 
 	const FEED_LIMIT = 50;
@@ -91,8 +105,78 @@
 		return RANK_NAMES[index] ?? `Rank ${Number(index) + 1}`;
 	}
 
-	function rankBadge(name) {
-		return el("span", "rank", name);
+	const SVG = "http://www.w3.org/2000/svg";
+
+	function svgNode(tag, attributes) {
+		const node = document.createElementNS(SVG, tag);
+		for (const [name, value] of Object.entries(attributes)) {
+			node.setAttribute(name, String(value));
+		}
+		return node;
+	}
+
+	function emblem(kind, color) {
+		const paint = { fill: color, stroke: "none" };
+		switch (kind) {
+			case "shield":
+				return svgNode("path", { d: "M6 4 L18 4 L18 10 Q18 16 12 18.5 Q6 16 6 10 Z", ...paint });
+			case "wings":
+				return svgNode("path", { d: "M2 15 L12 3.5 L22 15 L17.5 15 L12 9 L6.5 15 Z", ...paint });
+			case "globe": {
+				const group = svgNode("g", {});
+				group.append(
+					svgNode("circle", { cx: 12, cy: 11, r: 7, fill: color }),
+					svgNode("ellipse", { cx: 12, cy: 11, rx: 3, ry: 7, fill: "none", stroke: "#0d0f12", "stroke-width": 1.2 }),
+					svgNode("line", { x1: 5, y1: 11, x2: 19, y2: 11, stroke: "#0d0f12", "stroke-width": 1.2 }),
+				);
+				return group;
+			}
+			default: {
+				const points = [];
+				for (let i = 0; i < 10; i++) {
+					const radius = i % 2 === 0 ? 7.5 : 3.2;
+					const angle = (Math.PI / 5) * i - Math.PI / 2;
+					points.push(`${(12 + radius * Math.cos(angle)).toFixed(2)},${(11 + radius * Math.sin(angle)).toFixed(2)}`);
+				}
+				return svgNode("polygon", { points: points.join(" "), ...paint });
+			}
+		}
+	}
+
+	// A plate in the rank family's color: the emblem on the left, a mark for each step within the family, and
+	// five pips along the bottom that fill with the stage.
+	function badgeSvg(index) {
+		const rank = Math.max(0, Math.min(RANK_NAMES.length - 1, Math.floor(Number(index) || 0)));
+		const base = Math.floor(rank / STAGES_PER_RANK);
+		const stage = (rank % STAGES_PER_RANK) + 1;
+		const family = [...RANK_FAMILIES].reverse().find((f) => base >= f.from) ?? RANK_FAMILIES[0];
+		const svg = svgNode("svg", { viewBox: "0 0 48 28", role: "img", "aria-hidden": "true" });
+		svg.append(
+			svgNode("rect", { x: 0.5, y: 0.5, width: 47, height: 27, rx: 4, fill: "#15181d", stroke: family.color, "stroke-width": 1 }),
+			emblem(family.emblem, family.color),
+		);
+		const marks = base - family.from + 1;
+		for (let i = 0; i < marks; i++) {
+			svg.append(svgNode("rect", { x: 24 + i * 3.6, y: 7, width: 2.2, height: 8, rx: 1, fill: family.color }));
+		}
+		for (let i = 0; i < STAGES_PER_RANK; i++) {
+			svg.append(svgNode("rect", {
+				x: 4 + i * 8.2,
+				y: 21,
+				width: 7,
+				height: 3,
+				rx: 1,
+				fill: i < stage ? family.color : "#262b33",
+			}));
+		}
+		return svg;
+	}
+
+	function rankBadge(index, name, big = false) {
+		const badge = el("span", big ? "badge big" : "badge");
+		badge.title = name ?? rankName(index);
+		badge.append(badgeSvg(index), el("span", "rank", name ?? rankName(index)));
+		return badge;
 	}
 
 	function playerLink(steamId, name) {
@@ -317,7 +401,7 @@
 			const rows = players.map((player) => {
 				const tr = el("tr");
 				const name = player.isBot ? el("span", null, player.name) : playerLink(player.steamId, player.name);
-				const badge = player.isBot ? el("span", "rank bot", "bot") : rankBadge(rankName(player.rank));
+				const badge = player.isBot ? el("span", "rank bot", "bot") : rankBadge(player.rank);
 				tr.append(
 					cell("name", name),
 					cell(null, badge),
@@ -438,7 +522,7 @@
 				tr.append(
 					cell("num", row.position),
 					cell("name", playerLink(row.steamId, row.name)),
-					cell(null, rankBadge(row.rankName)),
+					cell(null, rankBadge(row.rank, row.rankName)),
 					cell("num", formatXp(row.rankXp)),
 					cell(row.online ? "online" : null, ago(row.lastSeen, row.online)),
 				);
@@ -538,7 +622,7 @@
 			const details = [`${formatXp(player.rankXp)} XP`];
 			details.push(atTop ? "top rank" : `${formatXp(player.xpToNextRank)} XP to ${player.nextRankName}`);
 			details.push(`first seen ${formatDate(player.firstSeen)}`);
-			summary.append(el("div", "big", player.rankName), bar(atTop ? 1 : player.rankProgress), el("div", "muted", details.join(" · ")));
+			summary.append(rankBadge(player.rank, player.rankName, true), bar(atTop ? 1 : player.rankProgress), el("div", "muted", details.join(" · ")));
 
 			const weapons = Array.isArray(player.weapons) ? player.weapons : [];
 			const parts = [head, summary];

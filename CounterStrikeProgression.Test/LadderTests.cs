@@ -13,11 +13,13 @@ public sealed class LadderTests
 	private static readonly RankLadder Ranks = new(1000, 1.25);
 
 	[TestMethod]
-	public void RanksStartAtSilverAndEndAtGlobalElite()
+	public void RanksStartAtSilverAndEndAtGlobalElite_InFiveStagesEach()
 	{
-		Assert.HasCount(18, RankLadder.Names);
-		Assert.AreEqual("Silver I", RankLadder.Names[0]);
-		Assert.AreEqual("Global Elite", RankLadder.Names[RankLadder.TopRank]);
+		Assert.HasCount(18 * RankLadder.StagesPerRank, RankLadder.Names);
+		Assert.AreEqual("Silver I · I", RankLadder.Names[0]);
+		Assert.AreEqual("Silver I · V", RankLadder.Names[4]);
+		Assert.AreEqual("Silver II · I", RankLadder.Names[5]);
+		Assert.AreEqual("Global Elite · V", RankLadder.Names[RankLadder.TopRank]);
 	}
 
 	[TestMethod]
@@ -30,11 +32,12 @@ public sealed class LadderTests
 	}
 
 	[TestMethod]
-	public void GlobalEliteTakesAbout174kXp()
+	public void GlobalEliteVTakesAboutFiveMillionXpByDefault()
 	{
-		long total = Ranks.ThresholdFor(RankLadder.TopRank);
-		Assert.IsGreaterThan(173_000, total);
-		Assert.IsLessThan(174_500, total);
+		ProgressionSettings settings = new();
+		long total = new RankLadder(settings.FirstRankXp, settings.RankGrowth).ThresholdFor(RankLadder.TopRank);
+		Assert.IsGreaterThan(4_900_000, total);
+		Assert.IsLessThan(5_100_000, total);
 	}
 
 	[TestMethod]
@@ -43,7 +46,7 @@ public sealed class LadderTests
 	[DataRow(1000, 1)]
 	[DataRow(2249, 1)]
 	[DataRow(2250, 2)]
-	[DataRow(10_000_000, 17)]
+	[DataRow(long.MaxValue, 89)]
 	public void RankForMatchesThresholds(long xp, int expected) => Assert.AreEqual(expected, Ranks.RankFor(xp));
 
 	[TestMethod]
@@ -51,7 +54,7 @@ public sealed class LadderTests
 	{
 		Assert.AreEqual(0.5, Ranks.ProgressToNext(500), 1e-9);
 		Assert.AreEqual(0.0, Ranks.ProgressToNext(1000), 1e-9);
-		Assert.AreEqual(1.0, Ranks.ProgressToNext(10_000_000), 1e-9);
+		Assert.AreEqual(1.0, Ranks.ProgressToNext(long.MaxValue), 1e-9);
 	}
 
 	[TestMethod]
