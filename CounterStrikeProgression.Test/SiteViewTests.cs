@@ -107,6 +107,36 @@ public sealed class SiteViewTests
 	}
 
 	[TestMethod]
+	public void Player_PercentagesAreCappedAt100()
+	{
+		PlayerProgress player = TestHelpers.Player();
+		WeaponProgress ak = player.Weapon(TestHelpers.Weapon("ak47").Key);
+		ak.Kills = 10;
+		ak.Headshots = 15;
+		ak.Shots = 100;
+		ak.Hits = 130;
+
+		WeaponView view = PlayerViewBuilder.Build(player, Settings(), online: false).Weapons.Single();
+
+		Assert.AreEqual(100, view.HeadshotPercent);
+		Assert.AreEqual(100, view.Accuracy);
+	}
+
+	[TestMethod]
+	public void Player_StoredLevelAboveCurve_HasZeroProgress()
+	{
+		PlayerProgress player = TestHelpers.Player();
+		WeaponProgress ak = player.Weapon(TestHelpers.Weapon("ak47").Key);
+		ak.Xp = 10;
+		ak.Level = 4;
+
+		WeaponView view = PlayerViewBuilder.Build(player, Settings(), online: false).Weapons.Single();
+
+		Assert.AreEqual(4, view.Level);
+		Assert.AreEqual(0, view.LevelProgress);
+	}
+
+	[TestMethod]
 	public void Player_WeaponsOrderedByXpDescending()
 	{
 		PlayerProgress player = TestHelpers.Player();

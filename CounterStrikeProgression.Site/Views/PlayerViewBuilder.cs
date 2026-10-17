@@ -32,7 +32,7 @@ internal static class PlayerViewBuilder
 
 		bool atTop = rank >= RankLadder.TopRank;
 		long xpToNext = atTop ? 0 : Math.Max(0, ladder.ThresholdFor(rank + 1) - merged.RankXp);
-		double progress = atTop ? 1 : (rank == ladderRank ? ladder.ProgressToNext(merged.RankXp) : 0);
+		double progress = atTop ? 1 : (rank == ladderRank ? Fraction(ladder.ProgressToNext(merged.RankXp)) : 0);
 
 		WeaponLevelCurve curve = new(settings.WeaponLevelBaseXp, settings.WeaponLevelStepXp, settings.WeaponMaxLevel);
 		ChallengeCatalog catalog = new(settings);
@@ -62,8 +62,9 @@ internal static class PlayerViewBuilder
 	private static WeaponView BuildWeapon(WeaponProgress weapon, WeaponLevelCurve curve, ChallengeCatalog catalog)
 	{
 		WeaponInfo? info = WeaponCatalog.Find(weapon.Weapon);
-		int level = Math.Min(curve.MaxLevel, Math.Max(curve.LevelFor(weapon.Xp), weapon.Level));
-		double levelProgress = level >= curve.MaxLevel ? 1 : curve.ProgressToNext(weapon.Xp);
+		int curveLevel = curve.LevelFor(weapon.Xp);
+		int level = Math.Min(curve.MaxLevel, Math.Max(curveLevel, weapon.Level));
+		double levelProgress = level >= curve.MaxLevel ? 1 : (level == curveLevel ? Fraction(curve.ProgressToNext(weapon.Xp)) : 0);
 
 		IReadOnlyList<ChallengeView> challenges = info is null
 			? []
@@ -90,5 +91,7 @@ internal static class PlayerViewBuilder
 	}
 
 	private static double Percent(long part, long whole) =>
-		whole <= 0 ? 0 : Math.Round(part * 100.0 / whole, 1, MidpointRounding.AwayFromZero);
+		whole <= 0 ? 0 : Math.Clamp(Math.Round(part * 100.0 / whole, 1, MidpointRounding.AwayFromZero), 0, 100);
+
+	private static double Fraction(double value) => double.IsFinite(value) ? Math.Clamp(value, 0, 1) : 0;
 }
