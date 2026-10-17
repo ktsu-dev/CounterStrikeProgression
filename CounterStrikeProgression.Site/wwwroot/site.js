@@ -915,6 +915,19 @@
 			return box;
 		}
 
+		function renderTab(player) {
+			switch (tab) {
+				case "weapons":
+					return renderWeapons(player);
+				case "feats":
+					return renderFeats(player);
+				case "feed":
+					return renderFeed(player);
+				default:
+					return renderNext(player);
+			}
+		}
+
 		function tabLabel(key, label, player) {
 			if (key === "weapons" && Array.isArray(player.weapons)) {
 				return `${label} · ${player.weapons.length}`;
@@ -991,8 +1004,7 @@
 			body.id = "player-tab";
 			body.setAttribute("role", "tabpanel");
 			body.setAttribute("aria-labelledby", `tab-${tab}`);
-			const renderers = new Map([["next", renderNext], ["weapons", renderWeapons], ["feats", renderFeats], ["feed", renderFeed]]);
-			body.append((renderers.get(tab) ?? renderNext)(player));
+			body.append(renderTab(player));
 
 			panel.replaceChildren(head, summary, tabBar(player), body);
 		}
