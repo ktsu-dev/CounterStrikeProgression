@@ -194,11 +194,27 @@ internal sealed class CombatHandlers(ProgressionServices services)
 			return HookResult.Continue;
 		}
 
-		WeaponInfo? weapon = GameState.ResolveWeapon(@event.Weapon, GameState.PawnOf(attacker));
-		if (weapon is not null)
+		CCSPlayerPawn? pawn = GameState.PawnOf(attacker);
+		WeaponInfo? weapon = GameState.ResolveWeapon(@event.Weapon, pawn);
+		if (weapon is null)
 		{
-			services.Apply(attacker, session, Engine.ApplyChickenKill(progress, weapon));
+			return HookResult.Continue;
 		}
+
+		CBaseEntity? chicken = Utilities.GetEntityFromIndex<CBaseEntity>(@event.Otherid);
+		CombatEvent kill = new()
+		{
+			Weapon = weapon,
+			IsKill = true,
+			IsHeadshot = @event.Headshot,
+			Attacker = GameState.StateOf(pawn),
+			Distance = GameState.Distance(pawn?.AbsOrigin, chicken?.AbsOrigin),
+			Penetrations = @event.Penetrated,
+			ThroughSmoke = @event.Thrusmoke,
+			AttackerBlind = @event.Attackerblind,
+			NoScope = @event.Noscope,
+		};
+		services.Apply(attacker, session, Engine.ApplyChickenKill(progress, kill));
 
 		return HookResult.Continue;
 	}

@@ -40,6 +40,9 @@ internal enum SkillTrigger
 
 	/// <summary>A round won as the team's last player alive.</summary>
 	Clutch,
+
+	/// <summary>A chicken killed.</summary>
+	Chicken,
 }
 
 /// <summary>

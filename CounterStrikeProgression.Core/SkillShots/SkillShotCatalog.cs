@@ -102,6 +102,20 @@ internal static class SkillShotCatalog
 		Kill("bounce_back", "Bounce back", "Kill right after taking damage", Rarity.Common, Any, (e, s) => e.SecondsSinceAttackerHurt <= s.BounceBackSeconds),
 		Kill("defuse_denial", "Defuse denial", "Kill a player who is defusing", Rarity.Rare, Any, (e, _) => e.Victim.Defusing),
 		Stat(Clutch, "Clutch", "Win the round as your team's last player alive", Rarity.Epic, SkillTrigger.Clutch, Any),
+
+		// Chickens
+		Chicken("chicken_nugget", "Nugget", "Headshot a chicken", Rarity.Common, Gun, (e, _) => e.IsHeadshot),
+		Chicken("chicken_cluck_and_cover", "Cluck and cover", "Kill a chicken while crouched", Rarity.Common, NotGrenade, (e, _) => e.Attacker.Ducked),
+		Chicken("chicken_hand_plucked", "Hand-plucked", "Knife a chicken", Rarity.Common, Knife, (_, _) => true),
+		Chicken("chicken_fowl_play", "Fowl play", "Kill a chicken through a wall", Rarity.Rare, Gun, (e, _) => e.Penetrations > 0),
+		Chicken("chicken_smoked", "Smoked chicken", "Kill a chicken through a smoke", Rarity.Rare, Gun, (e, _) => e.ThroughSmoke),
+		Chicken("chicken_fried", "Fried chicken", "Cook a chicken with a molotov or incendiary", Rarity.Rare, Named("inferno"), (_, _) => true),
+		Chicken("chicken_scrambled", "Scrambled", "Blow up a chicken with an HE grenade", Rarity.Rare, Named("hegrenade"), (_, _) => true),
+		Chicken("chicken_rotisserie", "Rotisserie", "Zap a chicken with the Zeus", Rarity.Rare, Taser, (_, _) => true),
+		Chicken("chicken_wing_it", "Wing it", "No-scope a chicken", Rarity.Rare, Scoped, (e, _) => e.NoScope),
+		Chicken("chicken_poultry_in_motion", "Poultry in motion", "Kill a chicken while you're in the air", Rarity.Rare, NotGrenade, (e, _) => IsAirborne(e.Attacker)),
+		Chicken("chicken_blind_clucking_luck", "Blind clucking luck", "Kill a chicken while flashed", Rarity.Epic, NotGrenade, (e, _) => e.AttackerBlind),
+		Chicken("chicken_crossed_the_road", "Crossed the road", "Kill a chicken from long range", Rarity.Epic, Gun, (e, s) => e.Distance >= LongShotDistance(e.Weapon.Class, s)),
 	];
 
 	private static FrozenDictionary<string, SkillShotDefinition> ById { get; } = All.ToFrozenDictionary(s => s.Id.WeakString);
@@ -167,6 +181,9 @@ internal static class SkillShotCatalog
 
 	private static SkillShotDefinition Kill(string id, string name, string description, Rarity rarity, Func<WeaponInfo, bool> appliesTo, Func<CombatEvent, ProgressionSettings, bool> detect) =>
 		new(SkillShotId.Create(id), name, description, rarity, SkillTrigger.Kill, appliesTo, detect);
+
+	private static SkillShotDefinition Chicken(string id, string name, string description, Rarity rarity, Func<WeaponInfo, bool> appliesTo, Func<CombatEvent, ProgressionSettings, bool> detect) =>
+		new(SkillShotId.Create(id), name, description, rarity, SkillTrigger.Chicken, appliesTo, detect);
 
 	private static SkillShotDefinition Stat(SkillShotId id, string name, string description, Rarity rarity, SkillTrigger trigger, Func<WeaponInfo, bool> appliesTo) =>
 		new(id, name, description, rarity, trigger, appliesTo);

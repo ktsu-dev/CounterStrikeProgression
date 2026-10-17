@@ -143,10 +143,16 @@ internal static class GameState
 	/// <param name="a">One pawn.</param>
 	/// <param name="b">The other pawn.</param>
 	/// <returns>The distance, or 0 when either position is unknown.</returns>
-	public static double Distance(CCSPlayerPawn? a, CCSPlayerPawn? b)
+	public static double Distance(CCSPlayerPawn? a, CCSPlayerPawn? b) => Distance(a?.AbsOrigin, b?.AbsOrigin);
+
+	/// <summary>
+	/// Gets the distance between two positions in game units.
+	/// </summary>
+	/// <param name="from">One position.</param>
+	/// <param name="to">The other position.</param>
+	/// <returns>The distance, or 0 when either position is unknown.</returns>
+	public static double Distance(Vector? from, Vector? to)
 	{
-		Vector? from = a?.AbsOrigin;
-		Vector? to = b?.AbsOrigin;
 		if ((from is null) || (to is null))
 		{
 			return 0;

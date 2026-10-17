@@ -179,17 +179,45 @@ public sealed class ProgressionEngineTests
 	{
 		ProgressionEngine engine = TestHelpers.Engine();
 		PlayerProgress player = TestHelpers.Player();
-		WeaponInfo knife = TestHelpers.Weapon("knife");
+		WeaponInfo ak = TestHelpers.Weapon("ak47");
 
-		ProgressionResult result = engine.ApplyChickenKill(player, knife);
+		ProgressionResult result = engine.ApplyChickenKill(player, new CombatEvent { Weapon = ak, IsKill = true });
 
-		WeaponProgress weapon = player.Weapons[knife.Key];
+		WeaponProgress weapon = player.Weapons[ak.Key];
 		Assert.AreEqual(1, weapon.Challenges[ChallengeDefinition.ChickensId].Count);
 		Assert.AreEqual(engine.Settings.ChickenXp, weapon.Xp);
 		Assert.AreEqual(0, weapon.Kills);
 		ProgressionNotice tier = result.Notices.Single(n => n.Kind == NoticeKind.TierCompleted);
 		Assert.AreEqual("Chickens", tier.ChallengeName);
 		Assert.AreEqual(engine.Settings.ChickenXp + engine.Settings.VolumeTierXp, player.RankXp);
+	}
+
+	[TestMethod]
+	public void ChickenSkillShots_AreEarnedOnlyOnChickens()
+	{
+		ProgressionEngine engine = TestHelpers.Engine();
+		PlayerProgress player = TestHelpers.Player();
+		CombatEvent headshot = TestHelpers.Kill("ak47") with { IsHeadshot = true, Penetrations = 1 };
+
+		ProgressionResult onChicken = engine.ApplyChickenKill(player, headshot);
+		ProgressionResult onPlayer = engine.ApplyCombat(player, headshot);
+
+		string[] expected = ["chicken_fowl_play", "chicken_nugget"];
+		CollectionAssert.AreEquivalent(expected, TestHelpers.SkillShots(onChicken).ToArray());
+		Assert.IsFalse(TestHelpers.SkillShots(onPlayer).Any(id => id.StartsWith("chicken_", StringComparison.Ordinal)));
+	}
+
+	[TestMethod]
+	public void ChickenSkillShots_FollowTheirWeapons()
+	{
+		ProgressionEngine engine = TestHelpers.Engine();
+		PlayerProgress player = TestHelpers.Player();
+
+		ProgressionResult knife = engine.ApplyChickenKill(player, new CombatEvent { Weapon = TestHelpers.Weapon("knife"), IsKill = true, IsHeadshot = true });
+		ProgressionResult zeus = engine.ApplyChickenKill(player, new CombatEvent { Weapon = TestHelpers.Weapon("taser"), IsKill = true });
+
+		Assert.AreEqual("chicken_hand_plucked", Assert.ContainsSingle(TestHelpers.SkillShots(knife)));
+		Assert.AreEqual("chicken_rotisserie", Assert.ContainsSingle(TestHelpers.SkillShots(zeus)));
 	}
 
 	[TestMethod]

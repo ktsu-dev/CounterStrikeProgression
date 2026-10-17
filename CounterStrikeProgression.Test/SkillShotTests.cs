@@ -20,11 +20,11 @@ public sealed class SkillShotTests
 	}
 
 	[TestMethod]
-	public void HitAndKillSkillShotsHaveADetectorAndOthersDoNot()
+	public void HitKillAndChickenSkillShotsHaveADetectorAndOthersDoNot()
 	{
 		foreach (SkillShotDefinition skillShot in SkillShotCatalog.All)
 		{
-			bool combat = skillShot.Trigger is SkillTrigger.Hit or SkillTrigger.Kill;
+			bool combat = skillShot.Trigger is SkillTrigger.Hit or SkillTrigger.Kill or SkillTrigger.Chicken;
 			Assert.AreEqual(combat, skillShot.Detect is not null, skillShot.Id.WeakString);
 		}
 	}
