@@ -714,23 +714,118 @@
 		return card;
 	}
 
-	function challengeChip(challenge) {
+	// Skill shots on the weapons tab are listed commonest first.
+	const RARITY_ORDER = { Common: 0, Rare: 1, Epic: 2 };
+
+	function tierPips(finished, count) {
+		const pips = el("span", "pips");
+		pips.setAttribute("aria-hidden", "true");
+		for (let i = 0; i < count; i++) {
+			pips.append(el("i", i < finished ? "on" : null));
+		}
+		return pips;
+	}
+
+	function challengeRow(challenge) {
 		const finished = Number(challenge.tier) || 0;
-		let label = challenge.name;
-		if (finished > 0) {
-			label += ` ${ROMAN[finished] ?? finished}`;
-		}
-		if (challenge.nextTarget !== null && challenge.nextTarget !== undefined) {
-			label += ` · ${formatXp(challenge.count)}/${formatXp(challenge.nextTarget)}`;
-		}
-		const chip = el("span", finished > 0 ? "done" : null);
+		const tierCount = Number(challenge.tierCount) || 0;
+		const complete = challenge.nextTarget === null || challenge.nextTarget === undefined;
+		const row = el("li", complete ? "challenge complete" : (finished > 0 ? "challenge started" : "challenge"));
+
+		const head = el("div", "head");
+		const title = el("span", "title");
 		const icon = challengeIcon(challenge.id);
 		if (icon) {
-			chip.append(icon, " ");
+			title.append(icon, " ");
 		}
-		chip.append(label);
-		return chip;
+		title.append(el("b", null, challenge.name));
+		if (challenge.rarity) {
+			title.append(el("span", `rarity ${String(challenge.rarity).toLowerCase()}`, challenge.rarity));
+		}
+		const tier = el("span", "tier", `${finished > 0 ? (ROMAN[finished] ?? finished) : "–"} / ${ROMAN[tierCount] ?? tierCount}`);
+		tier.title = `${finished} of ${tierCount} tiers done`;
+		head.append(title, tier);
+		row.append(head);
+
+		if (challenge.description) {
+			row.append(el("div", "muted", challenge.description));
+		}
+
+		const progress = el("div", "progress");
+		progress.append(tierPips(finished, tierCount), bar(complete ? 1 : challenge.progress, "thin"));
+		progress.append(el("span", "count", complete
+			? `${formatXp(challenge.count)} · done`
+			: `${formatXp(challenge.count)}/${formatXp(challenge.nextTarget)}`));
+		row.append(progress);
+		return row;
 	}
+
+	function challengeGroup(title, challenges) {
+		const box = el("div", "challenge-group");
+		const done = challenges.filter((c) => c.nextTarget === null || c.nextTarget === undefined).length;
+		box.append(el("h3", "section-title", `${title} · ${done}/${challenges.length} complete`));
+		const list = el("ul", "challenges");
+		list.append(...challenges.map(challengeRow));
+		box.append(list);
+		return box;
+	}
+
+	function tiersDone(weapon) {
+		const challenges = Array.isArray(weapon.challenges) ? weapon.challenges : [];
+		return {
+			done: challenges.reduce((sum, c) => sum + (Number(c.tier) || 0), 0),
+			total: challenges.reduce((sum, c) => sum + (Number(c.tierCount) || 0), 0),
+		};
+	}
+
+	function weaponDetail(weapon) {
+		const box = el("section", "weapon-detail");
+		const head = el("div", "weapon-head");
+		const name = el("h2", "weapon-name", weapon.displayName);
+		const maxed = weapon.level >= weapon.maxLevel;
+		const level = el("div", "weapon-level");
+		level.append(el("span", null, maxed ? `Level ${weapon.level} · max` : `Level ${weapon.level}/${weapon.maxLevel}`), bar(maxed ? 1 : weapon.levelProgress));
+		head.append(name, level);
+
+		const stats = el("div", "weapon-stats");
+		const { done, total } = tiersDone(weapon);
+		for (const [label, value] of [
+			["Kills", formatXp(weapon.kills)],
+			["HS%", formatPercent(weapon.headshotPercent)],
+			["Accuracy", formatPercent(weapon.accuracy)],
+			["Tiers", `${done}/${total}`],
+		]) {
+			const stat = el("div", "stat");
+			stat.append(el("b", null, value), el("span", "muted", label));
+			stats.append(stat);
+		}
+		box.append(head, stats);
+
+		const challenges = Array.isArray(weapon.challenges) ? weapon.challenges : [];
+		if (challenges.length === 0) {
+			box.append(message("This weapon has no challenges."));
+			return box;
+		}
+		const volume = challenges.filter((c) => c.kind !== "Skill");
+		const skill = challenges
+			.filter((c) => c.kind === "Skill")
+			.map((c, index) => ({ c, index }))
+			.sort((a, b) => ((RARITY_ORDER[a.c.rarity] ?? 0) - (RARITY_ORDER[b.c.rarity] ?? 0)) || (a.index - b.index))
+			.map(({ c }) => c);
+		if (volume.length > 0) {
+			box.append(challengeGroup("Ladder", volume));
+		}
+		if (skill.length > 0) {
+			box.append(challengeGroup("Skill shots", skill));
+		}
+		return box;
+	}
+
+	const PLAYER_TABS = [
+		["next", "Next up"],
+		["weapons", "Weapons"],
+		["feats", "Feats"],
+	];
 
 	function initPlayer(root) {
 		const match = /^\/players\/(\d{17})\/?$/.exec(window.location.pathname);
@@ -738,15 +833,167 @@
 		const panel = el("div", "panel");
 		root.replaceChildren(panel);
 		let online = false;
+		let last = null;
+		// The open tab and the weapon picked on the weapons tab, kept across refetches.
+		let tab = null;
+		let weaponKey = null;
+
+		function tabFromHash() {
+			const name = window.location.hash.replace(/^#/, "");
+			return PLAYER_TABS.some(([key]) => key === name) ? name : null;
+		}
 
 		function notFound() {
 			document.title = `Player not found · ${SERVER_NAME}`;
 			panel.replaceChildren(message("Player not found"));
 		}
 
+		function nextTab(player) {
+			const suggestions = Array.isArray(player.suggestions) ? player.suggestions : [];
+			return suggestions.length > 0 ? "next" : "weapons";
+		}
+
+		function renderNext(player) {
+			const box = el("div", "pad");
+			const suggestions = Array.isArray(player.suggestions) ? player.suggestions : [];
+			if (suggestions.length === 0) {
+				box.append(message("Nothing to suggest yet. Play a few rounds and the closest tiers show up here."));
+				return box;
+			}
+			const cards = el("div", "suggestions");
+			cards.append(...suggestions.map(suggestionCard));
+			box.append(el("h2", "section-title", "Closest to a tier"), cards);
+			return box;
+		}
+
+		function renderWeapons(player) {
+			const weapons = Array.isArray(player.weapons) ? player.weapons : [];
+			if (weapons.length === 0) {
+				return message("No weapon progress yet.");
+			}
+			if (!weapons.some((weapon) => weapon.key === weaponKey)) {
+				weaponKey = weapons[0].key;
+			}
+			const selected = weapons.find((weapon) => weapon.key === weaponKey);
+			const picks = el("div", "weapon-picks");
+			for (const weapon of weapons) {
+				const pick = el("button", weapon.key === weaponKey ? "weapon-pick selected" : "weapon-pick");
+				pick.type = "button";
+				pick.setAttribute("aria-pressed", weapon.key === weaponKey ? "true" : "false");
+				pick.append(el("span", null, weapon.displayName), el("span", "level", weapon.level));
+				const { done, total } = tiersDone(weapon);
+				pick.title = `Level ${weapon.level} · ${formatXp(weapon.kills)} kills · ${done}/${total} tiers`;
+				pick.addEventListener("click", () => {
+					weaponKey = weapon.key;
+					render(last);
+				});
+				picks.append(pick);
+			}
+			const layout = el("div", "pad");
+			layout.append(picks, weaponDetail(selected));
+			return layout;
+		}
+
+		function renderFeats(player) {
+			const featList = Array.isArray(player.feats) ? player.feats : [];
+			if (featList.length === 0) {
+				return message("No feats yet.");
+			}
+			const box = el("div", "pad");
+			const grid = el("div", "feats");
+			for (const feat of featList) {
+				const card = el("div", feat.earned ? "feat earned" : "feat");
+				const text = el("div", "feat-text");
+				text.append(el("b", null, feat.name), el("div", "muted", feat.description));
+				if (!feat.earned) {
+					const target = Number(feat.target) || 0;
+					text.append(bar(target > 0 ? Number(feat.current) / target : 0, "small"), el("span", "muted", ` ${formatXp(feat.current)}/${formatXp(target)}`));
+				}
+				card.append(featIcon(feat.id, feat.earned, feat.name), text);
+				grid.append(card);
+			}
+			box.append(grid);
+			return box;
+		}
+
+		function renderFeed(player) {
+			const feed = Array.isArray(player.feed) ? player.feed : [];
+			const box = el("section", "player-feed");
+			const feedList = el("ul", "feed");
+			if (feed.length === 0) {
+				feedList.append(el("li", null, "Nothing yet. Skill shots, rank ups, and tiers show up here as they happen."));
+			} else {
+				feedList.append(...feed.map((entry) => feedItem(entry, false)));
+			}
+			box.append(el("h2", "section-title", "XP feed"), feedList);
+			return box;
+		}
+
+		function renderTab(player) {
+			switch (tab) {
+				case "weapons":
+					return renderWeapons(player);
+				case "feats":
+					return renderFeats(player);
+				default:
+					return renderNext(player);
+			}
+		}
+
+		function tabLabel(key, label, player) {
+			if (key === "weapons" && Array.isArray(player.weapons)) {
+				return `${label} · ${player.weapons.length}`;
+			}
+			if (key === "feats" && Array.isArray(player.feats) && player.feats.length > 0) {
+				return `${label} · ${player.feats.filter((feat) => feat.earned).length}/${player.feats.length}`;
+			}
+			return label;
+		}
+
+		function tabBar(player) {
+			const strip = el("div", "tabs");
+			strip.setAttribute("role", "tablist");
+			const buttons = PLAYER_TABS.map(([key, label]) => {
+				const button = el("button", "tab", tabLabel(key, label, player));
+				button.type = "button";
+				button.id = `tab-${key}`;
+				button.setAttribute("role", "tab");
+				button.setAttribute("aria-controls", "player-tab");
+				button.setAttribute("aria-selected", key === tab ? "true" : "false");
+				button.tabIndex = key === tab ? 0 : -1;
+				button.addEventListener("click", () => selectTab(key, true));
+				return button;
+			});
+			strip.addEventListener("keydown", (event) => {
+				const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
+				if (!step) {
+					return;
+				}
+				event.preventDefault();
+				const index = PLAYER_TABS.findIndex(([key]) => key === tab);
+				const next = PLAYER_TABS[(index + step + PLAYER_TABS.length) % PLAYER_TABS.length][0];
+				selectTab(next, true);
+				panel.querySelector(`#tab-${next}`)?.focus();
+			});
+			strip.append(...buttons);
+			return strip;
+		}
+
+		function selectTab(key, updateHash) {
+			tab = key;
+			if (updateHash) {
+				history.replaceState(null, "", `#${key}`);
+			}
+			if (last) {
+				render(last);
+			}
+		}
+
 		function render(player) {
+			last = player;
 			online = Boolean(player.online);
 			document.title = `${player.name} · ${SERVER_NAME}`;
+			tab = tab ?? tabFromHash() ?? nextTab(player);
 
 			const head = el("div", "top player-head");
 			const left = el("span");
@@ -765,83 +1012,18 @@
 			details.push(`first seen ${formatDate(player.firstSeen)}`);
 			summary.append(rankBadge(player.rank, player.rankName, true), bar(atTop ? 1 : player.rankProgress), el("div", "muted", details.join(" · ")));
 
-			const weapons = Array.isArray(player.weapons) ? player.weapons : [];
-			const parts = [head, summary];
+			const body = el("div", "tab-panel");
+			body.id = "player-tab";
+			body.setAttribute("role", "tabpanel");
+			body.setAttribute("aria-labelledby", `tab-${tab}`);
+			body.append(renderTab(player));
 
-			const suggestions = Array.isArray(player.suggestions) ? player.suggestions : [];
-			if (suggestions.length > 0) {
-				const next = el("div", "pad");
-				const cards = el("div", "suggestions");
-				cards.append(...suggestions.map(suggestionCard));
-				next.append(el("h2", "section-title", "Next challenges"), cards);
-				parts.push(next);
-			}
+			const tabs = el("div", "player-tabs");
+			tabs.append(tabBar(player), body);
+			const grid = el("div", "player-grid");
+			grid.append(tabs, renderFeed(player));
 
-			const featList = Array.isArray(player.feats) ? player.feats : [];
-			let featBox = null;
-			if (featList.length > 0) {
-				featBox = el("div", "pad");
-				const grid = el("div", "feats");
-				for (const feat of featList) {
-					const card = el("div", feat.earned ? "feat earned" : "feat");
-					const text = el("div", "feat-text");
-					text.append(el("b", null, feat.name), el("div", "muted", feat.description));
-					if (!feat.earned) {
-						const target = Number(feat.target) || 0;
-						text.append(bar(target > 0 ? Number(feat.current) / target : 0, "small"), el("span", "muted", ` ${formatXp(feat.current)}/${formatXp(target)}`));
-					}
-					card.append(featIcon(feat.id, feat.earned, feat.name), text);
-					grid.append(card);
-				}
-				const earnedCount = featList.filter((feat) => feat.earned).length;
-				featBox.append(el("h2", "section-title", `Feats · ${earnedCount}/${featList.length}`), grid);
-			}
-
-			const feed = Array.isArray(player.feed) ? player.feed : [];
-			const feedBox = el("div", "pad");
-			const feedList = el("ul", "feed");
-			if (feed.length === 0) {
-				feedList.append(el("li", null, "Nothing yet. Skill shots, rank ups, and tiers show up here as they happen."));
-			} else {
-				feedList.append(...feed.map((entry) => feedItem(entry, false)));
-			}
-			feedBox.append(el("h2", "section-title", "XP feed"), feedList);
-			if (weapons.length === 0) {
-				parts.push(message("No weapon progress yet."));
-			} else {
-				const rows = weapons.map((weapon) => {
-					const tr = el("tr");
-					const level = el("span", null, weapon.level);
-					const levelCell = cell("num");
-					levelCell.append(level, bar(weapon.level >= weapon.maxLevel ? 1 : weapon.levelProgress, "small"));
-					tr.append(
-						cell("name", weapon.displayName),
-						levelCell,
-						cell("num", formatXp(weapon.kills)),
-						cell("num", formatPercent(weapon.headshotPercent)),
-						cell("num", formatPercent(weapon.accuracy)),
-					);
-					return tr;
-				});
-				parts.push(table([["Weapon"], ["Lvl", "num"], ["Kills", "num"], ["HS%", "num"], ["Acc", "num"]], rows));
-
-				const ladders = el("div", "pad");
-				for (const weapon of weapons) {
-					const challenges = Array.isArray(weapon.challenges) ? weapon.challenges : [];
-					if (challenges.length === 0) {
-						continue;
-					}
-					const tiers = el("div", "tiers");
-					tiers.append(...challenges.map(challengeChip));
-					ladders.append(el("div", "muted", `${weapon.displayName} challenges`), tiers);
-				}
-				if (ladders.childElementCount > 0) {
-					parts.push(ladders);
-				}
-			}
-			const insertAt = suggestions.length > 0 ? 3 : 2;
-			parts.splice(insertAt, 0, ...(featBox ? [featBox, feedBox] : [feedBox]));
-			panel.replaceChildren(...parts);
+			panel.replaceChildren(head, summary, grid);
 		}
 
 		async function load() {
@@ -860,6 +1042,13 @@
 			notFound();
 			return;
 		}
+
+		window.addEventListener("hashchange", () => {
+			const fromHash = tabFromHash();
+			if (fromHash && fromHash !== tab) {
+				selectTab(fromHash, false);
+			}
+		});
 
 		const refetch = throttle(load, REFETCH_EVERY_MS);
 		on("progress", (changed) => {

@@ -8,6 +8,7 @@ using ktsu.CounterStrikeProgression.Core.Challenges;
 using ktsu.CounterStrikeProgression.Core.Feats;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.SkillShots;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
 /// <summary>
@@ -93,7 +94,46 @@ internal static class PlayerViewBuilder
 		weapon.Challenges.TryGetValue(definition.Id, out ChallengeProgress? progress);
 		long count = progress?.Count ?? 0;
 		int tier = Math.Min(definition.Tiers.Count, Math.Max(definition.TierFor(count), progress?.TierReached ?? 0));
-		return new(definition.Id, definition.Name, count, tier, definition.Tiers.Count, definition.NextTarget(tier));
+		bool isSkill = definition.Kind == ChallengeKind.Skill;
+		return new(
+			definition.Id,
+			definition.Name,
+			count,
+			tier,
+			definition.Tiers.Count,
+			definition.NextTarget(tier),
+			definition.Kind,
+			isSkill ? definition.Rarity : null,
+			Describe(definition),
+			TierProgress(definition, tier, count));
+	}
+
+	/// <summary>
+	/// Gets what a skill challenge's skill shot asks for.
+	/// </summary>
+	/// <param name="definition">The challenge.</param>
+	/// <returns>The skill shot's description, or <see langword="null"/> for a volume challenge.</returns>
+	internal static string? Describe(ChallengeDefinition definition) =>
+		definition.Kind == ChallengeKind.Skill
+			? SkillShotCatalog.All.FirstOrDefault(s => string.Equals(s.Id.WeakString, definition.Id, StringComparison.Ordinal))?.Description
+			: null;
+
+	/// <summary>
+	/// Gets how far a count is from the last finished tier to the next one.
+	/// </summary>
+	/// <param name="definition">The challenge.</param>
+	/// <param name="tier">The number of tiers finished.</param>
+	/// <param name="count">The challenge's count.</param>
+	/// <returns>A fraction from 0 to 1, or 1 when every tier is done.</returns>
+	internal static double TierProgress(ChallengeDefinition definition, int tier, long count)
+	{
+		if (definition.NextTarget(tier) is not { } target)
+		{
+			return 1;
+		}
+
+		int previous = tier > 0 ? definition.Tiers[tier - 1] : 0;
+		return target > previous ? Math.Clamp((count - previous) / (double)(target - previous), 0, 1) : 0;
 	}
 
 	private static double Percent(long part, long whole) =>

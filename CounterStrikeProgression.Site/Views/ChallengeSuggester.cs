@@ -5,7 +5,6 @@ namespace ktsu.CounterStrikeProgression.Site.Views;
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Challenges;
 using ktsu.CounterStrikeProgression.Core.Progression;
-using ktsu.CounterStrikeProgression.Core.SkillShots;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
 /// <summary>
@@ -133,12 +132,9 @@ internal static class ChallengeSuggester
 			return null;
 		}
 
-		int previous = tier > 0 ? definition.Tiers[tier - 1] : 0;
-		double fraction = target > previous ? Math.Clamp((count - previous) / (double)(target - previous), 0, 1) : 0;
+		double fraction = PlayerViewBuilder.TierProgress(definition, tier, count);
 		bool isSkill = definition.Kind == ChallengeKind.Skill;
-		string? description = isSkill
-			? SkillShotCatalog.All.FirstOrDefault(s => string.Equals(s.Id.WeakString, definition.Id, StringComparison.Ordinal))?.Description
-			: null;
+		string? description = PlayerViewBuilder.Describe(definition);
 		int xp = (isSkill ? settings.SkillTierXp : settings.VolumeTierXp) * (tier + 1);
 
 		return new(info.Key.WeakString, info.DisplayName, definition.Id, definition.Name, description, tier + 1, count, target, fraction, xp, isNew);

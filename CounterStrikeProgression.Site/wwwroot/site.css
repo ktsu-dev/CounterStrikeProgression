@@ -7,7 +7,6 @@
 	--orange: #f2a33a;
 	--gold: #f2c94c;
 	--gold-bg: #1f1a0e;
-	--gold-chip: #3a2c10;
 	--green: #4cd17a;
 	--red: #e5534b;
 	color-scheme: dark;
@@ -250,7 +249,7 @@ td.name {
 	flex: none;
 }
 
-.tiers .challenge-icon {
+.challenge .title .challenge-icon {
 	width: 1.2em;
 	height: 1.2em;
 }
@@ -400,10 +399,6 @@ td.name {
 	text-transform: none;
 }
 
-.tiers {
-	margin-bottom: 10px;
-}
-
 .suggestions {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -432,17 +427,262 @@ td.name {
 	white-space: nowrap;
 }
 
-.tiers span {
-	display: inline-block;
-	background: var(--line);
-	padding: 1px 6px;
-	margin: 2px 4px 2px 0;
+.tabs {
+	display: flex;
+	flex-wrap: wrap;
+	border-bottom: 1px solid var(--line);
+	padding: 0 12px;
+}
+
+.tab {
+	background: none;
+	border: 0;
+	border-bottom: 2px solid transparent;
+	margin-bottom: -1px;
+	padding: 8px 12px;
+	color: var(--muted);
+	font: inherit;
+	font-size: 12px;
+	letter-spacing: 1px;
+	text-transform: uppercase;
+	cursor: pointer;
+}
+
+.tab:hover,
+.tab:focus-visible {
+	color: var(--text);
+}
+
+.tab[aria-selected="true"] {
+	color: var(--orange);
+	border-bottom-color: var(--orange);
+}
+
+.player-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+	border-top: 1px solid var(--line);
+	align-items: start;
+}
+
+.player-tabs {
+	min-width: 0;
+	border-right: 1px solid var(--line);
+}
+
+.player-feed {
+	min-width: 0;
+	padding: 12px;
+	position: sticky;
+	top: 0;
+	max-height: 100vh;
+	overflow-y: auto;
+}
+
+.weapon-picks {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-bottom: 12px;
+}
+
+.weapon-pick {
+	display: inline-flex;
+	gap: 6px;
+	align-items: baseline;
+	background: var(--bg);
+	border: 1px solid var(--line);
+	color: var(--text);
+	font: inherit;
+	font-size: 12px;
+	padding: 3px 8px;
+	cursor: pointer;
+}
+
+.weapon-pick .level {
+	color: var(--muted);
 	font-size: 11px;
 }
 
-.tiers span.done {
-	background: var(--gold-chip);
+.weapon-pick:hover,
+.weapon-pick:focus-visible {
+	border-color: var(--muted);
+}
+
+.weapon-pick.selected {
+	border-color: var(--orange);
+	color: var(--orange);
+}
+
+.weapon-detail {
+	min-width: 0;
+}
+
+.weapon-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 4px 16px;
+}
+
+.weapon-name {
+	margin: 0;
+	color: var(--orange);
+	font-size: 18px;
+}
+
+.weapon-level {
+	flex: 1 1 180px;
+	max-width: 280px;
+	color: var(--muted);
+	font-size: 12px;
+	text-align: right;
+}
+
+.weapon-stats {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 8px;
+	margin: 8px 0 16px;
+}
+
+.stat {
+	background: var(--bg);
+	padding: 6px 10px;
+}
+
+.stat b {
+	display: block;
+	font-size: 16px;
+	color: var(--text);
+}
+
+.challenge-group {
+	margin-bottom: 16px;
+}
+
+.challenges {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+	gap: 6px;
+}
+
+.challenge {
+	background: var(--bg);
+	border-left: 3px solid var(--line);
+	padding: 6px 10px;
+	min-width: 0;
+}
+
+.challenge.started {
+	border-left-color: var(--orange);
+}
+
+.challenge.complete {
+	border-left-color: var(--gold);
+	background: var(--gold-bg);
+}
+
+.challenge.complete .title b {
 	color: var(--gold);
+}
+
+.challenge .head {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 8px;
+}
+
+.challenge .title {
+	min-width: 0;
+}
+
+.challenge .tier {
+	flex: none;
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.rarity {
+	display: inline-block;
+	margin-left: 6px;
+	padding: 0 4px;
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 1px;
+	color: var(--muted);
+	border: 1px solid var(--line);
+	vertical-align: 1px;
+}
+
+.rarity.rare {
+	color: #5fa8ff;
+	border-color: #24486e;
+}
+
+.rarity.epic {
+	color: #c77dff;
+	border-color: #4f2f6b;
+}
+
+.challenge .progress {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 4px;
+}
+
+.challenge .progress .bar {
+	flex: 1;
+	margin: 0;
+}
+
+.challenge .count {
+	flex: none;
+	color: var(--muted);
+	font-size: 11px;
+}
+
+.pips {
+	display: inline-flex;
+	gap: 2px;
+	flex: none;
+}
+
+.pips i {
+	display: block;
+	width: 8px;
+	height: 8px;
+	background: var(--line);
+}
+
+.pips i.on {
+	background: var(--gold);
+}
+
+.bar.thin {
+	height: 4px;
+}
+
+@media (max-width: 900px) {
+	.player-grid {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.player-tabs {
+		border-right: 0;
+		border-bottom: 1px solid var(--line);
+	}
+
+	.player-feed {
+		position: static;
+		max-height: none;
+	}
 }
 
 @media (max-width: 700px) {
@@ -471,6 +711,18 @@ td.name {
 	.badge.big .rank {
 		display: inline;
 		font-size: 18px;
+	}
+
+	.tabs {
+		padding: 0 4px;
+	}
+
+	.tab {
+		padding: 8px;
+	}
+
+	.weapon-stats {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 
 	.ladder .badge .rank {
