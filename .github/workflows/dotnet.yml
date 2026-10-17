@@ -415,6 +415,19 @@ jobs:
           New-Item -ItemType Directory -Force -Path staging | Out-Null
           Compress-Archive -Path (Join-Path $root "addons") -DestinationPath "staging/CounterStrikeProgression-$version.zip" -Force
 
+      # The site ships as a container image on GHCR instead of in the plugin zip. The job's
+      # packages: write permission lets the workflow token push it, and the tags are the release
+      # version plus latest.
+      - name: Publish Site Image
+        if: steps.pipeline.outputs.should_release == 'true'
+        shell: pwsh
+        run: |
+          $version = "${{ steps.pipeline.outputs.version }}"
+          "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet publish CounterStrikeProgression.Site/CounterStrikeProgression.Site.csproj -c Release -t:PublishContainer -p:ContainerRegistry=ghcr.io "-p:ContainerImageTags=`"$version;latest`""
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       # Gated by the SonarQube steps above, but only where the gate is blocking. With SONAR_BLOCKING_GATE
       # set, `sonar.qualitygate.wait=true` makes a failed gate fail that step, and a step whose
       # `if:` names no status function is implicitly gated on success, so a release cannot proceed

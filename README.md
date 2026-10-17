@@ -93,6 +93,60 @@ Settings left out keep their defaults.
 
 `Panel` sets the draw mode (`Auto`, `WorldText`, `CenterHtml`, or `Chat`), how many lines each mode shows, and the side panel's font size, scale, color, and offsets. The default placement suits a 16:9 display. CS2 has no client-predicted anchor for world text, so the side panel trails slightly behind fast turns.
 
+### Progression site
+
+`Site` sends the server's live state to the progression site: the map and mode, the scoreboard, the feed of skill shots, rank-ups, level-ups, and finished tiers, and each player's changed progress. With an empty `Url`, the default, the plugin sends nothing.
+
+```json
+{
+  "Site": {
+    "Url": "http://cs2-progression-site.cs2.svc.cluster.local:8081/api/ingest",
+    "Token": "change-me",
+    "IntervalSeconds": 2,
+    "QueueLimit": 20,
+    "FullResendEvery": 15
+  }
+}
+```
+
+- **`Url`:** the site's ingest endpoint. A URL that isn't absolute http or https is logged and ignored.
+- **`Token`:** the shared token the site checks on every batch.
+- **`IntervalSeconds`:** the seconds between batches. Values under 1 count as 1.
+- **`QueueLimit`:** how many batches wait to send. When the site is slow or down, the oldest is dropped, so the game never waits on it.
+- **`FullResendEvery`:** how many batches pass between full resends of every connected player's progress, which repairs the site after a dropped batch or a restart. 0 turns it off.
+
+Sending runs on the thread pool with a 3 second timeout, and a failure is logged at most once a minute.
+
+#### The site
+
+The site is a small ASP.NET Core app, published as the image `ghcr.io/ktsu-dev/counterstrikeprogression-site:<version>` with each release (and as `latest`). It shows the live scoreboard and feed on `/`, the rank ladder on `/ranks`, and each player's profile on `/players/{steamId}` (a SteamID64). Pages update live over server-sent events, and a server counts as offline after a few seconds without a batch.
+
+The image listens on two ports:
+
+- **8080 (public):** `/`, `/ranks`, `/players/{steamId}`, `/api/live`, `/api/ranks`, `/api/players/{id}`, `/api/stream`, and `/healthz`. Route this port to visitors.
+- **8081 (ingest):** `POST /api/ingest` with the header `Authorization: Bearer <token>`. Keep this port inside your network, because only the plugin needs it.
+
+Point the health probe at `/healthz` on port 8080. Port 8081 answers nothing but the ingest route, so a probe there always fails.
+
+The site reads progress from the plugin's database and never writes to it. Give it a user with `SELECT` on `csp_players`, `csp_weapons`, and `csp_challenges` and nothing else. The live state and the feed history live in the site's memory and in a file under `/data`, so mount a volume there if the feed should survive a restart. The image runs as the non-root user with UID 1654, so that user must be able to write to the volume (in Kubernetes, set the pod's `fsGroup` to 1654).
+
+Configure the site with environment variables:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `Site__Database__Host` | empty | The database host. Empty keeps progress in memory, which starts empty. |
+| `Site__Database__Port` | `3306` | The database port. |
+| `Site__Database__Database` | `cs2` | The database name. |
+| `Site__Database__User` | `cs2` | The read-only database user. |
+| `Site__Database__Password` | empty | The database password. |
+| `Site__Database__RequireTls` | `false` | Whether the database connection must be encrypted. When it's `false`, the site still uses TLS if the server offers it. |
+| `Site__Token` | empty | The bearer token the plugin sends. Empty rejects every batch. |
+| `Site__DataPath` | `/data` | The folder for the feed history file. It must be writable by UID 1654, the user the image runs as. |
+| `Site__OfflineAfterSeconds` | `15` | Seconds without a batch before the server counts as offline. |
+| `Site__FeedLength` | `50` | How many feed entries to keep and show. |
+
+Point the plugin's `Site.Url` at port 8081 and set `Site.Token` to the same value as `Site__Token`.
+
 ## API Reference
 
 ### Skill shots

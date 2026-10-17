@@ -2,6 +2,7 @@
 
 namespace ktsu.CounterStrikeProgression;
 
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using CounterStrikeSharp.API.Core;
 using ktsu.CounterStrikeProgression.Core;
@@ -155,6 +156,34 @@ public sealed class FloatieSettings
 }
 
 /// <summary>
+/// The progression site the plugin sends live state to.
+/// </summary>
+public sealed class SiteSettings
+{
+	/// <summary>
+	/// Gets or sets the site's ingest URL, such as <c>http://host:8081/api/ingest</c>. With an empty URL, the
+	/// default, nothing is sent.
+	/// </summary>
+	[SuppressMessage("Design", "CA1056:URI-like properties should not be strings", Justification = "The config file holds the URL as text, and an empty value means no site. SiteReporter parses and validates it.")]
+	public string Url { get; set; } = "";
+
+	/// <summary>Gets or sets the shared token the site expects as a bearer token.</summary>
+	public string Token { get; set; } = "";
+
+	/// <summary>Gets or sets how often, in seconds, a batch is sent. Values under 1 count as 1.</summary>
+	public double IntervalSeconds { get; set; } = 2;
+
+	/// <summary>Gets or sets how many batches wait to send before the oldest is dropped. Values under 1 count as 1.</summary>
+	public int QueueLimit { get; set; } = 20;
+
+	/// <summary>
+	/// Gets or sets how many batches pass between full resends of every connected player's progress, which
+	/// repairs the site after a dropped batch or a restart. 0 turns full resends off.
+	/// </summary>
+	public int FullResendEvery { get; set; } = 15;
+}
+
+/// <summary>
 /// The plugin's config file, <c>configs/plugins/CounterStrikeProgression/CounterStrikeProgression.json</c>.
 /// </summary>
 public sealed class PluginConfig : BasePluginConfig
@@ -170,6 +199,9 @@ public sealed class PluginConfig : BasePluginConfig
 
 	/// <summary>Gets or sets the floating "+XP" text.</summary>
 	public FloatieSettings Floaties { get; set; } = new();
+
+	/// <summary>Gets or sets the progression site. With an empty URL, nothing is sent.</summary>
+	public SiteSettings Site { get; set; } = new();
 
 	/// <summary>Gets or sets how often, in seconds, changed progress is saved.</summary>
 	public float SaveIntervalSeconds { get; set; } = 60;

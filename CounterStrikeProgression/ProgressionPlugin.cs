@@ -55,6 +55,10 @@ public sealed class ProgressionPlugin : BasePlugin, IPluginConfig<PluginConfig>
 		new CombatHandlers(services).Register(this);
 		new PlayerCommands(services, ModuleName, ModuleVersion).Register(this);
 		AddTimer(Math.Max(10, Config.SaveIntervalSeconds), sessions.SaveAll, TimerFlags.REPEAT);
+		if (services.Site is { } site)
+		{
+			AddTimer((float)Math.Max(1, Config.Site.IntervalSeconds), site.Collect, TimerFlags.REPEAT);
+		}
 
 		if (hotReload)
 		{
@@ -71,6 +75,7 @@ public sealed class ProgressionPlugin : BasePlugin, IPluginConfig<PluginConfig>
 		services?.Panel.WorldText.HideAll();
 		services?.Floaties.RemoveAll();
 		services?.Sessions.Shutdown(TimeSpan.FromSeconds(5));
+		services?.Site?.Dispose();
 	}
 
 	private IProgressionStore CreateStore()

@@ -32,6 +32,11 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 		plugin.RegisterListener<Listeners.OnClientDisconnect>(OnClientDisconnect);
 		plugin.RegisterListener<Listeners.OnMapEnd>(OnMapEnd);
 		plugin.RegisterListener<Listeners.CheckTransmit>(OnCheckTransmit);
+		if (services.Site is { } site)
+		{
+			// A batch straight after the new map loads, so the site's scoreboard doesn't show the old map until the next interval.
+			plugin.RegisterListener<Listeners.OnMapStart>(_ => plugin.AddTimer(1, site.Collect));
+		}
 	}
 
 	private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event, GameEventInfo info)
@@ -51,6 +56,7 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 		if (session is not null)
 		{
 			services.Panel.Close(null, session);
+			services.Site?.Forget(session.SteamId);
 		}
 
 		services.Floaties.RemoveOwner(playerSlot);
@@ -169,6 +175,7 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 		foreach (PlayerSession session in Sessions.All)
 		{
 			session.Panel.IsOpen = false;
+			session.MapXp = 0;
 		}
 
 		Sessions.SaveAll();

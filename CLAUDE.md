@@ -30,7 +30,16 @@ The solution uses:
 |---|---|
 | `CounterStrikeProgression.Core` | Everything testable without a game server: weapons, ranks, the XP engine, skill shots, ladders, trackers, panel layout, and storage. No CounterStrikeSharp reference. |
 | `CounterStrikeProgression` | The plugin. It reads CS2 events and pawn state into Core's plain snapshots, draws the panel, and handles commands and saves. `AssemblyName` is `CounterStrikeProgression`, because CounterStrikeSharp loads `plugins/<Name>/<Name>.dll`. |
+| `CounterStrikeProgression.Site` | The progression website, an ASP.NET Core app with static pages. It takes batches from the plugin on port 8081 (`POST /api/ingest`), serves the pages and read-only API on port 8080, and reads stored progress through Core's `IProgressionStore`. It never writes to the database. |
 | `CounterStrikeProgression.Test` | MSTest tests for Core. |
+
+The site ships as a container image, built by the .NET SDK container support with no Dockerfile. To build one to a tarball without Docker:
+
+```bash
+dotnet publish CounterStrikeProgression.Site/CounterStrikeProgression.Site.csproj -c Release -t:PublishContainer -p:ContainerArchiveOutputPath=./site.tar.gz
+```
+
+Use `-t:` rather than `/t:`, because Git Bash rewrites a leading slash. The `Publish Site Image` step in `dotnet.yml` pushes `ghcr.io/ktsu-dev/counterstrikeprogression-site:<version>` and `latest` on release.
 
 Nothing goes to NuGet. ktsu.Sdk marks every library packable from its targets, after the project file is read, so `IsPackable=false` in a csproj has no effect. `Directory.Build.targets` turns packing off in a target that runs just before Pack. The release is a zip of the plugin folder, built by the `Package Plugin` step in `.github/workflows/dotnet.yml`.
 
