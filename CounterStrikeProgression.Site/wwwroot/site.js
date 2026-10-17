@@ -29,7 +29,7 @@
 	const REFETCH_EVERY_MS = 2000;
 	const STREAM_GRACE_MS = 15000;
 	const STEAM_ID = /^\d{17}$/;
-	const GOLD_KINDS = new Set(["SkillShot", "RankUp", "WeaponLevelUp", "TierCompleted"]);
+	const GOLD_KINDS = new Set(["RankUp", "WeaponLevelUp", "TierCompleted"]);
 	const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 
 	function el(tag, className, text) {
