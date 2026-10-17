@@ -76,7 +76,7 @@ internal sealed class DiscordSender : IDisposable
 			FullMode = BoundedChannelFullMode.DropOldest,
 			SingleReader = true,
 		});
-		_ = Task.Run(ReadLoopAsync);
+		_ = Task.Run(ReadLoopAsync, CancellationToken.None);
 	}
 
 	/// <summary>
