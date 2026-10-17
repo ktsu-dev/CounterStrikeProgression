@@ -15,8 +15,8 @@ internal static partial class Log
 	[LoggerMessage(EventId = 2, Level = LogLevel.Warning, Message = "No database host is configured, so progress lasts only until the server restarts")]
 	public static partial void InMemoryWarning(ILogger logger);
 
-	[LoggerMessage(EventId = 3, Level = LogLevel.Error, Message = "Creating the progression tables failed")]
-	public static partial void InitializeFailed(ILogger logger, Exception exception);
+	[LoggerMessage(EventId = 3, Level = LogLevel.Warning, Message = "Creating the progression tables failed (attempt {Attempt} of {Attempts})")]
+	public static partial void InitializeFailed(ILogger logger, int attempt, int attempts, Exception exception);
 
 	[LoggerMessage(EventId = 4, Level = LogLevel.Error, Message = "Loading progress for {SteamId} failed")]
 	public static partial void LoadFailed(ILogger logger, ulong steamId, Exception exception);

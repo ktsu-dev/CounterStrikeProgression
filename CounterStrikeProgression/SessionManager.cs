@@ -30,9 +30,11 @@ using Microsoft.Extensions.Logging;
 internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 {
 	private const int SaveAttempts = 5;
+	private const int InitializeAttempts = 6;
 
 	private static readonly TimeSpan LoadRetryDelay = TimeSpan.FromSeconds(15);
 	private static readonly TimeSpan FirstSaveRetryDelay = TimeSpan.FromSeconds(2);
+	private static readonly TimeSpan FirstInitializeRetryDelay = TimeSpan.FromSeconds(2);
 	private static readonly TimeSpan RecentlyLeftKeepFor = TimeSpan.FromMinutes(30);
 
 	private readonly Dictionary<int, PlayerSession> sessions = [];
@@ -49,17 +51,30 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 	/// <summary>
 	/// Creates the tables in the background. Loads and saves wait for it.
 	/// </summary>
+	/// <remarks>
+	/// The first connection after a server start can be refused while the pod's network comes up, so it
+	/// retries. After the last attempt loads and saves go ahead anyway, because on a database that already
+	/// has its tables they work, and their own retries cover a database that's still down.
+	/// </remarks>
 	public void Initialize()
 	{
 		initialized = Task.Run(async () =>
 		{
-			try
+			TimeSpan delay = FirstInitializeRetryDelay;
+			for (int attempt = 1; attempt <= InitializeAttempts; attempt++)
 			{
-				await Store.InitializeAsync(CancellationToken.None).ConfigureAwait(false);
-			}
-			catch (Exception exception) when (IsStorageFailure(exception))
-			{
-				Log.InitializeFailed(logger, exception);
+				try
+				{
+					await Store.InitializeAsync(CancellationToken.None).ConfigureAwait(false);
+					return;
+				}
+				catch (Exception exception) when (IsStorageFailure(exception))
+				{
+					Log.InitializeFailed(logger, attempt, InitializeAttempts, exception);
+				}
+
+				await Task.Delay(delay).ConfigureAwait(false);
+				delay *= 2;
 			}
 		});
 	}
