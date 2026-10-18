@@ -515,6 +515,23 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		int before = Math.Max(player.Rank, Ranks.RankFor(player.RankXp));
 		player.RankXp += whole;
 		player.IsDirty = true;
+
+		// The save writes the day's row under the day of LastSeen, so XP earned after midnight lands on the new day
+		// and the streak counts it.
+		DateTime now = Time.GetUtcNow().UtcDateTime;
+		player.LastSeen = now;
+		PlayStreak streak = player.Streak.Record(DailyRotation.Day(now));
+		if (streak != player.Streak)
+		{
+			// A new day is often the session's first result, which CheckFeats would only record quietly, so the feats
+			// held before the day counted are taken first and a streak feat it earns is still announced.
+			player.EarnedFeats ??= new(Feats.Earned(player).Select(f => f.Id), StringComparer.Ordinal);
+			player.Streak = streak;
+			if (streak.Length > 1)
+			{
+				result.Notices.Add(new() { Kind = NoticeKind.StreakDay, Value = streak.Length });
+			}
+		}
 		result.XpGained += whole;
 		CreditSeasonXp(player, whole);
 

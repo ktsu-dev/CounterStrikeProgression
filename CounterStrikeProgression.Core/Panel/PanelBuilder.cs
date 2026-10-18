@@ -164,6 +164,7 @@ internal sealed class PanelBuilder(ProgressionEngine engine)
 			new("Weapons levelled", $"{levelled} of {WeaponCatalog.All.Count}", LineState.InProgress),
 			new("Tiers finished", Number(tiers), LineState.InProgress),
 			new($"Season {engine.CurrentSeason.Name}", $"{Number(engine.SeasonXp(player))} XP", LineState.InProgress),
+			StreakLine(player.Streak, engine.Today),
 		]);
 
 		IReadOnlyList<ActiveContract> contracts = engine.ActiveContracts;
@@ -177,6 +178,19 @@ internal sealed class PanelBuilder(ProgressionEngine engine)
 
 		lines.AddRange(ClosestTiers(player, ClosestTiersShown));
 		return new PanelPage(RankLadder.Names[rank], "Overview", engine.Ranks.ProgressToNext(player.RankXp), progressLabel, lines);
+	}
+
+	/// <summary>
+	/// Builds the overview's play streak line, which shows the best streak too once it's longer than the current one.
+	/// </summary>
+	/// <param name="streak">The player's streak.</param>
+	/// <param name="today">The current UTC day.</param>
+	/// <returns>The line, done once today counts.</returns>
+	public static PanelLine StreakLine(PlayStreak streak, DateOnly today)
+	{
+		int current = streak.CurrentOn(today);
+		string value = streak.Best > current ? $"{Days(current)} · best {Days(streak.Best)}" : Days(current);
+		return new("Play streak", value, streak.PlayedOn(today) ? LineState.Done : LineState.InProgress);
 	}
 
 	/// <summary>
@@ -273,4 +287,6 @@ internal sealed class PanelBuilder(ProgressionEngine engine)
 
 		return candidates.OrderByDescending(c => c.Fraction).Take(count).Select(c => c.Line);
 	}
+
+	private static string Days(int days) => days == 1 ? "1 day" : $"{Number(days)} days";
 }

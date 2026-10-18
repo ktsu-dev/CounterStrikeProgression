@@ -43,6 +43,8 @@
 		collector: "Collector",
 		chicken_overlord: "Chicken overlord",
 		chicken_connoisseur: "Chicken connoisseur",
+		regular: "Regular",
+		devoted: "Devoted",
 	};
 
 	const FEED_LIMIT = 50;
@@ -98,6 +100,10 @@
 			return `${days}d ago`;
 		}
 		return formatDate(then);
+	}
+
+	function dayCount(days) {
+		return days === 1 ? "1 day" : `${days} days`;
 	}
 
 	function formatDate(date) {
@@ -229,6 +235,8 @@
 			svgNode("circle", { cx: 20.5, cy: 18.5, r: 1.6, fill: c }),
 			svgNode("circle", { cx: 18.5, cy: 20.5, r: 1.6, fill: c }),
 		],
+		regular: (c) => [svgNode("text", { x: 14, y: 17.5, "text-anchor": "middle", "font-size": 9, "font-weight": "bold", "font-family": "Consolas, monospace", fill: c, textContent: "7d" })],
+		devoted: (c) => [svgNode("text", { x: 14, y: 17.5, "text-anchor": "middle", "font-size": 8, "font-weight": "bold", "font-family": "Consolas, monospace", fill: c, textContent: "30d" })],
 	};
 
 	// A challenge's icon, drawn in the text color. The markup comes from icons.js, which the site ships itself.
@@ -1380,6 +1388,13 @@
 			const atTop = player.nextRankName === null || player.nextRankName === undefined;
 			const details = [`${formatXp(player.rankXp)} XP`];
 			details.push(atTop ? "top rank" : `${formatXp(player.xpToNextRank)} XP to ${player.nextRankName}`);
+			const streak = player.streak;
+			if (streak && streak.days > 0) {
+				details.push(streak.playedToday ? `${streak.days}-day streak` : `${streak.days}-day streak, play today to keep it`);
+			}
+			if (streak && streak.best > (streak.days ?? 0)) {
+				details.push(`best streak ${dayCount(streak.best)}`);
+			}
 			details.push(`first seen ${formatDate(player.firstSeen)}`);
 			summary.append(rankBadge(player.rank, player.rankName, true), bar(atTop ? 1 : player.rankProgress), el("div", "muted", details.join(" · ")));
 			const badges = seasonBadges(seasons);

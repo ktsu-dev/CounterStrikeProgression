@@ -32,6 +32,12 @@ internal sealed class FeatCatalog(ProgressionSettings settings)
 	/// <summary>The XP that earns Millionaire.</summary>
 	public const long MillionaireXp = 1_000_000;
 
+	/// <summary>The play streak, in days, that earns Regular.</summary>
+	public const int RegularDays = 7;
+
+	/// <summary>The play streak, in days, that earns Devoted.</summary>
+	public const int DevotedDays = 30;
+
 	/// <summary>Gets every feat, in the order the player page lists them.</summary>
 	public static IReadOnlyList<FeatDefinition> All { get; } =
 	[
@@ -43,6 +49,8 @@ internal sealed class FeatCatalog(ProgressionSettings settings)
 		new("collector", "Collector", "Earn every skill shot at least once"),
 		new("chicken_overlord", "Chicken overlord", "Finish all five Chickens tiers with one weapon"),
 		new("chicken_connoisseur", "Chicken connoisseur", "Earn every chicken skill shot"),
+		new("regular", "Regular", "Earn XP on 7 days in a row"),
+		new("devoted", "Devoted", "Earn XP on 30 days in a row"),
 	];
 
 	private static readonly string[] ChickenSkillShotIds =
@@ -131,6 +139,8 @@ internal sealed class FeatCatalog(ProgressionSettings settings)
 			new(skillShotsEarned.Count, SkillShotCatalog.All.Count),
 			new(bestChickenTier, settings.ChickenTiers.Count),
 			new(chickenShots, ChickenSkillShotIds.Length),
+			new(player.Streak.Best, RegularDays),
+			new(player.Streak.Best, DevotedDays),
 		];
 
 		return [.. All.Zip(measured)];

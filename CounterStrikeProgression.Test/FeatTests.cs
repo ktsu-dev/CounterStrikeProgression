@@ -23,7 +23,7 @@ public sealed class FeatTests
 	public void ANewPlayer_HasNoFeats()
 	{
 		Assert.IsFalse(new FeatCatalog(new ProgressionSettings()).Earned(TestHelpers.Player()).Any());
-		Assert.HasCount(8, FeatCatalog.All);
+		Assert.HasCount(10, FeatCatalog.All);
 		Assert.IsGreaterThan(1, ProgressOf(TestHelpers.Player(), "full_ladder").Target);
 	}
 

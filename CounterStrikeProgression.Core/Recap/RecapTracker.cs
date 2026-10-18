@@ -35,7 +35,7 @@ internal sealed class RecapTracker(DateTime startedAt)
 		Ensure.NotNull(result);
 
 		xp += result.XpEarned;
-		foreach (ProgressionNotice notice in result.Notices)
+		foreach (ProgressionNotice notice in result.Notices.Where(n => n.Kind != NoticeKind.StreakDay))
 		{
 			switch (notice.Kind)
 			{

@@ -39,6 +39,7 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 			challenges.Values.Where(c => c.SteamId == steamId),
 			seasons.Values.Where(s => s.SteamId == steamId).MaxBy(s => s.Start),
 			contracts.Values.Where(c => c.SteamId == steamId));
+		progress.Streak = PlayStreak.FromHistory(RowsOf(steamId), progress.FirstSeen);
 		return Task.FromResult<PlayerProgress?>(progress);
 	}
 

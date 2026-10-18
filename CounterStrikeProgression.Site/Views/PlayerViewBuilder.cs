@@ -35,6 +35,7 @@ internal static class PlayerViewBuilder
 		Ensure.NotNull(merged);
 		Ensure.NotNull(settings);
 
+		DateTime at = now ?? DateTime.UtcNow;
 		RankLadder ladder = new(settings.FirstRankXp, settings.RankGrowth);
 		int ladderRank = ladder.RankFor(merged.RankXp);
 		int rank = Math.Clamp(Math.Max(ladderRank, merged.Rank), 0, RankLadder.TopRank);
@@ -70,7 +71,8 @@ internal static class PlayerViewBuilder
 			[.. new FeatCatalog(settings).Measure(merged).Select(m => new FeatView(m.Feat.Id, m.Feat.Name, m.Feat.Description, m.Progress.IsEarned, Math.Min(m.Progress.Current, m.Progress.Target), m.Progress.Target))],
 			FeedCaptions.For(feed ?? [], settings),
 			lastSession is null ? null : BuildSession(lastSession),
-			Contracts(merged, settings, now ?? DateTime.UtcNow));
+			Contracts(merged, settings, at),
+			Streak(merged.Streak, at));
 	}
 
 	/// <summary>
@@ -90,6 +92,18 @@ internal static class PlayerViewBuilder
 			return new ContractView(c.Definition.Id, c.Definition.Description, c.Definition.Period, count, c.Definition.Target, completed, c.Xp, c.EndsAt);
 		}),
 	];
+
+	/// <summary>
+	/// Gets a player's play streak as it stands at a moment.
+	/// </summary>
+	/// <param name="streak">The player's streak.</param>
+	/// <param name="now">The moment, in UTC.</param>
+	/// <returns>The streak.</returns>
+	internal static StreakView Streak(PlayStreak streak, DateTime now)
+	{
+		DateOnly today = DailyRotation.Day(now);
+		return new(streak.CurrentOn(today), streak.Best, streak.PlayedOn(today));
+	}
 
 	private static SessionView BuildSession(MapRecap recap) =>
 		new(recap.Map, recap.StartedAt, recap.EndedAt, recap.Xp, recap.Kills, recap.Deaths, recap.SkillShots, recap.Levels, recap.Tiers, recap.RankUps, recap.Feats, recap.Best);

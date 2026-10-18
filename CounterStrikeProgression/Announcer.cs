@@ -14,7 +14,7 @@ using ktsu.CounterStrikeProgression.Core.SkillShots;
 
 /// <summary>
 /// Turns what a player earned into chat lines. Rank-ups, finished tiers, milestone weapon levels, and weekly
-/// contracts go to everyone, other level-ups, daily contracts, and rare skill shots go to the player, and common skill shots stay quiet unless
+/// contracts go to everyone, other level-ups, daily contracts, play streak days, and rare skill shots go to the player, and common skill shots stay quiet unless
 /// the config turns them on.
 /// </summary>
 /// <param name="config">The chat prefix and announcement settings.</param>
@@ -68,6 +68,10 @@ internal sealed class Announcer(PluginConfig config)
 
 				case NoticeKind.ContractCompleted when notice.Contract is not null:
 					player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} Daily contract done: {ChatColors.Yellow}{notice.Contract.Definition.Description}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
+					break;
+
+				case NoticeKind.StreakDay:
+					player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} Play streak: {ChatColors.Yellow}{notice.Value} days{ChatColors.Default} in a row. Come back tomorrow to keep it going.");
 					break;
 
 				case NoticeKind.RankUp:

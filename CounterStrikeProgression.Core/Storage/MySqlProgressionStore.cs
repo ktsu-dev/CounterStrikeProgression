@@ -285,7 +285,15 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			new { steamId, day = DailyRotation.DayKey(today), week = DailyRotation.WeekKey(today) },
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-		return ProgressSnapshot.Rebuild(player, weapons, challenges, season, contracts);
+		// A player has one row per day they played, so reading them all to find the streak stays small.
+		IEnumerable<DailyRow> daily = await connection.QueryAsync<DailyRow>(new CommandDefinition(
+			"SELECT day AS Day, rank_xp AS RankXp FROM csp_daily WHERE steam_id = @steamId ORDER BY day",
+			parameters,
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+		PlayerProgress progress = ProgressSnapshot.Rebuild(player, weapons, challenges, season, contracts);
+		progress.Streak = PlayStreak.FromHistory([.. daily.Select(r => new DailyXp(DateOnly.FromDateTime(r.Day), r.RankXp))], progress.FirstSeen);
+		return progress;
 	}
 
 	/// <inheritdoc/>
