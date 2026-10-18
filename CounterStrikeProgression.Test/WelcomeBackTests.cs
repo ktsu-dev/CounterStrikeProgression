@@ -71,15 +71,16 @@ public sealed class WelcomeBackTests
 	{
 		ProgressionEngine engine = TestHelpers.Engine();
 		long normal = engine.ApplyCombat(TestHelpers.Player(), TestHelpers.Kill("ak47")).XpGained;
+		long half = normal / 2;
 		PlayerProgress player = TestHelpers.Player();
-		player.WelcomeBackXp = normal + (normal / 2);
+		player.WelcomeBackXp = normal + half;
 
 		ProgressionResult first = engine.ApplyCombat(player, TestHelpers.Kill("ak47"));
 		ProgressionResult second = engine.ApplyCombat(player, TestHelpers.Kill("ak47"));
 		ProgressionResult third = engine.ApplyCombat(player, TestHelpers.Kill("ak47"));
 
 		Assert.AreEqual(normal * 2, first.XpGained);
-		Assert.AreEqual(normal + (normal / 2), second.XpGained);
+		Assert.AreEqual(normal + half, second.XpGained);
 		Assert.AreEqual(normal, third.XpGained);
 		Assert.AreEqual(0, player.WelcomeBackXp);
 		Assert.AreEqual(player.RankXp, engine.SeasonXp(player));
