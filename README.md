@@ -18,6 +18,7 @@ Players climb an up-only rank ladder from Silver I to Global Elite. Every weapon
 
 - **Up-only ranks**: 12 matchmaking-style ranks with five stages each, from Silver · I to Global Elite · V. Numbered ranks such as Silver I to IV are one rank here, because the stages number it. The first stage takes 5,000 XP, each one after costs about 7.7% more, and Global Elite · V takes about 5 million XP in total. Nobody loses progress for a bad night.
 - **Weapon levels**: every weapon, grenade, the knife, and the Zeus levels up to 40, and each level-up pays rank XP.
+- **Mastery stars**: past level 40, weapon XP keeps counting toward mastery stars, one for each 40 levels' worth of XP. They're cosmetic and pay no rank XP, but they show next to the weapon on the panel, in `!stats` and `!top`, and on the site, and each one is announced.
 - **Chickens**: every weapon has a Chickens challenge (1, 5, 15, 40, and 100 chickens), and each chicken pays 2 XP to the weapon and to rank. Twelve chicken skill shots sit on the weapon ladders too, from Nugget (headshot a chicken) and Fowl play (through a wall) to Fried chicken, Rotisserie, and Crossed the road (from long range).
 - **Weapon ladders**: Kills, Headshots, and Hits, plus one challenge for every skill shot the weapon can earn, each with five tiers. Skill tiers pay more than volume tiers.
 - **Skill shots**: about 50, covering movement, distance, wallbangs and smokes, scopes, utility and melee, timing and aim, multi-kills, and round situations.
@@ -28,7 +29,7 @@ Players climb an up-only rank ladder from Silver I to Global Elite. Every weapon
 - **XP floaties**: every XP gain floats up as "+XP" text from the center of your screen. Only you see your own. Quick gains add up in one floatie, and skill shots, tiers, and level-ups are named under the number in gold. A `World` mode floats them above the target instead.
 - **Feats**: eight really difficult feats, such as Global Elite, Millionaire, Weapon master, Full ladder, Collector, and Chicken overlord. They are worked out from the stored progress, announced to the server when earned, and shown as medallions on the progression site.
 - **Rank tags**: everyone's rank, such as `[GN III]`, shows as their scoreboard clan tag and before their name in chat.
-- **Announcements**: rank-ups, finished tiers, and every fifth weapon level go to the whole server.
+- **Announcements**: rank-ups, finished tiers, mastery stars, and every fifth weapon level go to the whole server.
 - **Map recap**: when the map ends, each player gets one chat line with the XP, kills and deaths, skill shots, levels, and tiers they earned, and their best moment. The recap also goes to the progression site, which shows it as "Last session" on the player page, and a player who leaves early still gets one there. `AnnounceMapRecap` turns the chat line off.
 - **Durable storage**: progress is kept in MariaDB or MySQL in `csp_` tables, saved off the game thread, and retried after a failed save without double counting.
 - **Configurable**: every XP value, multiplier, and detection threshold is a setting.
@@ -147,7 +148,7 @@ Sending runs on the thread pool with a 3 second timeout, and a failure is logged
 
 ### Discord announcements
 
-`Discord` posts the server's big moments to a Discord channel through a webhook: earned feats, epic skill shots, and rank-ups from Gold Nova up. It's off by default, because it sends player names and progress outside the server. With an empty `WebhookUrl`, nothing is posted.
+`Discord` posts the server's big moments to a Discord channel through a webhook: earned feats, epic skill shots, weapon mastery stars, and rank-ups from Gold Nova up. It's off by default, because it sends player names and progress outside the server. With an empty `WebhookUrl`, nothing is posted.
 
 ```json
 {
@@ -156,6 +157,7 @@ Sending runs on the thread pool with a 3 second timeout, and a failure is logged
     "Username": "CS2 Progression",
     "Feats": true,
     "EpicSkillShots": true,
+    "MasteryStars": true,
     "RankUps": true,
     "MinimumRank": "Gold Nova",
     "QueueLimit": 50
@@ -165,7 +167,7 @@ Sending runs on the thread pool with a 3 second timeout, and a failure is logged
 
 - **`WebhookUrl`:** the channel's webhook URL, from the channel's Integrations settings in Discord. It must be https, and because it holds the webhook's secret it is never written to the log.
 - **`Username`:** the name posts appear under. Empty keeps the name set on the webhook.
-- **`Feats`, `EpicSkillShots`, `RankUps`:** which moments to post.
+- **`Feats`, `EpicSkillShots`, `MasteryStars`, `RankUps`:** which moments to post.
 - **`MinimumRank`:** the lowest rank whose rank-ups are posted, either a whole rank such as `Gold Nova` (all of its stages) or one stage such as `Gold Nova · III`. A name that matches neither counts as `Gold Nova`.
 - **`QueueLimit`:** how many lines wait to post. When Discord is slow or down, the oldest is dropped.
 
