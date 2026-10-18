@@ -444,8 +444,70 @@ public sealed class SiteEndpointTests
 	[DataRow(8080, "/api/ingest", false)]
 	[DataRow(8080, "/api/live", true)]
 	[DataRow(8080, "/", true)]
+	[DataRow(8081, "/metrics", true)]
+	[DataRow(8080, "/metrics", false)]
 	public void PortGate_KeepsIngestOnItsOwnPort(int port, string path, bool allowed) =>
 		Assert.AreEqual(allowed, Endpoints.IsAllowedOnPort(port, new PathString(path)));
+
+	[TestMethod]
+	public void Metrics_BeforeAnyBatch_AgeCountsFromStartAndPluginCountersAreAbsent()
+	{
+		ManualTime time = new();
+		SiteMetrics metrics = new(time);
+		time.Advance(TimeSpan.FromSeconds(90));
+
+		string text = metrics.Render(NewState(time));
+
+		Assert.Contains("csp_site_server_online 0\n", text);
+		Assert.Contains("csp_site_last_batch_age_seconds 90\n", text);
+		Assert.Contains("csp_site_ingest_batches_total 0\n", text);
+		Assert.Contains("csp_site_ingest_failures_total{reason=\"unauthorized\"} 0\n", text);
+		Assert.DoesNotContain("csp_plugin_", text);
+	}
+
+	[TestMethod]
+	public async Task Metrics_CountBatchesFailuresPlayersAndPluginStats()
+	{
+		ManualTime time = new();
+		LiveState live = NewState(time);
+		SiteMetrics metrics = new(time);
+		SiteOptions options = new() { Token = "dev" };
+		LiveBatch batch = Batch() with
+		{
+			Snapshot = Batch().Snapshot with { Players = [new LivePlayer(1, TestHelpers.SteamId, "Tester", false, 2, 3, 1, 40), new LivePlayer(2, 0, "Bot", true, 0, 0, 0, 0)] },
+			Stats = new PluginStats(SendFailures: 3, BatchesDropped: 1, SaveFailures: 2),
+		};
+
+		metrics.Record(StatusOf(await Endpoints.IngestAsync(IngestContext("Bearer dev", JsonSerializer.Serialize(batch, LiveJson.Options)), options, live, new Broadcaster(), new FeatIndex()).ConfigureAwait(false)));
+		metrics.Record(StatusOf(await Endpoints.IngestAsync(IngestContext(null, "{}"), options, live, new Broadcaster(), new FeatIndex()).ConfigureAwait(false)));
+		metrics.Record(StatusOf(await Endpoints.IngestAsync(IngestContext("Bearer dev", "not json"), options, live, new Broadcaster(), new FeatIndex()).ConfigureAwait(false)));
+		metrics.Record(StatusCodes.Status499ClientClosedRequest);
+		time.Advance(TimeSpan.FromSeconds(5));
+
+		string text = metrics.Render(live);
+
+		Assert.Contains("csp_site_server_online 1\n", text);
+		Assert.Contains("csp_site_players_online{kind=\"human\"} 1\n", text);
+		Assert.Contains("csp_site_players_online{kind=\"bot\"} 1\n", text);
+		Assert.Contains("csp_site_last_batch_age_seconds 5\n", text);
+		Assert.Contains("csp_site_ingest_batches_total 1\n", text);
+		Assert.Contains("csp_site_ingest_failures_total{reason=\"unauthorized\"} 1\n", text);
+		Assert.Contains("csp_site_ingest_failures_total{reason=\"bad_request\"} 1\n", text);
+		Assert.Contains("csp_site_ingest_failures_total{reason=\"too_large\"} 0\n", text);
+		Assert.Contains("csp_plugin_send_failures_total 3\n", text);
+		Assert.Contains("csp_plugin_batches_dropped_total 1\n", text);
+		Assert.Contains("csp_plugin_save_failures_total 2\n", text);
+	}
+
+	[TestMethod]
+	public void Metrics_KeepPluginStatsFromABatchWithout()
+	{
+		LiveState live = NewState();
+		live.Apply(Batch() with { Stats = new PluginStats(4, 0, 0) });
+		live.Apply(Batch());
+
+		Assert.AreEqual(4, live.PluginStats?.SendFailures);
+	}
 
 	[TestMethod]
 	public void OnlineWatcher_PublishesOnlyWhenOnlineFlips()

@@ -47,6 +47,12 @@ internal sealed record LivePlayer(int Slot, ulong SteamId, string Name, bool IsB
 /// <param name="Players">The players on the server.</param>
 internal sealed record ServerSnapshot(DateTime SentAt, string Map, string GameMode, int MaxPlayers, IReadOnlyList<LivePlayer> Players);
 
+/// <summary>The plugin's own health counters, each counted since the plugin loaded.</summary>
+/// <param name="SendFailures">Batches the site didn't accept, or that never reached it.</param>
+/// <param name="BatchesDropped">Batches dropped unsent because the queue was full.</param>
+/// <param name="SaveFailures">Saves that failed every retry, leaving their rows to the next save.</param>
+internal sealed record PluginStats(long SendFailures, long BatchesDropped, long SaveFailures);
+
 /// <summary>Everything the plugin sends to the site in one request.</summary>
 /// <param name="Snapshot">The server state.</param>
 /// <param name="Feed">The feed entries since the last batch.</param>
@@ -57,4 +63,5 @@ internal sealed record ServerSnapshot(DateTime SentAt, string Map, string GameMo
 /// The players an admin corrected since the last batch. Their progress may have gone down, so the site drops
 /// the live rows it holds for them before taking this batch's, which carries all of their rows again.
 /// </param>
-internal sealed record LiveBatch(ServerSnapshot Snapshot, IReadOnlyList<FeedEntry> Feed, IReadOnlyList<ProgressSnapshot> Progress, ProgressionSettings Settings, IReadOnlyList<MapRecap>? Recaps = null, IReadOnlyList<ulong>? Corrected = null);
+/// <param name="Stats">The plugin's health counters, or <see langword="null"/> from a plugin that sends none.</param>
+internal sealed record LiveBatch(ServerSnapshot Snapshot, IReadOnlyList<FeedEntry> Feed, IReadOnlyList<ProgressSnapshot> Progress, ProgressionSettings Settings, IReadOnlyList<MapRecap>? Recaps = null, IReadOnlyList<ulong>? Corrected = null, PluginStats? Stats = null);

@@ -42,9 +42,13 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 	private readonly Dictionary<ulong, Task> saveChains = [];
 	private readonly Dictionary<ulong, PlayerProgress> recentlyLeft = [];
 	private Task initialized = Task.CompletedTask;
+	private long saveFailures;
 
 	/// <summary>Gets every current session.</summary>
 	public IEnumerable<PlayerSession> All => sessions.Values;
+
+	/// <summary>Gets how many saves failed every retry since the plugin loaded.</summary>
+	public long SaveFailures => Interlocked.Read(ref saveFailures);
 
 	/// <summary>Gets the store, for the leaderboard.</summary>
 	public IProgressionStore Store { get; } = store;
@@ -349,6 +353,7 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 				Log.SaveFailed(logger, steamId, exception);
 				if (attempt >= SaveAttempts)
 				{
+					Interlocked.Increment(ref saveFailures);
 					return false;
 				}
 			}

@@ -106,6 +106,9 @@ public sealed class LiveSenderTests
 		{
 			CollectionAssert.AreEqual(Expected, received);
 		}
+
+		Assert.AreEqual(1, sender.BatchesDropped);
+		Assert.AreEqual(0, sender.SendFailures);
 	}
 
 	[TestMethod]
@@ -141,6 +144,7 @@ public sealed class LiveSenderTests
 		await sender.StopAsync(Generous).ConfigureAwait(false);
 
 		Assert.AreEqual(1, Volatile.Read(ref reports));
+		Assert.AreEqual(5, sender.SendFailures);
 	}
 
 	[TestMethod]
