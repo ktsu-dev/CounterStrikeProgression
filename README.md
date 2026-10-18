@@ -27,7 +27,7 @@ Players climb an up-only rank ladder from Silver I to Global Elite. Every weapon
 - **Welcome-back bonus**: a player back after 7 or more days away earns double rank XP until they've had 2,000 bonus XP. The join message and the panel overview say how much is left, and what's left is saved, so it carries over between visits. `WelcomeBackDays` sets the gap, and `WelcomeBackXp` the bonus, where 0 turns it off.
 - **In-game panel**: `!rank` opens a side panel to the right of the view. It falls back to a center-screen card and then to chat if a way of drawing fails.
 - **XP floaties**: every XP gain floats up as "+XP" text from the center of your screen. Only you see your own. Quick gains add up in one floatie, and skill shots, tiers, and level-ups are named under the number in gold. A `World` mode floats them above the target instead.
-- **Feats**: eight really difficult feats, such as Global Elite, Millionaire, Weapon master, Full ladder, Collector, and Chicken overlord. They are worked out from the stored progress, announced to the server when earned, and shown as medallions on the progression site.
+- **Feats**: ten really difficult feats, such as Global Elite, Millionaire, Weapon master, Full ladder, Collector, Chicken overlord, Arsenal (every gun to level 10), and Polymath (a skill shot tier on 20 weapons). They are worked out from the stored progress, announced to the server when earned, and shown as medallions on the progression site.
 - **Rank tags**: everyone's rank, such as `[GN III]`, shows as their scoreboard clan tag and before their name in chat.
 - **Announcements**: rank-ups, finished tiers, and every fifth weapon level go to the whole server.
 - **Map recap**: when the map ends, each player gets one chat line with the XP, kills and deaths, skill shots, levels, and tiers they earned, and their best moment. The recap also goes to the progression site, which shows it as "Last session" on the player page, and a player who leaves early still gets one there. `AnnounceMapRecap` turns the chat line off.
@@ -214,7 +214,7 @@ Point the plugin's `Site.Url` at port 8081 and set `Site.Token` to the same valu
 | Scope | No-scope, Quickscope, Flying no-scope, Scoped on the move |
 | Utility and melee | Grenade kill, Fire kill, Grenade impact, Knife kill, Backstab, Zeus kill, Flash assist, Long flash |
 | Timing and aim | Quick switch, Fresh mag, Last bullet, One tap, Flick, Spray transfer, Efficient reload, Marksman, Sharpshooter, Headhunter |
-| Multi-kill and situation | Double kill, Triple kill, Rampage, Collateral, Opening kill, Trade, Revenge, Last stand, Bounce back, Defuse denial, Clutch |
+| Multi-kill and situation | Double kill, Triple kill, Rampage, Untouchable, 10-kill streak, 20-kill streak, Collateral, Opening kill, Trade, Revenge, Last stand, Bounce back, Defuse denial, Clutch |
 
 ### Storage tables
 

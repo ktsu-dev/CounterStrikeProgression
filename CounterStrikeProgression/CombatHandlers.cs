@@ -323,6 +323,8 @@ internal sealed class CombatHandlers(ProgressionServices services)
 			EarlierKillsInSpray = timing.EarlierKillsInSpray,
 			RecentTurnDegrees = timing.RecentTurnDegrees,
 			ChainedKills = context.ChainedKills,
+			LifeKills = timing.EarlierLifeKills + 1,
+			KillsUnhurt = timing.EarlierKillsUnhurt + 1,
 			KillsWithThisBullet = context.KillsWithThisBullet,
 			IsOpeningKill = context.IsOpeningKill,
 			IsTrade = context.IsTrade,

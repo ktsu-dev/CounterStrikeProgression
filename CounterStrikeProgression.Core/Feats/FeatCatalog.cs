@@ -32,6 +32,12 @@ internal sealed class FeatCatalog(ProgressionSettings settings)
 	/// <summary>The XP that earns Millionaire.</summary>
 	public const long MillionaireXp = 1_000_000;
 
+	/// <summary>The level every gun needs for Arsenal.</summary>
+	public const int ArsenalLevel = 10;
+
+	/// <summary>The weapons that need a skill shot tier for Polymath.</summary>
+	public const int PolymathWeapons = 20;
+
 	/// <summary>Gets every feat, in the order the player page lists them.</summary>
 	public static IReadOnlyList<FeatDefinition> All { get; } =
 	[
@@ -43,7 +49,11 @@ internal sealed class FeatCatalog(ProgressionSettings settings)
 		new("collector", "Collector", "Earn every skill shot at least once"),
 		new("chicken_overlord", "Chicken overlord", "Finish all five Chickens tiers with one weapon"),
 		new("chicken_connoisseur", "Chicken connoisseur", "Earn every chicken skill shot"),
+		new("arsenal", "Arsenal", "Take every gun to level 10"),
+		new("polymath", "Polymath", "Finish a skill shot tier on 20 weapons"),
 	];
+
+	private static readonly WeaponKey[] Guns = [.. WeaponCatalog.All.Where(w => w.IsGun).Select(w => w.Key)];
 
 	private static readonly string[] ChickenSkillShotIds =
 		[.. SkillShotCatalog.For(SkillTrigger.Chicken).Select(s => s.Id.WeakString)];
@@ -74,10 +84,12 @@ internal sealed class FeatCatalog(ProgressionSettings settings)
 		int bestEpicTier = 0;
 		int bestChickenTier = 0;
 		(long Done, long Total) bestLadder = (0, 0);
+		int weaponsWithSkillTier = 0;
 		foreach ((WeaponInfo info, WeaponProgress progress) in weapons)
 		{
 			IReadOnlyList<ChallengeDefinition> ladder = challenges.For(info);
 			int finished = 0;
+			bool skillTier = false;
 			foreach (ChallengeDefinition definition in ladder)
 			{
 				progress.Challenges.TryGetValue(definition.Id, out ChallengeProgress? challenge);
@@ -95,6 +107,8 @@ internal sealed class FeatCatalog(ProgressionSettings settings)
 						skillShotsEarned.Add(definition.Id);
 					}
 
+					skillTier |= tier > 0;
+
 					if (definition.Rarity == Rarity.Epic)
 					{
 						bestEpicTier = Math.Max(bestEpicTier, tier);
@@ -104,6 +118,11 @@ internal sealed class FeatCatalog(ProgressionSettings settings)
 				{
 					bestChickenTier = Math.Max(bestChickenTier, tier);
 				}
+			}
+
+			if (skillTier)
+			{
+				weaponsWithSkillTier++;
 			}
 
 			if ((ladder.Count > 0) && ((bestLadder.Total == 0) || ((double)finished / ladder.Count > (double)bestLadder.Done / bestLadder.Total)))
@@ -120,6 +139,8 @@ internal sealed class FeatCatalog(ProgressionSettings settings)
 		int rank = Math.Max(player.Rank, ranks.RankFor(player.RankXp));
 		int bestLevel = weapons.Count == 0 ? 0 : weapons.Max(w => Math.Max(w.Progress.Level, levels.LevelFor(w.Progress.Xp)));
 		int chickenShots = ChickenSkillShotIds.Count(skillShotsEarned.Contains);
+		int gunsAtArsenalLevel = Guns.Count(key => player.Weapons.TryGetValue(key, out WeaponProgress? weapon)
+			&& (Math.Max(weapon.Level, levels.LevelFor(weapon.Xp)) >= ArsenalLevel));
 
 		FeatProgress[] measured =
 		[
@@ -131,6 +152,8 @@ internal sealed class FeatCatalog(ProgressionSettings settings)
 			new(skillShotsEarned.Count, SkillShotCatalog.All.Count),
 			new(bestChickenTier, settings.ChickenTiers.Count),
 			new(chickenShots, ChickenSkillShotIds.Length),
+			new(gunsAtArsenalLevel, Guns.Length),
+			new(weaponsWithSkillTier, PolymathWeapons),
 		];
 
 		return [.. All.Zip(measured)];
