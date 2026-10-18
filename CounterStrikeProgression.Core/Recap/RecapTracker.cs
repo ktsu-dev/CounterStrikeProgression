@@ -151,12 +151,13 @@ internal sealed class RecapTracker(DateTime startedAt)
 			NoticeKind.RankUp => $"ranked up to {RankLadder.Names[notice.Value]}",
 			NoticeKind.TierCompleted => $"{weapon} {notice.ChallengeName} {PanelBuilder.Numeral(notice.Value)}".TrimStart(),
 			NoticeKind.WeaponLevelUp => $"{weapon} level {notice.Value}".TrimStart(),
+			NoticeKind.BountyCollected => $"{notice.Target}'s bounty",
 			_ => weapon is null ? $"{notice.SkillShot?.Name}" : $"{notice.SkillShot?.Name} with the {weapon}",
 		};
 	}
 
 	/// <summary>
-	/// Ranks moments: feats, then rank-ups, then epic skill shots, finished tiers, rare skill shots, weapon
+	/// Ranks moments: feats, then rank-ups, then epic skill shots, finished tiers and bounties, rare skill shots, weapon
 	/// levels, and common skill shots. Within a kind, the one that paid more wins, then the higher level, tier,
 	/// or rank, and the first wins a tie.
 	/// </summary>
@@ -167,7 +168,7 @@ internal sealed class RecapTracker(DateTime startedAt)
 			NoticeKind.FeatEarned => 6,
 			NoticeKind.RankUp => 5,
 			NoticeKind.SkillShot when notice.SkillShot?.Rarity == Rarity.Epic => 4,
-			NoticeKind.TierCompleted => 3,
+			NoticeKind.TierCompleted or NoticeKind.BountyCollected => 3,
 			NoticeKind.SkillShot when notice.SkillShot?.Rarity == Rarity.Rare => 2,
 			NoticeKind.WeaponLevelUp => 1,
 			_ => 0,

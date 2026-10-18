@@ -11,9 +11,10 @@ using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
+using ktsu.CounterStrikeProgression.Core.Tracking;
 
 /// <summary>
-/// Turns what a player earned into chat lines. Rank-ups, finished tiers, milestone weapon levels, and weekly
+/// Turns what a player earned into chat lines. Rank-ups, finished tiers, milestone weapon levels, bounties, and weekly
 /// contracts go to everyone, other level-ups, daily contracts, and rare skill shots go to the player, and common skill shots stay quiet unless
 /// the config turns them on.
 /// </summary>
@@ -70,6 +71,10 @@ internal sealed class Announcer(PluginConfig config)
 					player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} Daily contract done: {ChatColors.Yellow}{notice.Contract.Definition.Description}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
 					break;
 
+				case NoticeKind.BountyCollected:
+					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} ended {ChatColors.Red}{notice.Target}{ChatColors.Default}'s {notice.Value}-kill streak and collected the {ChatColors.Gold}{Xp(notice.Xp)} XP{ChatColors.Default} bounty!");
+					break;
+
 				case NoticeKind.RankUp:
 					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} ranked up to {ChatColors.Gold}{RankLadder.Names[notice.Value]}{ChatColors.Default}!");
 					break;
@@ -81,6 +86,31 @@ internal sealed class Announcer(PluginConfig config)
 		{
 			session.LastSkillShotMessage = now;
 			player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.LightPurple}{string.Join(", ", skillShots)}{ChatColors.Default} +{Xp(skillShotXp)} XP");
+		}
+	}
+
+	/// <summary>
+	/// Tells the server a bounty was placed, grew, or went unclaimed. A collected bounty is announced with the
+	/// collector's result instead.
+	/// </summary>
+	/// <param name="change">What happened.</param>
+	/// <param name="holderName">The name of the player who carries, or carried, the bounty.</param>
+	public void AnnounceBounty(BountyChange change, string holderName)
+	{
+		Ensure.NotNull(change);
+		Ensure.NotNull(holderName);
+
+		string? line = change.Kind switch
+		{
+			BountyChangeKind.Placed => $"{ChatColors.Red}{holderName}{ChatColors.Default} leads with a {change.Kills}-kill streak. End it for a {ChatColors.Gold}{Xp(change.Xp)} XP{ChatColors.Default} bounty!",
+			BountyChangeKind.Raised => $"{ChatColors.Red}{holderName}{ChatColors.Default} is on {change.Kills} kills. The bounty is up to {ChatColors.Gold}{Xp(change.Xp)} XP{ChatColors.Default}!",
+			BountyChangeKind.Lost => $"{ChatColors.Red}{holderName}{ChatColors.Default}'s {change.Kills}-kill streak ended and the bounty went unclaimed.",
+			_ => null,
+		};
+
+		if (line is not null)
+		{
+			Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {line}");
 		}
 	}
 

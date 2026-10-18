@@ -235,8 +235,21 @@ internal sealed class CombatHandlers(ProgressionServices services)
 		NoteLastAlive(teammatesAreEnemies, victim.Slot);
 		if ((attacker is null) || !attacker.IsValid || (attacker == victim))
 		{
+			services.ApplyBounty(services.Bounties.Drop(victim.Slot));
 			return HookResult.Continue;
 		}
+
+		// The kill is credited before the bounty, so its skill shots are announced first.
+		bool teamkill = ProgressionServices.IsTeammate(attacker, victim);
+		bool collects = !teamkill && (Sessions.Get(attacker) is { Progress: not null });
+		IReadOnlyList<BountyChange> bounty = services.Bounties.Kill(attacker.Slot, !attacker.IsBot && !teamkill, victim.Slot, collects);
+		CreditKill(@event, attacker, victim, teammatesAreEnemies);
+		services.ApplyBounty(bounty);
+		return HookResult.Continue;
+	}
+
+	private void CreditKill(EventPlayerDeath @event, CCSPlayerController attacker, CCSPlayerController victim, bool teammatesAreEnemies)
+	{
 
 		KillContext context = services.Round.RegisterKill(
 			attacker.Slot,
@@ -249,21 +262,20 @@ internal sealed class CombatHandlers(ProgressionServices services)
 		CreditAssist(@event, victim);
 		if (Sessions.Get(attacker) is not { Progress: PlayerProgress progress } session)
 		{
-			return HookResult.Continue;
+			return;
 		}
 
 		CCSPlayerPawn? attackerPawn = GameState.PawnOf(attacker);
 		WeaponInfo? weapon = GameState.ResolveWeapon(@event.Weapon, attackerPawn);
 		if (weapon is null)
 		{
-			return HookResult.Continue;
+			return;
 		}
 
 		CombatEvent kill = BuildKill(@event, victim, attackerPawn, weapon, session.Combat.Read(Server.CurrentTime), context, session.LastHitVictim);
 		session.Combat.KillMade();
 		session.LastKillWeapon = weapon;
 		services.Apply(attacker, session, Engine.ApplyCombat(progress, kill), victim.Slot, Copy(GameState.PawnOf(victim)?.AbsOrigin));
-		return HookResult.Continue;
 	}
 
 	private HookResult OnPlayerBlind(EventPlayerBlind @event, GameEventInfo info)

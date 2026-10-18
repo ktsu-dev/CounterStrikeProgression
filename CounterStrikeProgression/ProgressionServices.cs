@@ -2,6 +2,7 @@
 
 namespace ktsu.CounterStrikeProgression;
 
+using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using ktsu.CounterStrikeProgression.Core.Discord;
@@ -53,6 +54,9 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	/// <summary>Gets the round's kills.</summary>
 	public RoundTracker Round { get; } = new(config.Progression);
 
+	/// <summary>Gets the bounty on the leading life streak.</summary>
+	public BountyBoard Bounties { get; } = new(config.Progression);
+
 	/// <summary>Gets where failures are reported.</summary>
 	public ILogger Logger { get; } = logger;
 
@@ -100,6 +104,30 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	}
 
 	/// <summary>
+	/// Announces what happened to the bounty and pays a collected one. Call it while the players involved are still
+	/// connected, so their names can be read.
+	/// </summary>
+	/// <param name="changes">What the bounty board returned.</param>
+	public void ApplyBounty(IReadOnlyList<BountyChange> changes)
+	{
+		Ensure.NotNull(changes);
+		foreach (BountyChange change in changes)
+		{
+			string holder = NameOf(change.HolderSlot);
+			if ((change.Kind == BountyChangeKind.Collected)
+				&& (Utilities.GetPlayerFromSlot(change.CollectorSlot ?? -1) is { IsValid: true } collector)
+				&& (Sessions.Get(collector) is { Progress: PlayerProgress progress } session))
+			{
+				Apply(collector, session, Engine.ApplyBounty(progress, holder, change.Kills, change.Xp), change.HolderSlot);
+			}
+			else
+			{
+				announcer.AnnounceBounty(change.Kind == BountyChangeKind.Collected ? change with { Kind = BountyChangeKind.Lost } : change, holder);
+			}
+		}
+	}
+
+	/// <summary>
 	/// Ends a player's map recap, sends it to the site, and tells them about it. A session that earned
 	/// nothing just starts over.
 	/// </summary>
@@ -137,6 +165,11 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 		Ensure.NotNull(victim);
 		return !GameState.TeammatesAreEnemies && (attacker.TeamNum == victim.TeamNum);
 	}
+
+	private string NameOf(int slot) =>
+		(Utilities.GetPlayerFromSlot(slot) is { IsValid: true } player ? player.PlayerName : null)
+		?? Sessions.All.FirstOrDefault(s => s.Slot == slot)?.Progress?.Name
+		?? "Someone";
 
 	private static DiscordSender? CreateDiscord(PluginConfig config, ILogger logger)
 	{
