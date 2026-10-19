@@ -82,6 +82,7 @@ internal sealed record AdminCorrection(CorrectionKind Kind, long Xp = 0)
 			weaponsCleared = player.Weapons.Count;
 			player.Weapons.Clear();
 			player.Contracts.Clear();
+			player.Victims.Clear();
 			player.RankXp = 0;
 			player.Rank = 0;
 			player.PendingXp = 0;
@@ -90,6 +91,7 @@ internal sealed record AdminCorrection(CorrectionKind Kind, long Xp = 0)
 			player.SeasonXp = 0;
 			player.IsSeasonDirty = false;
 			player.EndedSeason = null;
+			player.Streak = default;
 		}
 		else
 		{

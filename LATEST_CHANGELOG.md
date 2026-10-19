@@ -1,12 +1,15 @@
-## v1.15.0 (minor)
+## v1.17.0 (minor)
 
-Changes since v1.14.0:
+Changes since v1.16.0:
 
-- Cover the stars in !stats and !top (Claude)
-- Test the ingest counting middleware and the metrics route (Claude)
-- Merge main into claude/project-thread-88d2z4 (Claude)
-- Merge main (Claude)
-- [minor] Add weapon mastery stars past the top weapon level (Claude)
-- Document the metrics in the README (Claude)
-- [minor] Add Prometheus metrics to the site, with the plugin's health counters (Claude)
+- [minor] Add kill heatmaps over each map's radar (#38) (matt-edmondson)
+- Merge main into the play streak branch (Claude)
+- Merge main (nemesis and rivals) into the play streak branch (Claude)
+- Fix the card test for WeaponView's mastery star fields (Claude)
+- Merge remote-tracking branch 'origin/main' into claude/project-thread-aluulv (Claude)
+- Word the player page's streak line on the server (Claude)
+- Merge main into the play streak branch (Claude)
+- Read the daily rows in one statement (Claude)
+- Merge main into the play streak branch, and build the streak in Rebuild (Claude)
+- [minor] Add a daily play streak with Regular and Devoted feats (Claude)
 

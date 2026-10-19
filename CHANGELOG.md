@@ -1,7 +1,38 @@
+## v1.17.0 (minor)
+
+Changes since v1.16.0:
+
+- [minor] Add kill heatmaps over each map's radar (#38) (matt-edmondson)
+- Merge main into the play streak branch (Claude)
+- Merge main (nemesis and rivals) into the play streak branch (Claude)
+- Fix the card test for WeaponView's mastery star fields (Claude)
+- Merge remote-tracking branch 'origin/main' into claude/project-thread-aluulv (Claude)
+- Word the player page's streak line on the server (Claude)
+- Merge main into the play streak branch (Claude)
+- Read the daily rows in one statement (Claude)
+- Merge main into the play streak branch, and build the streak in Rebuild (Claude)
+- [minor] Add a daily play streak with Regular and Devoted feats (Claude)
+
+## v1.16.0 (minor)
+
+Changes since v1.15.0:
+
+- [minor] Put a bounty on the leading life streak (#29) (matt-edmondson)
+- Merge main (nemesis and rivals) (Claude)
+- Merge main, and fix CardTests for the mastery star fields (Claude)
+- Return a completed task rather than null when no digest check starts (Claude)
+- Move the weekly digest's scheduling into Core so it's tested (Claude)
+- Merge main (Claude)
+- [minor] Post a weekly Discord digest every Monday (Claude)
+
 ## v1.15.0 (minor)
 
 Changes since v1.14.0:
 
+- [minor] Nemesis and rivals (#35) (matt-edmondson)
+- Append the rune directly when filtering card names (Claude)
+- Merge main into share cards (Claude)
+- [minor] Add share cards and link previews for player pages (Claude)
 - Cover the stars in !stats and !top (Claude)
 - Test the ingest counting middleware and the metrics route (Claude)
 - Merge main into claude/project-thread-88d2z4 (Claude)

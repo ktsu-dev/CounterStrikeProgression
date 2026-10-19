@@ -41,6 +41,15 @@ public sealed class DiscordSettings
 	/// </summary>
 	public string MinimumRank { get; set; } = "Gold Nova";
 
+	/// <summary>
+	/// Gets or sets a value indicating whether a digest of the week before is posted once each week, from the first
+	/// map start after Monday 00:00 UTC.
+	/// </summary>
+	public bool WeeklyDigest { get; set; } = true;
+
+	/// <summary>Gets or sets how many top climbers the weekly digest lists, from 1 to 10.</summary>
+	public int WeeklyDigestPlayers { get; set; } = 5;
+
 	/// <summary>Gets or sets how many posts wait to send before the oldest is dropped. Values under 1 count as 1.</summary>
 	public int QueueLimit { get; set; } = 50;
 }

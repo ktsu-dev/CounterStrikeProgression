@@ -453,6 +453,20 @@ td.name {
 	color: var(--green);
 }
 
+.suggestion.rival.nemesis {
+	border-left-color: var(--red);
+}
+
+.suggestion.rival.victim {
+	border-left-color: var(--green);
+}
+
+.suggestion.rival a {
+	display: block;
+	margin: 2px 0;
+	font-weight: bold;
+}
+
 .suggestions + .section-title {
 	margin-top: 14px;
 }
@@ -982,4 +996,31 @@ tr.place-3 td.num:first-child {
 .chart .hit {
 	fill: transparent;
 	pointer-events: all;
+}
+
+.heat-body {
+	display: grid;
+	gap: 8px;
+	justify-items: start;
+}
+
+.heat-canvas {
+	display: block;
+	width: 100%;
+	max-width: 720px;
+	aspect-ratio: 1;
+	background: #101318;
+	border: 1px solid var(--line);
+}
+
+.heat-legend {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.heat-ramp {
+	display: inline-block;
+	width: 120px;
+	height: 8px;
 }

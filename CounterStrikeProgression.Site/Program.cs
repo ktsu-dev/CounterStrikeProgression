@@ -2,6 +2,7 @@
 
 namespace ktsu.CounterStrikeProgression.Site;
 
+using ktsu.CounterStrikeProgression.Core.Heatmaps;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Site.Cards;
 using ktsu.CounterStrikeProgression.Site.Data;
@@ -48,6 +49,8 @@ internal static class Program
 		services.AddSingleton<Broadcaster>();
 		services.AddSingleton<IProgressionStore>(hasDatabase ? new MySqlProgressionStore(options.Database) : new InMemoryProgressionStore());
 		services.AddSingleton(provider => new ProgressReader(provider.GetRequiredService<IProgressionStore>(), provider.GetRequiredService<TimeProvider>()));
+		services.AddSingleton<IKillMapStore>(hasDatabase ? new MySqlKillMapStore(options.Database) : new InMemoryKillMapStore());
+		services.AddSingleton(provider => new HeatmapReader(provider.GetRequiredService<IKillMapStore>(), provider.GetRequiredService<TimeProvider>()));
 		services.AddHostedService<OnlineWatcher>();
 		services.AddSingleton<FeatIndex>();
 		services.AddSingleton(provider => new BoardIndex(provider.GetRequiredService<TimeProvider>()));
@@ -55,8 +58,7 @@ internal static class Program
 		services.AddSingleton(provider => new CardCache(provider.GetRequiredService<TimeProvider>()));
 	}
 
-	private static void MapRoutes(WebApplication app)
-	{
+	private static void UsePortFilter(WebApplication app) =>
 		app.Use(async (context, next) =>
 		{
 			if (!Endpoints.IsAllowedOnPort(context.Connection.LocalPort, context.Request.Path))
@@ -67,6 +69,10 @@ internal static class Program
 
 			await next(context).ConfigureAwait(false);
 		});
+
+	private static void MapRoutes(WebApplication app)
+	{
+		UsePortFilter(app);
 		app.UseStaticFiles();
 
 		app.MapGet("/", (IWebHostEnvironment environment) => Endpoints.Page(environment, "index.html"));
@@ -76,6 +82,7 @@ internal static class Program
 		app.MapGet("/skillshots", (IWebHostEnvironment environment) => Endpoints.Page(environment, "skillshots.html"));
 		app.MapGet("/seasons", (IWebHostEnvironment environment) => Endpoints.Page(environment, "seasons.html"));
 		app.MapGet("/healthz", Endpoints.Health);
+		MapPlayerApi(app);
 		MapApi(app);
 	}
 
@@ -87,14 +94,12 @@ internal static class Program
 		app.MapGet("/api/ladder", Endpoints.LadderAsync);
 		app.MapGet("/api/leaderboards", Endpoints.LeaderboardsAsync);
 		app.MapGet("/api/skillshots", Endpoints.SkillShotsAsync);
-		app.MapGet("/api/players/{id}", Endpoints.PlayerAsync);
-		app.MapGet("/api/players/{id}/history", HistoryEndpoints.PlayerHistoryAsync);
 		app.MapGet("/api/weekly", HistoryEndpoints.WeeklyAsync);
-		app.MapGet("/api/players/{id}/seasons", SeasonEndpoints.PlayerSeasonsAsync);
 		app.MapGet("/api/seasons", SeasonEndpoints.SeasonsAsync);
 		app.MapGet("/api/records", RecordEndpoints.RecordsAsync);
 		app.MapGet("/api/stream", Endpoints.Stream);
 		app.MapPost(Endpoints.IngestRoute, Endpoints.IngestAsync);
+		HeatmapEndpoints.Map(app);
 		MapCardRoutes(app);
 	}
 
@@ -102,5 +107,14 @@ internal static class Program
 	{
 		app.MapGet("/players/{id}", CardEndpoints.PlayerPageAsync);
 		app.MapGet(CardEndpoints.CardRoute, CardEndpoints.CardAsync);
+	}
+
+	// Kept apart from MapRoutes so neither method couples to too many types.
+	private static void MapPlayerApi(WebApplication app)
+	{
+		app.MapGet("/api/players/{id}", Endpoints.PlayerAsync);
+		app.MapGet("/api/players/{id}/history", HistoryEndpoints.PlayerHistoryAsync);
+		app.MapGet("/api/players/{id}/seasons", SeasonEndpoints.PlayerSeasonsAsync);
+		app.MapGet("/api/players/{id}/rivals", RivalEndpoints.PlayerRivalsAsync);
 	}
 }

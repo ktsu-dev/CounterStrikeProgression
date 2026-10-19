@@ -186,6 +186,24 @@ public sealed class ProgressionSettings
 	/// <summary>Gets or sets the rank XP for finishing the weekly contract.</summary>
 	public int WeeklyContractXp { get; set; } = 2500;
 
+	/// <summary>
+	/// Gets or sets the life streak at which the leading human player carries a bounty, which also sets how often it
+	/// grows loud enough to announce. 0 turns bounties off.
+	/// </summary>
+	public int BountyStartKills { get; set; } = 5;
+
+	/// <summary>Gets or sets the rank XP a bounty is worth for each kill in the holder's streak. 0 turns bounties off.</summary>
+	public int BountyXpPerKill { get; set; } = 50;
+
+	/// <summary>
+	/// Gets or sets how many times a human must have killed a player to be that player's nemesis, and how many kills
+	/// make a favourite victim.
+	/// </summary>
+	public int NemesisMinimumKills { get; set; } = 3;
+
+	/// <summary>Gets or sets the rank XP for killing your nemesis. 0 turns the bonus off.</summary>
+	public int NemesisKillXp { get; set; } = 50;
+
 	/// <summary>Gets or sets how many whole days away earn the welcome-back bonus when a player returns.</summary>
 	public int WelcomeBackDays { get; set; } = 7;
 

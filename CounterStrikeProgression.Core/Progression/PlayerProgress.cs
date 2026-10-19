@@ -36,6 +36,18 @@ internal sealed class ContractProgress
 }
 
 /// <summary>
+/// How many times a player has killed one other human.
+/// </summary>
+internal sealed class RivalProgress
+{
+	/// <summary>Gets or sets the kills.</summary>
+	public long Kills { get; set; }
+
+	/// <summary>Gets or sets a value indicating whether the row changed since it was last saved.</summary>
+	public bool IsDirty { get; set; }
+}
+
+/// <summary>
 /// A player's progress with one weapon.
 /// </summary>
 /// <param name="weapon">The weapon.</param>
@@ -118,11 +130,29 @@ internal sealed class PlayerProgress(ulong steamId)
 	/// </summary>
 	public HashSet<string>? EarnedFeats { get; set; }
 
+	/// <summary>
+	/// Gets or sets the player's run of consecutive days with rank XP. Not saved, because it's worked out from the
+	/// daily rows when the player loads.
+	/// </summary>
+	public PlayStreak Streak { get; set; }
+
 	/// <summary>Gets the player's weapons, keyed by weapon.</summary>
 	public Dictionary<WeaponKey, WeaponProgress> Weapons { get; } = [];
 
 	/// <summary>Gets the player's contracts, keyed by the period's key and the contract id. Only current periods are loaded.</summary>
 	public Dictionary<(string Period, string Contract), ContractProgress> Contracts { get; } = [];
+
+	/// <summary>Gets the humans the player has killed, keyed by their Steam ID. Saved to <c>csp_rivals</c>.</summary>
+	public Dictionary<ulong, RivalProgress> Victims { get; } = [];
+
+	/// <summary>
+	/// Gets how many times each human has killed the player, keyed by their Steam ID. Not saved, because each count is
+	/// the other player's own row.
+	/// </summary>
+	public Dictionary<ulong, long> KilledBy { get; } = [];
+
+	/// <summary>Gets the last known names of the players in <see cref="Victims"/> and <see cref="KilledBy"/>. Not saved.</summary>
+	public Dictionary<ulong, string> RivalNames { get; } = [];
 
 	/// <summary>
 	/// Gets or sets the first day of the season <see cref="SeasonXp"/> was earned in, or <see langword="null"/> before
@@ -152,6 +182,13 @@ internal sealed class PlayerProgress(ulong steamId)
 	/// <param name="contract">The contract id.</param>
 	/// <returns>The contract's progress.</returns>
 	public ContractProgress Contract(string period, string contract) => Contracts.GetOrCreate((period, contract));
+
+	/// <summary>
+	/// Gets the player's kills of one other human, creating the row when they haven't killed them.
+	/// </summary>
+	/// <param name="victim">The other player's 64-bit Steam ID.</param>
+	/// <returns>The kills.</returns>
+	public RivalProgress Victim(ulong victim) => Victims.GetOrCreate(victim);
 
 	/// <summary>
 	/// Gets a weapon's progress, creating it when the player hasn't used the weapon.

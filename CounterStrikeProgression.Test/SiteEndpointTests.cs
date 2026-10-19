@@ -9,6 +9,7 @@ using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Records;
+using ktsu.CounterStrikeProgression.Core.Rivals;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 using ktsu.CounterStrikeProgression.Site;
@@ -537,6 +538,12 @@ public sealed class SiteEndpointTests
 		public Task<IReadOnlyList<RecordRow>> RecordsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<RecordRow>>([]);
 
 		public Task SaveRecordsAsync(IReadOnlyList<RecordRow> rows, CancellationToken cancellationToken) => Task.CompletedTask;
+
+		public Task<IReadOnlyList<PeriodGain>> GainsBetweenAsync(DateOnly start, DateOnly end, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PeriodGain>>([]);
+
+		public Task<bool> ClaimDigestAsync(DateOnly week, DateTime at, CancellationToken cancellationToken) => Task.FromResult(false);
+
+		public Task<IReadOnlyList<HeadToHead>> HeadToHeadAsync(ulong steamId, int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<HeadToHead>>([]);
 
 		public void Dispose() => Entered.Dispose();
 	}

@@ -21,6 +21,9 @@ internal enum NoticeKind
 	ContractCompleted,
 	MasteryStar,
 	RecordBroken,
+	BountyCollected,
+	NemesisKilled,
+	StreakDay,
 }
 
 /// <summary>
@@ -46,10 +49,13 @@ internal sealed record ProgressionNotice
 	/// <summary>Gets the record set or broken, for record notices.</summary>
 	public RecordBreak? Record { get; init; }
 
+	/// <summary>Gets the other player's name, for nemesis notices and the player whose bounty was collected.</summary>
+	public string? PlayerName { get; init; }
+
 	/// <summary>Gets the challenge name, for tier notices.</summary>
 	public string? ChallengeName { get; init; }
 
-	/// <summary>Gets the tier reached, the weapon level reached, the mastery star reached, or the rank reached.</summary>
+	/// <summary>Gets the tier reached, the weapon level reached, the mastery star reached, the rank reached, the streak a bounty ended, or the play streak's length in days.</summary>
 	public int Value { get; init; }
 
 	/// <summary>Gets the rank XP the moment paid.</summary>
