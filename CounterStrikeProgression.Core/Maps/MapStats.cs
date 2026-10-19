@@ -89,16 +89,15 @@ internal static class MapStats
 	/// <summary>
 	/// Adds a finished recap to the player's totals for its map.
 	/// </summary>
-	/// <param name="progress">The player's progress.</param>
+	/// <param name="progress">The player's progress, or <see langword="null"/> while it hasn't loaded.</param>
 	/// <param name="recap">The recap.</param>
-	/// <returns><see langword="true"/> when the recap named a map and was added.</returns>
-	public static bool Add(PlayerProgress progress, MapRecap recap)
+	/// <returns><see langword="true"/> when the player's progress has loaded and the recap named a map, so it was added.</returns>
+	public static bool Add(PlayerProgress? progress, MapRecap recap)
 	{
-		Ensure.NotNull(progress);
 		Ensure.NotNull(recap);
 
 		string map = Normalize(recap.Map);
-		if (map.Length == 0)
+		if ((progress is null) || (map.Length == 0))
 		{
 			return false;
 		}

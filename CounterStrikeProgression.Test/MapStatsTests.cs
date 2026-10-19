@@ -2,6 +2,7 @@
 
 namespace ktsu.CounterStrikeProgression.Test;
 
+using System.Data.Common;
 using System.Globalization;
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Admin;
@@ -9,6 +10,7 @@ using ktsu.CounterStrikeProgression.Core.Maps;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.Storage;
+using ktsu.CounterStrikeProgression.Core.Weapons;
 using ktsu.CounterStrikeProgression.Site;
 using ktsu.CounterStrikeProgression.Site.Data;
 using ktsu.CounterStrikeProgression.Site.Live;
@@ -75,6 +77,23 @@ public sealed class MapStatsTests
 		PlayerProgress player = TestHelpers.Player();
 		Assert.IsFalse(MapStats.Add(player, Recap(" ", xp: 300, kills: 1, deaths: 1, minutes: 20)));
 		Assert.IsEmpty(player.Maps);
+		Assert.IsFalse(MapStats.Add(null, Recap("de_dust2", xp: 300, kills: 1, deaths: 1, minutes: 20)));
+	}
+
+	[TestMethod]
+	public void MergeKeepsTheStoredMaps()
+	{
+		PlayerProgress stored = TestHelpers.Player();
+		MapStats.Add(stored, Recap("de_dust2", xp: 300, kills: 10, deaths: 4, minutes: 20));
+
+		PlayerProgress merged = ProgressMerge.Merge(stored, null);
+
+		MapProgress dust = merged.Maps["de_dust2"];
+		Assert.AreEqual(300, dust.Xp);
+		Assert.AreEqual(10, dust.Kills);
+		Assert.AreEqual(4, dust.Deaths);
+		Assert.AreEqual(1200, dust.Seconds);
+		Assert.AreEqual(1, dust.Sessions);
 	}
 
 	[TestMethod]
@@ -209,6 +228,14 @@ public sealed class MapStatsTests
 	}
 
 	[TestMethod]
+	public async Task MapEndpoints_AnswerUnavailableWhenTheDatabaseIsDown()
+	{
+		using ProgressReader reader = new(new DownStore());
+		Assert.AreEqual(StatusCodes.Status503ServiceUnavailable, StatusOf(await MapEndpoints.MapsAsync(null, reader, NewState(), CancellationToken.None).ConfigureAwait(false)));
+		Assert.AreEqual(StatusCodes.Status503ServiceUnavailable, StatusOf(await MapEndpoints.PlayerMapsAsync(TestHelpers.SteamId.ToString(CultureInfo.InvariantCulture), reader, CancellationToken.None).ConfigureAwait(false)));
+	}
+
+	[TestMethod]
 	public async Task PlayerMapsEndpoint_RejectsBadAndUnknownIds()
 	{
 		using ProgressReader reader = new(new InMemoryProgressionStore());
@@ -267,5 +294,54 @@ public sealed class MapStatsTests
 			Maps = [.. maps.Select(m => new MapRow(steamId, m.Map, m.Xp, 1, 1, m.Minutes * 60L, 1))],
 		};
 		await store.SaveAsync(rows, TestContext.CancellationToken).ConfigureAwait(false);
+	}
+
+	private static int StatusOf(IResult result) => ((IStatusCodeHttpResult)result).StatusCode ?? 0;
+
+	private sealed class DownStore : IProgressionStore
+	{
+		public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+		public Task<PlayerProgress?> LoadAsync(ulong steamId, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task SaveAsync(ProgressSnapshot snapshot, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task ResetAsync(PlayerRow player, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task<IReadOnlyList<LeaderboardEntry>> TopAsync(int count, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task<IReadOnlyList<WeaponLeaderboardEntry>> TopByWeaponAsync(WeaponKey weapon, int count, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task<IReadOnlyList<RankingEntry>> RankingsAsync(int count, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task<IReadOnlyList<SeasonStanding>> SeasonStandingsAsync(DateOnly start, int count, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task<IReadOnlyList<SeasonResult>> SeasonResultsAsync(ulong steamId, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task<IReadOnlyList<DailyXp>> HistoryAsync(ulong steamId, DateOnly from, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task<IReadOnlyList<XpGainEntry>> GainsSinceAsync(DateOnly start, int count, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task<IReadOnlyList<MapStanding>> MapStandingsAsync(string map, int count, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task<IReadOnlyList<MapSummary>> MapSummariesAsync(CancellationToken cancellationToken) => throw new DatabaseDown();
+	}
+
+	private sealed class DatabaseDown : DbException
+	{
+		public DatabaseDown()
+			: base("The database is down.")
+		{
+		}
+
+		public DatabaseDown(string message)
+			: base(message)
+		{
+		}
+
+		public DatabaseDown(string message, Exception innerException)
+			: base(message, innerException)
+		{
+		}
 	}
 }

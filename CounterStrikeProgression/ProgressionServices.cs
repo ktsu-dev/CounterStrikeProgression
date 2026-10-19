@@ -120,10 +120,7 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 		}
 
 		// The save that follows every map end and disconnect writes the map's new totals.
-		if (session.Progress is { } progress)
-		{
-			MapStats.Add(progress, recap);
-		}
+		MapStats.Add(session.Progress, recap);
 
 		Site?.Record(recap);
 		if (announce && (valid is not null))
