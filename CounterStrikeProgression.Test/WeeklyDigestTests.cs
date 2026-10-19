@@ -131,6 +131,59 @@ public sealed class WeeklyDigestTests
 	}
 
 	[TestMethod]
+	public async Task Poster_ChecksOncePerWeekAndRetriesAfterAFailure()
+	{
+		InMemoryProgressionStore store = await StoreAsync(Save(1, "Player", 800, LastMonday, LastMonday.AddDays(2))).ConfigureAwait(false);
+		List<string> sent = [];
+		List<Exception> failures = [];
+		bool fail = true;
+		bool Send(string post)
+		{
+			if (fail)
+			{
+				fail = false;
+				throw new InvalidOperationException("Discord is down");
+			}
+
+			sent.Add(post);
+			return true;
+		}
+
+		WeeklyDigestPoster poster = new(store, Ranks, Progression, new DiscordSettings(), Send, failures.Add);
+
+		await poster.Check(At(Monday))!.ConfigureAwait(false);
+		Assert.HasCount(1, failures);
+
+		// The failed send had already claimed the week, so the retry finds it posted and gives up on it.
+		await poster.Check(At(Monday, 13))!.ConfigureAwait(false);
+		Assert.IsNull(poster.Check(At(Monday, 14)));
+		Assert.IsEmpty(sent);
+		Assert.HasCount(1, failures);
+	}
+
+	[TestMethod]
+	public async Task Poster_PostsAgainTheWeekAfter()
+	{
+		InMemoryProgressionStore store = await StoreAsync(
+			Save(1, "Player", 800, LastMonday, LastMonday.AddDays(2)),
+			Save(1, "Player", 1500, LastMonday, Monday.AddDays(2))).ConfigureAwait(false);
+		List<string> sent = [];
+		WeeklyDigestPoster poster = new(store, Ranks, Progression, new DiscordSettings(), p =>
+		{
+			sent.Add(p);
+			return true;
+		}, e => Assert.Fail(e.Message));
+
+		await poster.Check(At(Monday))!.ConfigureAwait(false);
+		Assert.IsNull(poster.Check(At(Monday.AddDays(6))));
+		await poster.Check(At(Monday.AddDays(7)))!.ConfigureAwait(false);
+
+		Assert.HasCount(2, sent);
+		Assert.Contains("+800 XP", sent[0]);
+		Assert.Contains("+700 XP", sent[1]);
+	}
+
+	[TestMethod]
 	public async Task MySql_ReadsGainsAndClaimsOnce()
 	{
 		// Runs against a real MariaDB only when CSP_TEST_MYSQL names an empty, disposable database as host:port/database:user:password.

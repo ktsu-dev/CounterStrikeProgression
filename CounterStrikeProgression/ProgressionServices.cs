@@ -2,14 +2,12 @@
 
 namespace ktsu.CounterStrikeProgression;
 
-using System.Diagnostics.CodeAnalysis;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using ktsu.CounterStrikeProgression.Core.Discord;
 using ktsu.CounterStrikeProgression.Core.Floaties;
 using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
-using ktsu.CounterStrikeProgression.Core.Rotation;
 using ktsu.CounterStrikeProgression.Core.Tracking;
 using ktsu.CounterStrikeProgression.Panel;
 using ktsu.CounterStrikeProgression.Site;
@@ -30,10 +28,6 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 
 	// Discord allows a webhook about five posts every two seconds, and lines that arrive meanwhile join the next post.
 	private static readonly TimeSpan DiscordPostGap = TimeSpan.FromSeconds(1);
-
-	// The Monday whose digest is known to be handled, as a day number, and whether a check is running.
-	private int digestWeek = -1;
-	private int digestBusy;
 
 	/// <summary>Gets the plugin config.</summary>
 	public PluginConfig Config { get; } = config;
@@ -67,6 +61,9 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 
 	/// <summary>Gets the Discord poster, which is <see langword="null"/> when no webhook is configured.</summary>
 	public DiscordSender? Discord { get; } = CreateDiscord(config, logger);
+
+	/// <summary>Gets the weekly Discord digest, which is <see langword="null"/> when there's no webhook or it's turned off.</summary>
+	public WeeklyDigestPoster? Digest { get; private set; }
 
 	/// <summary>
 	/// Refreshes a player's panel, shows a floatie, announces what they earned, and adds it to this map's XP,
@@ -132,41 +129,15 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	}
 
 	/// <summary>
-	/// Posts the weekly Discord digest from the thread pool, when this week's hasn't been handled yet. A check that
-	/// fails is logged and tried again at the next map start.
+	/// Creates the weekly digest, which posts through <see cref="Discord"/>.
 	/// </summary>
-	[SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "The digest runs unobserved on the thread pool, so anything it throws must be logged here or it vanishes.")]
-	public void PostWeeklyDigest()
+	public void CreateDigest()
 	{
 		DiscordSettings settings = Config.Discord ?? new();
-		if ((Discord is not { } discord) || !settings.WeeklyDigest)
+		if ((Discord is { } discord) && settings.WeeklyDigest)
 		{
-			return;
+			Digest = new(Sessions.Store, Engine.Ranks, Config.Progression, settings, discord.TryEnqueue, exception => Log.DigestFailed(Logger, exception));
 		}
-
-		DateTime now = DateTime.UtcNow;
-		int week = DailyRotation.WeekStart(DateOnly.FromDateTime(now)).DayNumber;
-		if ((Volatile.Read(ref digestWeek) == week) || (Interlocked.Exchange(ref digestBusy, 1) == 1))
-		{
-			return;
-		}
-
-		_ = Task.Run(async () =>
-		{
-			try
-			{
-				await WeeklyDigest.PostAsync(Sessions.Store, Engine.Ranks, Config.Progression, settings, discord.TryEnqueue, now, CancellationToken.None).ConfigureAwait(false);
-				Volatile.Write(ref digestWeek, week);
-			}
-			catch (Exception exception)
-			{
-				Log.DigestFailed(Logger, exception);
-			}
-			finally
-			{
-				Volatile.Write(ref digestBusy, 0);
-			}
-		});
 	}
 
 	/// <summary>
