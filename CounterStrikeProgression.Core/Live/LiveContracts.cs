@@ -16,6 +16,7 @@ internal enum FeedKind
 	TierCompleted,
 	FeatEarned,
 	ContractCompleted,
+	MasteryStar,
 }
 
 /// <summary>One line of the live feed.</summary>
