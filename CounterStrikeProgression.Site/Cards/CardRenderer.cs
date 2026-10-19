@@ -106,7 +106,7 @@ internal static class CardRenderer
 
 			if (Rune.IsWhiteSpace(rune) || (font.GetGlyph(rune.Value) != 0))
 			{
-				kept.Append(rune.ToString());
+				kept.Append(rune);
 			}
 		}
 
