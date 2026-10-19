@@ -72,7 +72,7 @@ internal sealed class Announcer(PluginConfig config)
 					break;
 
 				case NoticeKind.RecordBroken when notice.Record is { } record:
-					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} {RecordText(record)}");
+					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} {RecordWording.Describe(record, n => $"{ChatColors.Gold}{n}{ChatColors.Default}", v => $"{ChatColors.Yellow}{v}{ChatColors.Default}", p => $"{ChatColors.Green}{p}{ChatColors.Default}")}!");
 					break;
 
 				case NoticeKind.RankUp:
@@ -103,22 +103,6 @@ internal sealed class Announcer(PluginConfig config)
 		{
 			player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {PanelFormatter.ToRecapChat(recap)}");
 		}
-	}
-
-	private static string RecordText(RecordBreak record)
-	{
-		RecordRow holder = record.Holder;
-		string name = $"{ChatColors.Gold}{record.Definition.Name}{ChatColors.Default}";
-		string value = $"{ChatColors.Yellow}{record.Definition.Format(holder.Value)}{ChatColors.Default}";
-		if (holder.PreviousValue is not { } previous)
-		{
-			return $"set the server record for {name}: {value}!";
-		}
-
-		string was = record.Definition.Format(previous);
-		return record.BeatOwn
-			? $"beat their own server record for {name}: {value} (was {was})!"
-			: $"broke {ChatColors.Green}{holder.PreviousName}{ChatColors.Default}'s server record for {name}: {value} (was {was})!";
 	}
 
 	private static string Xp(long xp) => xp.ToString("N0", CultureInfo.InvariantCulture);

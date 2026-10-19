@@ -50,6 +50,7 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 	private readonly Dictionary<int, PlayerSession> sessions = [];
 	private readonly Dictionary<ulong, Task> saveChains = [];
 	private readonly Dictionary<ulong, PlayerProgress> recentlyLeft = [];
+	private readonly RecordKeeper records = new(store, engine.Records, Server.NextFrameAsync, IsStorageFailure, exception => Log.RecordsLoadFailed(logger, exception));
 	private Task initialized = Task.CompletedTask;
 	private volatile bool stopped;
 
@@ -88,7 +89,11 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 				delay *= 2;
 			}
 		});
-		_ = Task.Run(LoadRecordsAsync);
+		_ = Task.Run(async () =>
+		{
+			await initialized.ConfigureAwait(false);
+			await records.LoadAsync(() => stopped, LoadRetryDelay).ConfigureAwait(false);
+		});
 	}
 
 	/// <summary>
@@ -96,19 +101,10 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 	/// </summary>
 	public void SaveRecords()
 	{
-		IReadOnlyList<RecordRow> rows = engine.Records.TakeDirty();
-		if (rows.Count == 0)
+		if (records.TakeSave(write => SaveWithRetriesAsync(exception => Log.RecordsSaveFailed(logger, exception), write)) is { } save)
 		{
-			return;
+			Chain(RecordsChain, save);
 		}
-
-		Chain(RecordsChain, async () =>
-		{
-			if (!await SaveWithRetriesAsync(exception => Log.RecordsSaveFailed(logger, exception), () => Store.SaveRecordsAsync(rows, CancellationToken.None)).ConfigureAwait(false))
-			{
-				await Server.NextFrameAsync(() => engine.Records.Restore(rows)).ConfigureAwait(false);
-			}
-		});
 	}
 
 	/// <summary>
@@ -309,26 +305,6 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 			catch (Exception exception) when (IsStorageFailure(exception))
 			{
 				Log.LoadFailed(logger, session.SteamId, exception);
-			}
-
-			await Task.Delay(LoadRetryDelay).ConfigureAwait(false);
-		}
-	}
-
-	private async Task LoadRecordsAsync()
-	{
-		await initialized.ConfigureAwait(false);
-		while (!stopped)
-		{
-			try
-			{
-				IReadOnlyList<RecordRow> rows = await Store.RecordsAsync(CancellationToken.None).ConfigureAwait(false);
-				await Server.NextFrameAsync(() => engine.Records.Load(rows)).ConfigureAwait(false);
-				return;
-			}
-			catch (Exception exception) when (IsStorageFailure(exception))
-			{
-				Log.RecordsLoadFailed(logger, exception);
 			}
 
 			await Task.Delay(LoadRetryDelay).ConfigureAwait(false);

@@ -9,6 +9,7 @@ using ktsu.CounterStrikeProgression.Core.Feats;
 using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.Rotation;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
+using ktsu.CounterStrikeProgression.Core.Tracking;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
 /// <summary>
@@ -176,6 +177,21 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 
 		Credit(player, weapon, award, result);
 		return Settle(player, result);
+	}
+
+	/// <summary>
+	/// Ends a player's life: each weapon's accuracy skill shots, then the whole life's records.
+	/// </summary>
+	/// <param name="player">The player's progress, or <see langword="null"/> while it hasn't loaded.</param>
+	/// <param name="life">The life's tracker, which is reset.</param>
+	/// <param name="warmup">Whether it's warmup, when the life is forgotten without earning anything.</param>
+	/// <returns>One result per weapon, then the records'. Each is worked out as it's enumerated, so apply each before the next.</returns>
+	public IEnumerable<ProgressionResult> EndLife(PlayerProgress? player, LifeTracker life, bool warmup)
+	{
+		Ensure.NotNull(life);
+		LifeTotals totals = life.Totals;
+		IReadOnlyList<WeaponLifeStats> lives = life.EndLife();
+		return (warmup || (player is null)) ? [] : LifeResults(player, lives, totals);
 	}
 
 	/// <summary>
@@ -451,6 +467,16 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		result.Notices.Add(new() { Kind = NoticeKind.SkillShot, Weapon = award.Weapon, SkillShot = skillShot, Xp = (long)Math.Round(ScaleForBots(xp, award.VsBot)), VsBot = award.VsBot });
 		result.Signals.Add(new(SignalKind.SkillShot, award.Weapon, SkillShot: skillShot));
 		Advance(weapon, award, skillShot.Id.WeakString, result);
+	}
+
+	private IEnumerable<ProgressionResult> LifeResults(PlayerProgress player, IReadOnlyList<WeaponLifeStats> lives, LifeTotals totals)
+	{
+		foreach (WeaponLifeStats weapon in lives)
+		{
+			yield return ApplyLifeEnd(player, weapon);
+		}
+
+		yield return ApplyLifeRecords(player, totals);
 	}
 
 	private void CheckKillRecords(PlayerProgress player, CombatEvent kill, ProgressionResult result)

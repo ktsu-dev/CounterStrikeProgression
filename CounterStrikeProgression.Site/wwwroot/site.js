@@ -1772,13 +1772,16 @@
 			}
 		}
 
-		async function load() {
-			loadRecords();
+		async function loadBoards() {
 			try {
 				render(await getJson("/api/leaderboards"));
 			} catch {
 				overview.replaceChildren(message("The leaderboards can't be loaded right now."));
 			}
+		}
+
+		async function load() {
+			await Promise.all([loadBoards(), loadRecords()]);
 		}
 
 		window.addEventListener("hashchange", () => {

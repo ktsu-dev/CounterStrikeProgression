@@ -2,13 +2,16 @@
 
 namespace ktsu.CounterStrikeProgression.Test;
 
+using System.Data.Common;
 using ktsu.CounterStrikeProgression.Core.Discord;
 using ktsu.CounterStrikeProgression.Core.Events;
+using ktsu.CounterStrikeProgression.Core.Floaties;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.Storage;
+using ktsu.CounterStrikeProgression.Core.Tracking;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 using ktsu.CounterStrikeProgression.Site;
 using ktsu.CounterStrikeProgression.Site.Data;
@@ -166,7 +169,7 @@ public sealed class RecordTests
 	[TestMethod]
 	public void TheLifeTrackerTotalsEveryWeaponAndStartsOverAtDeath()
 	{
-		Core.Tracking.LifeTracker life = new();
+		LifeTracker life = new();
 		WeaponInfo ak = TestHelpers.Weapon("ak47");
 		WeaponInfo deagle = TestHelpers.Weapon("deagle");
 		life.Shot(ak);
@@ -266,5 +269,131 @@ public sealed class RecordTests
 		Assert.AreEqual("Rival", kills.PreviousHolder);
 		Assert.AreEqual("9", kills.PreviousValue);
 		Assert.IsTrue(items.Where(i => i.Id != RecordCatalog.LifeKillsId).All(i => i.Holder is null));
+	}
+
+	[TestMethod]
+	public void TheWordingNamesTheFirstHolderTheirOwnRecordOrTheOldHolder()
+	{
+		RecordDefinition kills = RecordCatalog.Get(RecordCatalog.LifeKillsId);
+		DateTime now = DateTime.UtcNow;
+		static string Plain(string text) => text;
+		static string Marked(string text) => $"[{text}]";
+
+		RecordBreak first = new(kills, new RecordRow(kills.Id, TestHelpers.SteamId, "Tester", 6, now, null, null, null));
+		RecordBreak own = new(kills, new RecordRow(kills.Id, TestHelpers.SteamId, "Tester", 7, now, TestHelpers.SteamId, "Tester", 6));
+		RecordBreak taken = new(kills, new RecordRow(kills.Id, TestHelpers.SteamId, "Tester", 8, now, Other, "Rival", 7));
+
+		Assert.AreEqual("set the server record for [Most kills in one life]: 6", RecordWording.Describe(first, Marked, Plain, Marked));
+		Assert.AreEqual("beat their own server record for Most kills in one life: [7] (was 6)", RecordWording.Describe(own, Plain, Marked, Marked));
+		Assert.AreEqual("broke [Rival]'s server record for Most kills in one life: 8 (was 7)", RecordWording.Describe(taken, Plain, Plain, Marked));
+
+		Assert.AreEqual("The first to set it", FeedBuilder.RecordDetail(first));
+		Assert.AreEqual("Beat their own 6", FeedBuilder.RecordDetail(own));
+	}
+
+	[TestMethod]
+	public void EndingALifeSkipsWarmupAndUnloadedPlayers()
+	{
+		ProgressionEngine engine = LoadedEngine();
+		LifeTracker life = new();
+		for (int i = 0; i < 6; i++)
+		{
+			life.Kill(vsBot: false);
+		}
+
+		Assert.IsEmpty(engine.EndLife(TestHelpers.Player(), life, warmup: true));
+		Assert.AreEqual(new LifeTotals(0, 0, 0, 0, 0), life.Totals);
+
+		life.Kill(vsBot: false);
+		Assert.IsEmpty(engine.EndLife(null, life, warmup: false));
+		Assert.AreEqual(new LifeTotals(0, 0, 0, 0, 0), life.Totals);
+	}
+
+	[TestMethod]
+	public void EndingALifeChecksItsRecordsLast()
+	{
+		ProgressionEngine engine = LoadedEngine();
+		LifeTracker life = new();
+		for (int i = 0; i < 6; i++)
+		{
+			life.Kill(vsBot: false);
+		}
+
+		life.Shot(TestHelpers.Weapon("ak47"));
+		IReadOnlyList<ProgressionResult> results = [.. engine.EndLife(TestHelpers.Player(), life, warmup: false)];
+
+		Assert.HasCount(2, results);
+		ProgressionNotice notice = Records(results[^1]).Single();
+		Assert.AreEqual(RecordCatalog.LifeKillsId, notice.Record!.Definition.Id);
+		Assert.AreEqual("Record: Most kills in one life", FloatieMerger.Labels(results[^1]).Single());
+	}
+
+	[TestMethod]
+	public async Task TheKeeperLoadsTheStoredRecords()
+	{
+		InMemoryProgressionStore store = new();
+		await store.SaveRecordsAsync([new RecordRow(RecordCatalog.LifeKillsId, Other, "Rival", 9, DateTime.UtcNow, null, null, null)], TestContext.CancellationToken).ConfigureAwait(false);
+		RecordBook book = new();
+		RecordKeeper keeper = new(store, book, OnGameThread, _ => true, _ => Assert.Fail("The load failed."));
+
+		Assert.IsTrue(await keeper.LoadAsync(() => false, TimeSpan.Zero).ConfigureAwait(false));
+		Assert.IsTrue(book.IsLoaded);
+		Assert.AreEqual(9, book.Holder(RecordCatalog.LifeKillsId)!.Value);
+	}
+
+	[TestMethod]
+	public async Task TheKeeperRetriesALoadUntilItIsStopped()
+	{
+		RecordBook book = new();
+		int failures = 0;
+		RecordKeeper keeper = new(new SeasonTests.FailingStore(), book, OnGameThread, e => e is DbException, _ => failures++);
+
+		Assert.IsFalse(await keeper.LoadAsync(() => failures >= 2, TimeSpan.Zero).ConfigureAwait(false));
+		Assert.AreEqual(2, failures);
+		Assert.IsFalse(book.IsLoaded);
+	}
+
+	[TestMethod]
+	public async Task TheKeeperWritesChangedRecordsAndFlagsThemAgainWhenTheWriteFails()
+	{
+		InMemoryProgressionStore store = new();
+		RecordBook book = new();
+		book.Load([]);
+		RecordKeeper keeper = new(store, book, OnGameThread, _ => true, _ => { });
+		static async Task<bool> Once(Func<Task> write)
+		{
+			await write().ConfigureAwait(false);
+			return true;
+		}
+
+		Assert.IsNull(keeper.TakeSave(Once));
+
+		_ = book.TryBreak(RecordCatalog.Get(RecordCatalog.LifeKillsId), TestHelpers.SteamId, "Tester", 6, DateTime.UtcNow);
+		await keeper.TakeSave(Once)!().ConfigureAwait(false);
+		Assert.AreEqual(6, (await store.RecordsAsync(TestContext.CancellationToken).ConfigureAwait(false)).Single().Value);
+		Assert.IsFalse(book.IsDirty);
+
+		_ = book.TryBreak(RecordCatalog.Get(RecordCatalog.LifeKillsId), TestHelpers.SteamId, "Tester", 7, DateTime.UtcNow);
+		await keeper.TakeSave(_ => Task.FromResult(false))!().ConfigureAwait(false);
+		Assert.IsTrue(book.IsDirty);
+	}
+
+	[TestMethod]
+	public async Task TheSiteSaysWhenTheRecordsCannotBeRead()
+	{
+		using ProgressReader reader = new(new SeasonTests.FailingStore());
+
+		IResult result = await RecordEndpoints.RecordsAsync(reader, TestContext.CancellationToken).ConfigureAwait(false);
+
+		Assert.AreEqual(StatusCodes.Status503ServiceUnavailable, Assert.IsInstanceOfType<StatusCodeHttpResult>(result).StatusCode);
+	}
+
+	[TestMethod]
+	public void AnUnknownRecordIdFindsNothing() => Assert.IsNull(RecordCatalog.Find("not_a_record"));
+
+	private static Task OnGameThread(Action action)
+	{
+		action();
+		return Task.CompletedTask;
 	}
 }

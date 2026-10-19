@@ -405,7 +405,7 @@ public sealed class SeasonTests
 		await store.SaveAsync(rows, TestContext.CancellationToken).ConfigureAwait(false);
 	}
 
-	private sealed class FailingStore : IProgressionStore
+	internal sealed class FailingStore : IProgressionStore
 	{
 		public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
@@ -434,7 +434,7 @@ public sealed class SeasonTests
 		public Task<IReadOnlyList<XpGainEntry>> GainsSinceAsync(DateOnly start, int count, CancellationToken cancellationToken) => throw new DatabaseDown();
 	}
 
-	private sealed class DatabaseDown : DbException
+	internal sealed class DatabaseDown : DbException
 	{
 		public DatabaseDown()
 			: base("The database is down.")

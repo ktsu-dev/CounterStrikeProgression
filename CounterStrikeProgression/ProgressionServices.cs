@@ -5,7 +5,6 @@ namespace ktsu.CounterStrikeProgression;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using ktsu.CounterStrikeProgression.Core.Discord;
-using ktsu.CounterStrikeProgression.Core.Events;
 using ktsu.CounterStrikeProgression.Core.Floaties;
 using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
@@ -115,19 +114,10 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	public void EndLife(CCSPlayerController player, PlayerSession session, bool warmup)
 	{
 		Ensure.NotNull(session);
-		LifeTotals totals = session.Life.Totals;
-		IReadOnlyList<WeaponLifeStats> lives = session.Life.EndLife();
-		if (warmup || (session.Progress is not PlayerProgress progress))
+		foreach (ProgressionResult result in Engine.EndLife(session.Progress, session.Life, warmup))
 		{
-			return;
+			Apply(player, session, result);
 		}
-
-		foreach (WeaponLifeStats life in lives)
-		{
-			Apply(player, session, Engine.ApplyLifeEnd(progress, life));
-		}
-
-		Apply(player, session, Engine.ApplyLifeRecords(progress, totals));
 	}
 
 	/// <summary>
