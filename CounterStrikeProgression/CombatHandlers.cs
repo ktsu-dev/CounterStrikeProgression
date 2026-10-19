@@ -114,9 +114,10 @@ internal sealed class CombatHandlers(ProgressionServices services)
 
 		int tick = Server.TickCount;
 		bool headshot = @event.Hitgroup == (int)HitGroup_t.HITGROUP_HEAD;
+		bool isTeammate = ProgressionServices.IsTeammate(attacker, victim);
 		if (weapon.IsGun)
 		{
-			session.Life.Hit(weapon, headshot, victim.IsBot, tick);
+			session.Life.Hit(weapon, headshot, victim.IsBot, isTeammate, tick);
 		}
 
 		// A shotgun blast arrives as one hurt event per pellet, but it's one hit.
@@ -137,7 +138,7 @@ internal sealed class CombatHandlers(ProgressionServices services)
 			IsHeadshot = headshot,
 			Damage = @event.DmgHealth,
 			VictimIsBot = victim.IsBot,
-			IsTeammate = ProgressionServices.IsTeammate(attacker, victim),
+			IsTeammate = isTeammate,
 			Attacker = GameState.StateOf(attackerPawn),
 			Victim = victimState,
 			VictimSidewaysSpeed = sideways,
