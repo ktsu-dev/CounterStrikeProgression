@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Core.Storage;
 using System.Runtime.CompilerServices;
 using Dapper;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Rivals;
 using ktsu.CounterStrikeProgression.Core.Rotation;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 using MySqlConnector;
@@ -88,6 +89,14 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			xp BIGINT NOT NULL DEFAULT 0,
 			PRIMARY KEY (steam_id, season_start),
 			KEY idx_csp_seasons_xp (season_start, xp)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+		CREATE TABLE IF NOT EXISTS csp_rivals (
+			steam_id BIGINT UNSIGNED NOT NULL,
+			victim_id BIGINT UNSIGNED NOT NULL,
+			kills BIGINT NOT NULL DEFAULT 0,
+			PRIMARY KEY (steam_id, victim_id),
+			KEY idx_csp_rivals_victim (victim_id)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 		INSERT IGNORE INTO csp_schema (id, version) VALUES (1, @version);
@@ -176,6 +185,28 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		ON DUPLICATE KEY UPDATE xp = VALUES(xp);
 		""";
 
+	private const string UpsertRival = """
+		INSERT INTO csp_rivals (steam_id, victim_id, kills)
+		VALUES (@SteamId, @VictimId, @Kills)
+		ON DUPLICATE KEY UPDATE kills = VALUES(kills);
+		""";
+
+	/// <summary>
+	/// A player's kills of each other player and that player's kills of them, from both sides of <c>csp_rivals</c>.
+	/// </summary>
+	private const string SelectHeadToHead = """
+		SELECT o.other AS SteamId, COALESCE(MAX(p.name), '') AS Name, CAST(SUM(o.kills) AS SIGNED) AS Kills, CAST(SUM(o.deaths) AS SIGNED) AS Deaths
+		FROM (
+			SELECT victim_id AS other, kills, 0 AS deaths FROM csp_rivals WHERE steam_id = @steamId AND kills > 0
+			UNION ALL
+			SELECT steam_id AS other, 0 AS kills, kills AS deaths FROM csp_rivals WHERE victim_id = @steamId AND kills > 0
+		) o
+		LEFT JOIN csp_players p ON p.steam_id = o.other
+		GROUP BY o.other
+		ORDER BY Kills + Deaths DESC, SteamId ASC
+		LIMIT @count
+		""";
+
 	private const string SelectLatestSeason =
 		"SELECT steam_id AS SteamId, season_start AS Start, xp AS Xp FROM csp_seasons WHERE steam_id = @steamId ORDER BY season_start DESC LIMIT 1";
 
@@ -206,10 +237,16 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		DELETE FROM csp_challenges WHERE steam_id = @SteamId;
 		DELETE FROM csp_weapons WHERE steam_id = @SteamId;
 		DELETE FROM csp_contracts WHERE steam_id = @SteamId;
+		DELETE FROM csp_rivals WHERE steam_id = @SteamId;
 		DELETE FROM csp_seasons WHERE steam_id = @SteamId;
 		DELETE FROM csp_daily WHERE steam_id = @SteamId;
 		INSERT INTO csp_daily (steam_id, day, rank_xp) VALUES (@SteamId, DATE(@LastSeen) - INTERVAL 1 DAY, @RankXp);
 		""";
+
+	/// <summary>
+	/// The most rivals a load reads. Players only meet the people on the server with them, so real counts stay far below it.
+	/// </summary>
+	private const int MaxRivalsLoaded = 5000;
 
 	private readonly string connectionString = ConnectionStringFor(settings);
 
@@ -288,7 +325,18 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			new { steamId, day = DailyRotation.DayKey(today), week = DailyRotation.WeekKey(today) },
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-		return ProgressSnapshot.Rebuild(player, weapons, challenges, season, contracts);
+		PlayerProgress progress = ProgressSnapshot.Rebuild(player, weapons, challenges, season, contracts);
+		try
+		{
+			Rivalry.Load(progress, await QueryHeadToHeadAsync(connection, steamId, MaxRivalsLoaded, cancellationToken).ConfigureAwait(false));
+		}
+		catch (MySqlException exception) when (exception.ErrorCode == MySqlErrorCode.TableAccessDenied)
+		{
+			// The site's read-only user gets its grant on csp_rivals after the plugin creates the table. Until then
+			// its pages still load, without rivals, which they read separately anyway.
+		}
+
+		return progress;
 	}
 
 	/// <inheritdoc/>
@@ -329,6 +377,11 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		if (snapshot.Seasons.Count > 0)
 		{
 			await connection.ExecuteAsync(new CommandDefinition(UpsertSeason, snapshot.Seasons, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+		}
+
+		if (snapshot.Rivals.Count > 0)
+		{
+			await connection.ExecuteAsync(new CommandDefinition(UpsertRival, snapshot.Rivals, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
 		}
 
 		await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
@@ -432,6 +485,23 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			new { steamId },
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 		return [.. results];
+	}
+
+	/// <inheritdoc/>
+	public async Task<IReadOnlyList<HeadToHead>> HeadToHeadAsync(ulong steamId, int count, CancellationToken cancellationToken)
+	{
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		return await QueryHeadToHeadAsync(connection, steamId, count, cancellationToken).ConfigureAwait(false);
+	}
+
+	private static async Task<IReadOnlyList<HeadToHead>> QueryHeadToHeadAsync(MySqlConnection connection, ulong steamId, int count, CancellationToken cancellationToken)
+	{
+		IEnumerable<HeadToHead> rows = await connection.QueryAsync<HeadToHead>(new CommandDefinition(
+			SelectHeadToHead,
+			new { steamId, count },
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+		return [.. rows];
 	}
 
 	private async Task<MySqlConnection> OpenAsync(CancellationToken cancellationToken)

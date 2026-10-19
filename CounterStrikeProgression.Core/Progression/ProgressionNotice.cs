@@ -19,6 +19,7 @@ internal enum NoticeKind
 	FeatEarned,
 	ContractCompleted,
 	MasteryStar,
+	NemesisKilled,
 }
 
 /// <summary>
@@ -40,6 +41,9 @@ internal sealed record ProgressionNotice
 
 	/// <summary>Gets the contract finished, for contract notices.</summary>
 	public ActiveContract? Contract { get; init; }
+
+	/// <summary>Gets the other player's name, for nemesis notices.</summary>
+	public string? PlayerName { get; init; }
 
 	/// <summary>Gets the challenge name, for tier notices.</summary>
 	public string? ChallengeName { get; init; }

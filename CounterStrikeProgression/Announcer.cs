@@ -74,6 +74,10 @@ internal sealed class Announcer(PluginConfig config)
 					player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} Daily contract done: {ChatColors.Yellow}{notice.Contract.Definition.Description}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
 					break;
 
+				case NoticeKind.NemesisKilled:
+					player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} You took down your nemesis {ChatColors.LightRed}{notice.PlayerName}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
+					break;
+
 				case NoticeKind.RankUp:
 					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} ranked up to {ChatColors.Gold}{RankLadder.Names[notice.Value]}{ChatColors.Default}!");
 					break;

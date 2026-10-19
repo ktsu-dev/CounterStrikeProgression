@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Core.Panel;
 using System.Globalization;
 using ktsu.CounterStrikeProgression.Core.Feats;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Rivals;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
@@ -146,7 +147,7 @@ internal sealed class ChatReports(ProgressionEngine engine)
 	}
 
 	/// <summary>
-	/// Builds <c>!stats</c>: rank, XP, kills, headshot share, best weapon, and feats.
+	/// Builds <c>!stats</c>: rank, XP, kills, headshot share, best weapon, feats, and the player's nemesis and favourite victim.
 	/// </summary>
 	/// <param name="name">The player's name.</param>
 	/// <param name="player">The player's progress.</param>
@@ -166,7 +167,31 @@ internal sealed class ChatReports(ProgressionEngine engine)
 		}
 
 		int feats = engine.Feats.Earned(player).Count();
-		return $"{name}: {RankName(player)}, {Number(player.RankXp)} XP. {Number(kills)} kills{headshotShare}{best}. Feats {feats} of {FeatCatalog.All.Count}.";
+		return $"{name}: {RankName(player)}, {Number(player.RankXp)} XP. {Number(kills)} kills{headshotShare}{best}. Feats {feats} of {FeatCatalog.All.Count}.{Rivals(player)}";
+	}
+
+	/// <summary>
+	/// Builds the rivals part of <c>!stats</c>, with each head-to-head written as the player's kills first.
+	/// </summary>
+	/// <param name="player">The player's progress.</param>
+	/// <returns>The text, starting with a space, or empty when the player has neither a nemesis nor a victim.</returns>
+	public string Rivals(PlayerProgress player)
+	{
+		Ensure.NotNull(player);
+		IReadOnlyList<HeadToHead> rows = Rivalry.Of(player);
+		int minimum = engine.Settings.NemesisMinimumKills;
+		string text = string.Empty;
+		if (Rivalry.Nemesis(rows, minimum) is { } nemesis)
+		{
+			text += $" Nemesis {NameOf(nemesis)} ({Number(nemesis.Kills)}-{Number(nemesis.Deaths)}).";
+		}
+
+		if (Rivalry.Victim(rows, minimum) is { } victim)
+		{
+			text += $" Favourite victim {NameOf(victim)} ({Number(victim.Kills)}-{Number(victim.Deaths)}).";
+		}
+
+		return text;
 	}
 
 	/// <summary>
@@ -206,4 +231,6 @@ internal sealed class ChatReports(ProgressionEngine engine)
 	}
 
 	private static string Number(long value) => value.ToString("N0", CultureInfo.InvariantCulture);
+
+	private static string NameOf(HeadToHead rival) => string.IsNullOrWhiteSpace(rival.Name) ? "an unknown player" : rival.Name;
 }
