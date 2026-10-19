@@ -45,10 +45,13 @@ internal static class Endpoints
 	/// <summary>The ingest route.</summary>
 	public const string IngestRoute = "/api/ingest";
 
+	/// <summary>The Prometheus metrics route, served on <see cref="IngestPort"/> only.</summary>
+	public const string MetricsRoute = "/metrics";
+
 	/// <summary>
-	/// Checks whether a path may be served on a port. The ingest route answers only on <see cref="IngestPort"/>,
-	/// and that port answers nothing else. This reads the port the connection arrived on, not the
-	/// <c>Host</c> header, which the client controls.
+	/// Checks whether a path may be served on a port. The ingest and metrics routes answer only on
+	/// <see cref="IngestPort"/>, and that port answers nothing else. This reads the port the connection
+	/// arrived on, not the <c>Host</c> header, which the client controls.
 	/// </summary>
 	/// <param name="localPort">The port the connection arrived on.</param>
 	/// <param name="path">The request path.</param>
@@ -56,7 +59,8 @@ internal static class Endpoints
 	public static bool IsAllowedOnPort(int localPort, PathString path)
 	{
 		bool onIngestPort = localPort == IngestPort;
-		bool isIngestRoute = path.StartsWithSegments(IngestRoute, StringComparison.OrdinalIgnoreCase);
+		bool isIngestRoute = path.StartsWithSegments(IngestRoute, StringComparison.OrdinalIgnoreCase)
+			|| path.StartsWithSegments(MetricsRoute, StringComparison.OrdinalIgnoreCase);
 		return onIngestPort == isIngestRoute;
 	}
 
@@ -78,15 +82,6 @@ internal static class Endpoints
 			? TypedResults.PhysicalFile(path, "text/html; charset=utf-8")
 			: TypedResults.NotFound();
 	}
-
-	/// <summary>
-	/// Serves the player page for a well-formed SteamID64.
-	/// </summary>
-	/// <param name="id">The SteamID64 from the URL.</param>
-	/// <param name="environment">The host environment.</param>
-	/// <returns>The page, or 404 when the id isn't a SteamID64 or the file is missing.</returns>
-	public static IResult PlayerPage(string id, IWebHostEnvironment environment) =>
-		ProgressReader.TryParseSteamId(id, out _) ? Page(environment, "player.html") : TypedResults.NotFound();
 
 	/// <summary>
 	/// Gets the live state for the live page.
