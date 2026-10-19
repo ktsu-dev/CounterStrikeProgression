@@ -447,6 +447,20 @@ td.name {
 	color: var(--green);
 }
 
+.suggestion.rival.nemesis {
+	border-left-color: var(--red);
+}
+
+.suggestion.rival.victim {
+	border-left-color: var(--green);
+}
+
+.suggestion.rival a {
+	display: block;
+	margin: 2px 0;
+	font-weight: bold;
+}
+
 .suggestions + .section-title {
 	margin-top: 14px;
 }
