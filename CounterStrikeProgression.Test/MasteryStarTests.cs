@@ -9,6 +9,7 @@ using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Recap;
+using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Site.Views;
 
 [TestClass]
@@ -156,5 +157,20 @@ public sealed class MasteryStarTests
 
 		LeaderboardsView boards = LeaderboardViewBuilder.Build([PlayerTally.From(player, settings)], null);
 		Assert.AreEqual(1, boards.Weapons.Single(w => w.Key == "ak47").Rows.Single().Stars);
+	}
+
+	[TestMethod]
+	public void Chat_StatsAndTopNameTheStars()
+	{
+		ProgressionEngine engine = TestHelpers.Engine(SmallCurve);
+		ChatReports reports = new(engine);
+		PlayerProgress player = TestHelpers.Player();
+		WeaponProgress ak = player.Weapon(TestHelpers.Weapon("ak47").Key);
+		ak.Xp = 40 + 80;
+		ak.Level = 5;
+
+		Assert.Contains("Best weapon AK-47, level 5, 2 stars.", reports.Stats("Tester", player));
+		Assert.AreEqual("1. P1 level 5, 1 star (80 XP)", reports.WeaponLeader(1, new WeaponLeaderboardEntry("P1", 80, 5)));
+		Assert.AreEqual("2. P2 level 3 (25 XP)", reports.WeaponLeader(2, new WeaponLeaderboardEntry("P2", 25, 3)));
 	}
 }
