@@ -327,6 +327,10 @@ public sealed class MapStatsTests
 
 		public Task<IReadOnlyList<MapSummary>> MapSummariesAsync(CancellationToken cancellationToken) => throw new DatabaseDown();
 
+		public Task<IReadOnlyList<Core.Records.RecordRow>> RecordsAsync(CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task SaveRecordsAsync(IReadOnlyList<Core.Records.RecordRow> rows, CancellationToken cancellationToken) => throw new DatabaseDown();
+
 		public Task<IReadOnlyList<PeriodGain>> GainsBetweenAsync(DateOnly start, DateOnly end, CancellationToken cancellationToken) => throw new DatabaseDown();
 
 		public Task<bool> ClaimDigestAsync(DateOnly week, DateTime at, CancellationToken cancellationToken) => throw new DatabaseDown();

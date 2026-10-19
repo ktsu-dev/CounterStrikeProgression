@@ -83,10 +83,11 @@ internal static class Program
 		app.MapGet("/seasons", (IWebHostEnvironment environment) => Endpoints.Page(environment, "seasons.html"));
 		app.MapGet("/healthz", Endpoints.Health);
 		MapPlayerApi(app);
-		MapApiRoutes(app);
+		MapApi(app);
 	}
 
-	private static void MapApiRoutes(WebApplication app)
+	// Kept apart from the pages, because each handler's parameter types count toward one method's coupling.
+	private static void MapApi(WebApplication app)
 	{
 		app.MapGet("/api/live", Endpoints.Live);
 		app.MapGet("/api/ranks", Endpoints.RanksAsync);
@@ -97,6 +98,7 @@ internal static class Program
 		app.MapGet("/api/seasons", SeasonEndpoints.SeasonsAsync);
 		app.MapGet("/api/maps", MapEndpoints.MapsAsync);
 		app.MapGet("/api/players/{id}/maps", MapEndpoints.PlayerMapsAsync);
+		app.MapGet("/api/records", RecordEndpoints.RecordsAsync);
 		app.MapGet("/api/stream", Endpoints.Stream);
 		app.MapPost(Endpoints.IngestRoute, Endpoints.IngestAsync);
 		HeatmapEndpoints.Map(app);

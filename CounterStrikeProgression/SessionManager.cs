@@ -9,6 +9,7 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using ktsu.CounterStrikeProgression.Core.Admin;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.Rivals;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using Microsoft.Extensions.Logging;
@@ -26,12 +27,19 @@ using Microsoft.Extensions.Logging;
 /// that, two saves could commit out of order and put an older value back. A load also waits for the player's
 /// chain, so a quick reconnect can't read a row that's about to be overwritten.
 /// </para>
+/// <para>
+/// The server records have a chain of their own. They load once at startup, and until they have, none are
+/// checked, so an empty book can't hand out records below the stored ones.
+/// </para>
 /// </remarks>
 /// <param name="store">Where progress is kept.</param>
 /// <param name="engine">The progression engine, which grants the welcome-back bonus on load.</param>
 /// <param name="logger">Where failures are reported.</param>
 internal sealed class SessionManager(IProgressionStore store, ProgressionEngine engine, ILogger logger)
 {
+	// No player has Steam ID 0, so the records' saves can share the per-player chains without meeting one.
+	private const ulong RecordsChain = 0;
+
 	private const int SaveAttempts = 5;
 	private const int InitializeAttempts = 6;
 
@@ -43,8 +51,10 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 	private readonly Dictionary<int, PlayerSession> sessions = [];
 	private readonly Dictionary<ulong, Task> saveChains = [];
 	private readonly Dictionary<ulong, PlayerProgress> recentlyLeft = [];
+	private readonly RecordKeeper records = new(store, engine.Records, Server.NextFrameAsync, IsStorageFailure, exception => Log.RecordsLoadFailed(logger, exception));
 	private Task initialized = Task.CompletedTask;
 	private long saveFailures;
+	private volatile bool stopped;
 
 	/// <summary>Gets every current session.</summary>
 	public IEnumerable<PlayerSession> All => sessions.Values;
@@ -84,6 +94,18 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 				delay *= 2;
 			}
 		});
+		_ = Task.Run(() => records.LoadAsync(initialized, () => stopped, LoadRetryDelay));
+	}
+
+	/// <summary>
+	/// Writes the server records that changed, in the background.
+	/// </summary>
+	public void SaveRecords()
+	{
+		if (records.TakeSave(write => SaveWithRetriesAsync(RecordsChain, write)) is { } save)
+		{
+			Chain(RecordsChain, save);
+		}
 	}
 
 	/// <summary>
@@ -157,6 +179,8 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 			}
 		}
 
+		SaveRecords();
+
 		// Players who left are kept so a quick reconnect reuses their progress, and so rows whose save ran out
 		// of retries get another try. Once they're saved and have been gone a while, they're dropped.
 		DateTime cutoff = DateTime.UtcNow - RecentlyLeftKeepFor;
@@ -177,10 +201,13 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 	/// <param name="timeout">How long to wait.</param>
 	public void Shutdown(TimeSpan timeout)
 	{
+		stopped = true;
 		foreach (int slot in sessions.Keys.ToList())
 		{
 			DisconnectSlot(slot);
 		}
+
+		SaveRecords();
 
 		Task[] pending = [.. saveChains.Values];
 		if (pending.Length > 0)
@@ -355,7 +382,14 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 			}
 			catch (Exception exception)
 			{
-				Log.SaveFailed(logger, steamId, exception);
+				if (steamId == RecordsChain)
+				{
+					Log.RecordsSaveFailed(logger, exception);
+				}
+				else
+				{
+					Log.SaveFailed(logger, steamId, exception);
+				}
 				if (attempt >= SaveAttempts)
 				{
 					Interlocked.Increment(ref saveFailures);

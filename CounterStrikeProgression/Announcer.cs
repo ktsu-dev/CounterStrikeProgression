@@ -10,6 +10,7 @@ using ktsu.CounterStrikeProgression.Core.Contracts;
 using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Recap;
+using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
 
 /// <summary>
@@ -72,6 +73,10 @@ internal sealed class Announcer(PluginConfig config)
 
 				case NoticeKind.ContractCompleted when notice.Contract is not null:
 					player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} Daily contract done: {ChatColors.Yellow}{notice.Contract.Definition.Description}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
+					break;
+
+				case NoticeKind.RecordBroken when notice.Record is { } record:
+					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} {RecordWording.Describe(record, n => $"{ChatColors.Gold}{n}{ChatColors.Default}", v => $"{ChatColors.Yellow}{v}{ChatColors.Default}", p => $"{ChatColors.Green}{p}{ChatColors.Default}")}!");
 					break;
 
 				case NoticeKind.BountyCollected:

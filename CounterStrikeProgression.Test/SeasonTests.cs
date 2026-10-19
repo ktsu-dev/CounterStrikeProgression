@@ -11,6 +11,7 @@ using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Maps;
 using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.Rivals;
 using ktsu.CounterStrikeProgression.Core.Rotation;
 using ktsu.CounterStrikeProgression.Core.Storage;
@@ -406,7 +407,7 @@ public sealed class SeasonTests
 		await store.SaveAsync(rows, TestContext.CancellationToken).ConfigureAwait(false);
 	}
 
-	private sealed class FailingStore : IProgressionStore
+	internal sealed class FailingStore : IProgressionStore
 	{
 		public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
@@ -426,6 +427,10 @@ public sealed class SeasonTests
 
 		public Task<IReadOnlyList<SeasonResult>> SeasonResultsAsync(ulong steamId, CancellationToken cancellationToken) => throw new DatabaseDown();
 
+		public Task<IReadOnlyList<RecordRow>> RecordsAsync(CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task SaveRecordsAsync(IReadOnlyList<RecordRow> rows, CancellationToken cancellationToken) => throw new DatabaseDown();
+
 		public Task<IReadOnlyList<PeriodGain>> GainsBetweenAsync(DateOnly start, DateOnly end, CancellationToken cancellationToken) => throw new DatabaseDown();
 
 		public Task<bool> ClaimDigestAsync(DateOnly week, DateTime at, CancellationToken cancellationToken) => throw new DatabaseDown();
@@ -441,7 +446,7 @@ public sealed class SeasonTests
 		public Task<IReadOnlyList<HeadToHead>> HeadToHeadAsync(ulong steamId, int count, CancellationToken cancellationToken) => throw new DatabaseDown();
 	}
 
-	private sealed class DatabaseDown : DbException
+	internal sealed class DatabaseDown : DbException
 	{
 		public DatabaseDown()
 			: base("The database is down.")

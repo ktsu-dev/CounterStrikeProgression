@@ -146,7 +146,13 @@ internal static class SkillShotCatalog
 
 	private static bool IsAirborne(PlayerState state) => !state.OnGround && !state.OnLadder && !state.InWater;
 
-	private static double LongShotDistance(WeaponClass weaponClass, ProgressionSettings settings) => weaponClass switch
+	/// <summary>
+	/// Gets the distance beyond which a kill with a weapon class is a Long shot.
+	/// </summary>
+	/// <param name="weaponClass">The weapon class.</param>
+	/// <param name="settings">The settings.</param>
+	/// <returns>The distance in units.</returns>
+	internal static double LongShotDistance(WeaponClass weaponClass, ProgressionSettings settings) => weaponClass switch
 	{
 		WeaponClass.Pistol => settings.LongShotPistolDistance,
 		WeaponClass.Smg => settings.LongShotSmgDistance,

@@ -4,6 +4,7 @@ namespace ktsu.CounterStrikeProgression.Core.Storage;
 
 using ktsu.CounterStrikeProgression.Core.Maps;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.Rivals;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
@@ -186,6 +187,21 @@ internal interface IProgressionStore
 	/// <param name="cancellationToken">Cancels the operation.</param>
 	/// <returns>The maps, most played first and then by name.</returns>
 	public Task<IReadOnlyList<MapSummary>> MapSummariesAsync(CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Gets every server record's holder.
+	/// </summary>
+	/// <param name="cancellationToken">Cancels the operation.</param>
+	/// <returns>One row per record anyone holds.</returns>
+	public Task<IReadOnlyList<RecordRow>> RecordsAsync(CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Writes server records. A row only replaces a stored one it beats, so a stale row can't take a record back.
+	/// </summary>
+	/// <param name="rows">The records that changed.</param>
+	/// <param name="cancellationToken">Cancels the operation.</param>
+	/// <returns>A task that completes when the rows are written.</returns>
+	public Task SaveRecordsAsync(IReadOnlyList<RecordRow> rows, CancellationToken cancellationToken);
 
 	/// <summary>
 	/// Gets every player who earned rank XP from one day up to, but not including, another.

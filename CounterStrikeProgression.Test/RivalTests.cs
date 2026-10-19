@@ -8,6 +8,7 @@ using ktsu.CounterStrikeProgression.Core.Admin;
 using ktsu.CounterStrikeProgression.Core.Floaties;
 using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.Rivals;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Site;
@@ -380,6 +381,10 @@ public sealed class RivalTests
 		public Task<IReadOnlyList<PeriodGain>> GainsBetweenAsync(DateOnly start, DateOnly end, CancellationToken cancellationToken) => inner.GainsBetweenAsync(start, end, cancellationToken);
 
 		public Task<bool> ClaimDigestAsync(DateOnly week, DateTime at, CancellationToken cancellationToken) => inner.ClaimDigestAsync(week, at, cancellationToken);
+
+		public Task<IReadOnlyList<RecordRow>> RecordsAsync(CancellationToken cancellationToken) => inner.RecordsAsync(cancellationToken);
+
+		public Task SaveRecordsAsync(IReadOnlyList<RecordRow> rows, CancellationToken cancellationToken) => inner.SaveRecordsAsync(rows, cancellationToken);
 
 		public Task<IReadOnlyList<HeadToHead>> HeadToHeadAsync(ulong steamId, int count, CancellationToken cancellationToken) => throw new DatabaseDown();
 	}
