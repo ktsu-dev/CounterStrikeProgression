@@ -13,7 +13,6 @@ using ktsu.CounterStrikeProgression.Core.SkillShots;
 internal sealed class RecapTracker(DateTime startedAt)
 {
 	private double xp;
-	private int skillShots;
 	private int levels;
 	private int tiers;
 	private int rankUps;
@@ -22,6 +21,12 @@ internal sealed class RecapTracker(DateTime startedAt)
 
 	/// <summary>Gets when the session started, in UTC.</summary>
 	public DateTime StartedAt { get; private set; } = startedAt;
+
+	/// <summary>Gets the skill shots earned since the session started.</summary>
+	public int SkillShots { get; private set; }
+
+	/// <summary>Gets how many of <see cref="SkillShots"/> were against bots.</summary>
+	public int BotSkillShots { get; private set; }
 
 	/// <summary>Gets a value indicating whether nothing has been earned since the session started.</summary>
 	public bool IsEmpty => (xp <= 0) && (best is null);
@@ -40,7 +45,12 @@ internal sealed class RecapTracker(DateTime startedAt)
 			switch (notice.Kind)
 			{
 				case NoticeKind.SkillShot:
-					skillShots++;
+					SkillShots++;
+					if (notice.VsBot)
+					{
+						BotSkillShots++;
+					}
+
 					break;
 				case NoticeKind.WeaponLevelUp:
 					levels++;
@@ -87,7 +97,7 @@ internal sealed class RecapTracker(DateTime startedAt)
 			(long)Math.Floor(Math.Max(0, xp)),
 			kills,
 			deaths,
-			skillShots,
+			SkillShots,
 			levels,
 			tiers,
 			rankUps,
@@ -127,7 +137,8 @@ internal sealed class RecapTracker(DateTime startedAt)
 	{
 		StartedAt = at;
 		xp = 0;
-		skillShots = 0;
+		SkillShots = 0;
+		BotSkillShots = 0;
 		levels = 0;
 		tiers = 0;
 		rankUps = 0;
@@ -148,6 +159,7 @@ internal sealed class RecapTracker(DateTime startedAt)
 		return notice.Kind switch
 		{
 			NoticeKind.FeatEarned => $"the feat {notice.Feat?.Name}",
+			NoticeKind.RecordBroken => $"the server record for {notice.Record?.Definition.Name}",
 			NoticeKind.RankUp => $"ranked up to {RankLadder.Names[notice.Value]}",
 			NoticeKind.TierCompleted => $"{weapon} {notice.ChallengeName} {PanelBuilder.Numeral(notice.Value)}".TrimStart(),
 			NoticeKind.WeaponLevelUp => $"{weapon} level {notice.Value}".TrimStart(),
@@ -158,7 +170,7 @@ internal sealed class RecapTracker(DateTime startedAt)
 	}
 
 	/// <summary>
-	/// Ranks moments: feats, then mastery stars, rank-ups, then epic skill shots, finished tiers and bounties, rare skill shots, weapon
+	/// Ranks moments: server records, then feats, then mastery stars, rank-ups, then epic skill shots, finished tiers and bounties, rare skill shots, weapon
 	/// levels, and common skill shots. Within a kind, the one that paid more wins, then the higher level, tier,
 	/// or rank, and the first wins a tie.
 	/// </summary>
@@ -166,6 +178,7 @@ internal sealed class RecapTracker(DateTime startedAt)
 	{
 		int kind = notice.Kind switch
 		{
+			NoticeKind.RecordBroken => 8,
 			NoticeKind.FeatEarned => 7,
 			NoticeKind.MasteryStar => 6,
 			NoticeKind.RankUp => 5,

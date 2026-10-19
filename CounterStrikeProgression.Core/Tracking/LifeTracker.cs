@@ -15,6 +15,29 @@ using ktsu.CounterStrikeProgression.Core.Weapons;
 internal sealed class LifeTracker
 {
 	private readonly Dictionary<WeaponKey, Counts> byWeapon = [];
+	private int kills;
+	private int botKills;
+
+	/// <summary>Gets what the player has done so far this life, across every weapon.</summary>
+	public LifeTotals Totals => new(
+		kills,
+		botKills,
+		byWeapon.Values.Sum(c => c.Shots),
+		byWeapon.Values.Sum(c => c.Hits),
+		byWeapon.Values.Sum(c => c.BotHits));
+
+	/// <summary>
+	/// Records a kill.
+	/// </summary>
+	/// <param name="vsBot">Whether the victim was a bot.</param>
+	public void Kill(bool vsBot)
+	{
+		kills++;
+		if (vsBot)
+		{
+			botKills++;
+		}
+	}
 
 	/// <summary>
 	/// Records a shot.
@@ -63,6 +86,8 @@ internal sealed class LifeTracker
 	{
 		List<WeaponLifeStats> lives = [.. byWeapon.Values.Select(c => new WeaponLifeStats(c.Weapon, c.Shots, c.Hits, c.HeadshotHits, (c.BotHits * 2) > c.Hits))];
 		byWeapon.Clear();
+		kills = 0;
+		botKills = 0;
 		return lives;
 	}
 

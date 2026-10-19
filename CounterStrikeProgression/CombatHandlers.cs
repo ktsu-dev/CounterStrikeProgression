@@ -258,6 +258,11 @@ internal sealed class CombatHandlers(ProgressionServices services)
 			Server.TickCount);
 
 		CreditAssist(@event, victim);
+		if (!ProgressionServices.IsTeammate(attacker, victim) && (Sessions.Get(attacker) is { Progress: not null } lifeSession))
+		{
+			lifeSession.Life.Kill(victim.IsBot);
+		}
+
 		CCSPlayerPawn? attackerPawn = GameState.PawnOf(attacker);
 		WeaponInfo? weapon = GameState.ResolveWeapon(@event.Weapon, attackerPawn);
 		if ((weapon is not null) && !ProgressionServices.IsTeammate(attacker, victim))
@@ -357,15 +362,7 @@ internal sealed class CombatHandlers(ProgressionServices services)
 		}
 
 		services.Panel.Close(victim, session);
-		IReadOnlyList<WeaponLifeStats> lives = session.Life.EndLife();
-		if (!warmup && (session.Progress is PlayerProgress progress))
-		{
-			foreach (WeaponLifeStats life in lives)
-			{
-				services.Apply(victim, session, Engine.ApplyLifeEnd(progress, life));
-			}
-		}
-
+		services.EndLife(victim, session, warmup);
 		session.Combat.Reset();
 	}
 

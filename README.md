@@ -23,6 +23,7 @@ Players climb an up-only rank ladder from Silver I to Global Elite. Every weapon
 - **Weapon ladders**: Kills, Headshots, and Hits, plus one challenge for every skill shot the weapon can earn, each with five tiers. Skill tiers pay more than volume tiers.
 - **Skill shots**: about 50, covering movement, distance, wallbangs and smokes, scopes, utility and melee, timing and aim, multi-kills, and round situations.
 - **Daily and weekly contracts**: three daily contracts and one weekly, such as "Get 20 kills with SMGs" or "Get 2 kills through walls", pay 500 and 2,500 rank XP. The picks come from the UTC date, so everyone gets the same ones, and they reset at midnight UTC and on Monday. `!contracts` opens them in the panel, and the site's player page shows your progress.
+- **Server records**: a hall of fame of single-moment bests: the longest kill with each gun class, the longest no-scope, the most kills in one life, the best accuracy over one life (from 30 shots), and the most skill shots in one map. Beating one is announced to the server, to the site's feed, and to Discord, naming the holder it was taken from, and the site's Leaderboards page lists every record. A record has to be beaten outright, and kills and skill shots against bots don't count unless `RecordsCountBots` is on. `RecordsEnabled` turns them off.
 - **Bounty on the leader**: the human player on the longest current life streak, once it reaches 5 kills, carries a bounty worth 50 rank XP per kill in the streak. Whoever ends the streak collects it, and chat hears when a bounty is placed, every 5 kills after, and when it's collected. Bots never carry one, and `BountyStartKills` and `BountyXpPerKill` tune it (0 turns it off).
 - **Bots count, at a reduced rate**: rank XP against bots is scaled down, while weapon levels and ladders still move, so practice against bots isn't wasted.
 - **Featured weapon of the day**: one gun class (pistols, SMGs, rifles, snipers, shotguns, or machine guns) earns double weapon XP each UTC day. Challenge ladders move at the usual pace. The pick comes from the date, so the panel overview and the site's live page always agree. `FeaturedWeaponMultiplier` sets the multiplier, and 1 turns it off.
@@ -113,6 +114,7 @@ Settings left out keep their defaults.
 - **Curves:** the rank and weapon level costs.
 - **Ladders:** the five tier thresholds for each challenge kind.
 - **Detection thresholds:** such as `MovingTargetSpeed`, `QuickscopeSeconds`, `FlickDegrees`, and `EfficientReloadFraction`.
+- **Record minimums:** a kill must reach `RecordMinimumDistanceShare` (half) of its class's Long shot distance, or `RecordMinimumNoScopeDistance` for a no-scope, before it can set a record, and a life or map must reach `RecordMinimumLifeKills`, `RecordAccuracyMinimumShots`, or `RecordMinimumMapSkillShots`, so the first records aren't ordinary moments.
 
 ### Panel placement
 
@@ -152,13 +154,14 @@ Sending runs on the thread pool with a 3 second timeout, and a failure is logged
 
 ### Discord announcements
 
-`Discord` posts the server's big moments to a Discord channel through a webhook: earned feats, epic skill shots, weapon mastery stars, and rank-ups from Gold Nova up, plus a weekly digest every Monday. It's off by default, because it sends player names and progress outside the server. With an empty `WebhookUrl`, nothing is posted.
+`Discord` posts the server's big moments to a Discord channel through a webhook: server records, earned feats, epic skill shots, weapon mastery stars, and rank-ups from Gold Nova up, plus a weekly digest every Monday. It's off by default, because it sends player names and progress outside the server. With an empty `WebhookUrl`, nothing is posted.
 
 ```json
 {
   "Discord": {
     "WebhookUrl": "https://discord.com/api/webhooks/<id>/<token>",
     "Username": "CS2 Progression",
+    "Records": true,
     "Feats": true,
     "EpicSkillShots": true,
     "MasteryStars": true,
@@ -173,7 +176,7 @@ Sending runs on the thread pool with a 3 second timeout, and a failure is logged
 
 - **`WebhookUrl`:** the channel's webhook URL, from the channel's Integrations settings in Discord. It must be https, and because it holds the webhook's secret it is never written to the log.
 - **`Username`:** the name posts appear under. Empty keeps the name set on the webhook.
-- **`Feats`, `EpicSkillShots`, `MasteryStars`, `RankUps`:** which moments to post.
+- **`Records`, `Feats`, `EpicSkillShots`, `MasteryStars`, `RankUps`:** which moments to post.
 - **`MinimumRank`:** the lowest rank whose rank-ups are posted, either a whole rank such as `Gold Nova` (all of its stages) or one stage such as `Gold Nova · III`. A name that matches neither counts as `Gold Nova`.
 - **`WeeklyDigest`:** whether to post a digest of the week before at the first map start after Monday 00:00 UTC: the top climbers by rank XP earned, the rank-ups from `MinimumRank` up, and the weekly contract that starts now. A row in `csp_digests` records each week posted, so a restart never posts it twice, and a week nobody played posts nothing.
 - **`WeeklyDigestPlayers`:** how many top climbers the digest lists, from 1 to 10.
@@ -222,7 +225,7 @@ Point the health probe at `/healthz` on port 8080. Port 8081 answers nothing but
 - `csp_site_ingest_batches_total` and `csp_site_ingest_failures_total{reason="unauthorized"|"too_large"|"bad_request"}`: batches applied and turned away.
 - `csp_plugin_send_failures_total`, `csp_plugin_batches_dropped_total`, and `csp_plugin_save_failures_total`: the plugin's own counts since it loaded, as of its last batch. They reset when the plugin reloads, and are absent until a batch carries them.
 
-The site reads progress from the plugin's database and never writes to it. Give it a user with `SELECT` on `csp_players`, `csp_weapons`, `csp_challenges`, `csp_seasons`, `csp_rivals`, and `csp_kills` and nothing else. Until it has `csp_rivals`, player pages still load but show no rivals. The live state and the feed history live in the site's memory and in a file under `/data`, so mount a volume there if the feed should survive a restart. The image runs as the non-root user with UID 1654, so that user must be able to write to the volume (in Kubernetes, set the pod's `fsGroup` to 1654).
+The site reads progress from the plugin's database and never writes to it. Give it a user with `SELECT` on `csp_players`, `csp_weapons`, `csp_challenges`, `csp_seasons`, `csp_records`, `csp_rivals`, and `csp_kills` and nothing else. Until it has `csp_rivals`, player pages still load but show no rivals. The live state and the feed history live in the site's memory and in a file under `/data`, so mount a volume there if the feed should survive a restart. The image runs as the non-root user with UID 1654, so that user must be able to write to the volume (in Kubernetes, set the pod's `fsGroup` to 1654).
 
 Configure the site with environment variables:
 
@@ -265,6 +268,7 @@ Point the plugin's `Site.Url` at port 8081 and set `Site.Token` to the same valu
 | `csp_seasons` | Steam ID, season start, rank XP earned in the season |
 | `csp_kills` | Map, killer and victim Steam IDs (0 for a bot), weapon, headshot, both positions, time |
 | `csp_rivals` | Killer's Steam ID, victim's Steam ID, kills |
+| `csp_records` | Record id, the holder's Steam ID, name, and value, when it was set, and the holder it was taken from |
 | `csp_schema` | The schema version |
 
 Skill shot ids double as challenge ids in `csp_challenges`, so an id is never renamed once released.
