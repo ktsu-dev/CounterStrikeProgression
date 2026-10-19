@@ -1,16 +1,12 @@
-## v1.15.0 (minor)
+## v1.16.0 (minor)
 
-Changes since v1.14.0:
+Changes since v1.15.0:
 
-- [minor] Nemesis and rivals (#35) (matt-edmondson)
-- Append the rune directly when filtering card names (Claude)
-- Merge main into share cards (Claude)
-- [minor] Add share cards and link previews for player pages (Claude)
-- Cover the stars in !stats and !top (Claude)
-- Test the ingest counting middleware and the metrics route (Claude)
-- Merge main into claude/project-thread-88d2z4 (Claude)
+- [minor] Put a bounty on the leading life streak (#29) (matt-edmondson)
+- Merge main (nemesis and rivals) (Claude)
+- Merge main, and fix CardTests for the mastery star fields (Claude)
+- Return a completed task rather than null when no digest check starts (Claude)
+- Move the weekly digest's scheduling into Core so it's tested (Claude)
 - Merge main (Claude)
-- [minor] Add weapon mastery stars past the top weapon level (Claude)
-- Document the metrics in the README (Claude)
-- [minor] Add Prometheus metrics to the site, with the plugin's health counters (Claude)
+- [minor] Post a weekly Discord digest every Monday (Claude)
 
