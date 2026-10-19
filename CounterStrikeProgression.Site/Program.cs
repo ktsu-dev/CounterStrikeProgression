@@ -3,6 +3,7 @@
 namespace ktsu.CounterStrikeProgression.Site;
 
 using ktsu.CounterStrikeProgression.Core.Storage;
+using ktsu.CounterStrikeProgression.Site.Cards;
 using ktsu.CounterStrikeProgression.Site.Data;
 using ktsu.CounterStrikeProgression.Site.Live;
 using Microsoft.AspNetCore.Builder;
@@ -51,6 +52,7 @@ internal static class Program
 		services.AddSingleton<FeatIndex>();
 		services.AddSingleton(provider => new BoardIndex(provider.GetRequiredService<TimeProvider>()));
 		services.AddHostedService<FeatRefresher>();
+		services.AddSingleton(provider => new CardCache(provider.GetRequiredService<TimeProvider>()));
 	}
 
 	private static void MapRoutes(WebApplication app)
@@ -79,7 +81,6 @@ internal static class Program
 		app.MapGet("/skillshots", (IWebHostEnvironment environment) => Endpoints.Page(environment, "skillshots.html"));
 		app.MapGet("/seasons", (IWebHostEnvironment environment) => Endpoints.Page(environment, "seasons.html"));
 		app.MapGet("/compare", (IWebHostEnvironment environment) => Endpoints.Page(environment, "compare.html"));
-		app.MapGet("/players/{id}", Endpoints.PlayerPage);
 	}
 
 	private static void MapApi(WebApplication app)
@@ -98,5 +99,12 @@ internal static class Program
 		app.MapGet("/api/compare", CompareEndpoints.CompareAsync);
 		app.MapGet("/api/stream", Endpoints.Stream);
 		app.MapPost(Endpoints.IngestRoute, Endpoints.IngestAsync);
+		MapCardRoutes(app);
+	}
+
+	private static void MapCardRoutes(WebApplication app)
+	{
+		app.MapGet("/players/{id}", CardEndpoints.PlayerPageAsync);
+		app.MapGet(CardEndpoints.CardRoute, CardEndpoints.CardAsync);
 	}
 }

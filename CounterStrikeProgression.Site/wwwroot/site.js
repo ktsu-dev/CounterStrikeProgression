@@ -1406,8 +1406,13 @@
 			steam.target = "_blank";
 			const compare = el("a", null, "Compare");
 			compare.href = `/compare?a=${id}`;
-			const links = el("span", "head-links");
-			links.append(compare, " · ", steam);
+			// The same image is the link preview, so it also works pasted as a forum signature.
+			const card = el("a", null, "Share card");
+			card.href = `/card/${id}.png`;
+			card.target = "_blank";
+			card.title = "An image of this page, for chats and forum signatures";
+			const links = el("span", "player-links");
+			links.append(compare, card, steam);
 			head.append(left, links);
 
 			const summary = el("div", "pad");
