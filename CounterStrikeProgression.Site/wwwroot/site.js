@@ -1381,7 +1381,11 @@
 			steam.href = `https://steamcommunity.com/profiles/${id}`;
 			steam.rel = "noopener noreferrer";
 			steam.target = "_blank";
-			head.append(left, steam);
+			const heat = el("a", null, "Heatmap");
+			heat.href = `/heatmaps?player=${id}`;
+			const links = el("span");
+			links.append(heat, " · ", steam);
+			head.append(left, links);
 
 			const summary = el("div", "pad");
 			const atTop = player.nextRankName === null || player.nextRankName === undefined;
