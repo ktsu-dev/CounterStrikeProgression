@@ -8,6 +8,7 @@ using System.Text.Json;
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Admin;
 using ktsu.CounterStrikeProgression.Core.Live;
+using ktsu.CounterStrikeProgression.Core.Maps;
 using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Rotation;
@@ -427,6 +428,10 @@ public sealed class SeasonTests
 		public Task<IReadOnlyList<DailyXp>> HistoryAsync(ulong steamId, DateOnly from, CancellationToken cancellationToken) => throw new DatabaseDown();
 
 		public Task<IReadOnlyList<XpGainEntry>> GainsSinceAsync(DateOnly start, int count, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task<IReadOnlyList<MapStanding>> MapStandingsAsync(string map, int count, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task<IReadOnlyList<MapSummary>> MapSummariesAsync(CancellationToken cancellationToken) => throw new DatabaseDown();
 	}
 
 	private sealed class DatabaseDown : DbException

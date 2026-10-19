@@ -6,6 +6,7 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using ktsu.CounterStrikeProgression.Core.Discord;
 using ktsu.CounterStrikeProgression.Core.Floaties;
+using ktsu.CounterStrikeProgression.Core.Maps;
 using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Tracking;
@@ -100,7 +101,7 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	}
 
 	/// <summary>
-	/// Ends a player's map recap, sends it to the site, and tells them about it. A session that earned
+	/// Ends a player's map recap, adds it to their totals for the map, sends it to the site, and tells them about it. A session that earned
 	/// nothing just starts over.
 	/// </summary>
 	/// <param name="session">The player's session.</param>
@@ -116,6 +117,12 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 		if (session.Recap.TryFinish(session.SteamId, name, map, stats?.Kills ?? 0, stats?.Deaths ?? 0, DateTime.UtcNow) is not { } recap)
 		{
 			return;
+		}
+
+		// The save that follows every map end and disconnect writes the map's new totals.
+		if (session.Progress is { } progress)
+		{
+			MapStats.Add(progress, recap);
 		}
 
 		Site?.Record(recap);

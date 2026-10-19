@@ -73,6 +73,11 @@ internal static class Program
 		app.MapGet("/seasons", (IWebHostEnvironment environment) => Endpoints.Page(environment, "seasons.html"));
 		app.MapGet("/players/{id}", Endpoints.PlayerPage);
 		app.MapGet("/healthz", Endpoints.Health);
+		MapApiRoutes(app);
+	}
+
+	private static void MapApiRoutes(WebApplication app)
+	{
 		app.MapGet("/api/live", Endpoints.Live);
 		app.MapGet("/api/ranks", Endpoints.RanksAsync);
 		app.MapGet("/api/ladder", Endpoints.LadderAsync);
@@ -83,6 +88,8 @@ internal static class Program
 		app.MapGet("/api/weekly", HistoryEndpoints.WeeklyAsync);
 		app.MapGet("/api/players/{id}/seasons", SeasonEndpoints.PlayerSeasonsAsync);
 		app.MapGet("/api/seasons", SeasonEndpoints.SeasonsAsync);
+		app.MapGet("/api/maps", MapEndpoints.MapsAsync);
+		app.MapGet("/api/players/{id}/maps", MapEndpoints.PlayerMapsAsync);
 		app.MapGet("/api/stream", Endpoints.Stream);
 		app.MapPost(Endpoints.IngestRoute, Endpoints.IngestAsync);
 	}

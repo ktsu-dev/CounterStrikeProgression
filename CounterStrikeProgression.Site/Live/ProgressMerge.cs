@@ -2,6 +2,7 @@
 
 namespace ktsu.CounterStrikeProgression.Site.Live;
 
+using ktsu.CounterStrikeProgression.Core.Maps;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Core.Weapons;
@@ -153,6 +154,16 @@ internal static class ProgressMerge
 			ContractProgress copy = result.Contract(period, id);
 			copy.Count = contract.Count;
 			copy.Completed = contract.Completed;
+		}
+
+		foreach ((string map, MapProgress totals) in stored.Maps)
+		{
+			MapProgress copy = result.Map(map);
+			copy.Xp = totals.Xp;
+			copy.Kills = totals.Kills;
+			copy.Deaths = totals.Deaths;
+			copy.Seconds = totals.Seconds;
+			copy.Sessions = totals.Sessions;
 		}
 	}
 
