@@ -20,15 +20,28 @@ internal static class MetricsEndpoints
 	{
 		Ensure.NotNull(app);
 		SiteMetrics metrics = app.Services.GetRequiredService<SiteMetrics>();
-		app.Use(async (context, next) =>
-		{
-			await next(context).ConfigureAwait(false);
-			if ((context.Connection.LocalPort == Endpoints.IngestPort) && context.Request.Path.StartsWithSegments(Endpoints.IngestRoute, StringComparison.OrdinalIgnoreCase))
-			{
-				metrics.Record(context.Response.StatusCode);
-			}
-		});
+		app.Use((context, next) => CountIngestAsync(context, next, metrics));
 		app.MapGet(Endpoints.MetricsRoute, Metrics);
+	}
+
+	/// <summary>
+	/// Runs the rest of the pipeline, then counts the answer when the request was a batch on the ingest port.
+	/// </summary>
+	/// <param name="context">The request.</param>
+	/// <param name="next">The rest of the pipeline.</param>
+	/// <param name="metrics">Where the answer is counted.</param>
+	/// <returns>A task that completes when the request has been answered.</returns>
+	public static async Task CountIngestAsync(HttpContext context, RequestDelegate next, SiteMetrics metrics)
+	{
+		Ensure.NotNull(context);
+		Ensure.NotNull(next);
+		Ensure.NotNull(metrics);
+
+		await next(context).ConfigureAwait(false);
+		if ((context.Connection.LocalPort == Endpoints.IngestPort) && context.Request.Path.StartsWithSegments(Endpoints.IngestRoute, StringComparison.OrdinalIgnoreCase))
+		{
+			metrics.Record(context.Response.StatusCode);
+		}
 	}
 
 	/// <summary>Serves the metrics for Prometheus.</summary>
