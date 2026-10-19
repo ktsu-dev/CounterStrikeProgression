@@ -83,6 +83,12 @@ internal sealed record CombatEvent
 	/// <summary>Gets the attacker's kills inside the multi-kill window, counting this one.</summary>
 	public int ChainedKills { get; init; } = 1;
 
+	/// <summary>Gets the attacker's kills this life, counting this one.</summary>
+	public int LifeKills { get; init; } = 1;
+
+	/// <summary>Gets the attacker's kills since they last took damage this life, counting this one.</summary>
+	public int KillsUnhurt { get; init; } = 1;
+
 	/// <summary>Gets the kills the attacker made with the same bullet, counting this one.</summary>
 	public int KillsWithThisBullet { get; init; } = 1;
 

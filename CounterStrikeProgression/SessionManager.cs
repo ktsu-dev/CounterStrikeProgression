@@ -32,9 +32,9 @@ using Microsoft.Extensions.Logging;
 /// </para>
 /// </remarks>
 /// <param name="store">Where progress is kept.</param>
+/// <param name="engine">The progression engine, which grants the welcome-back bonus on load.</param>
 /// <param name="logger">Where failures are reported.</param>
-/// <param name="records">The server records to load and save.</param>
-internal sealed class SessionManager(IProgressionStore store, ILogger logger, RecordBook records)
+internal sealed class SessionManager(IProgressionStore store, ProgressionEngine engine, ILogger logger)
 {
 	// No player has Steam ID 0, so the records' saves can share the per-player chains without meeting one.
 	private const ulong RecordsChain = 0;
@@ -96,7 +96,7 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger, Re
 	/// </summary>
 	public void SaveRecords()
 	{
-		IReadOnlyList<RecordRow> rows = records.TakeDirty();
+		IReadOnlyList<RecordRow> rows = engine.Records.TakeDirty();
 		if (rows.Count == 0)
 		{
 			return;
@@ -106,7 +106,7 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger, Re
 		{
 			if (!await SaveWithRetriesAsync(exception => Log.RecordsSaveFailed(logger, exception), () => Store.SaveRecordsAsync(rows, CancellationToken.None)).ConfigureAwait(false))
 			{
-				await Server.NextFrameAsync(() => records.Restore(rows)).ConfigureAwait(false);
+				await Server.NextFrameAsync(() => engine.Records.Restore(rows)).ConfigureAwait(false);
 			}
 		});
 	}
@@ -323,7 +323,7 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger, Re
 			try
 			{
 				IReadOnlyList<RecordRow> rows = await Store.RecordsAsync(CancellationToken.None).ConfigureAwait(false);
-				await Server.NextFrameAsync(() => records.Load(rows)).ConfigureAwait(false);
+				await Server.NextFrameAsync(() => engine.Records.Load(rows)).ConfigureAwait(false);
 				return;
 			}
 			catch (Exception exception) when (IsStorageFailure(exception))
@@ -343,8 +343,10 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger, Re
 		}
 
 		PlayerProgress progress = loaded ?? new PlayerProgress(session.SteamId);
+		DateTime now = DateTime.UtcNow;
+		_ = engine.GrantWelcomeBack(progress, now);
 		progress.Name = name;
-		progress.LastSeen = DateTime.UtcNow;
+		progress.LastSeen = now;
 		progress.IsDirty = true;
 		session.Progress = progress;
 	}

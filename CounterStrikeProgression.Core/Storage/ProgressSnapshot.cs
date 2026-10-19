@@ -12,7 +12,8 @@ using ktsu.CounterStrikeProgression.Core.Weapons;
 /// <param name="Rank">The rank index.</param>
 /// <param name="FirstSeen">When the player was first seen, in UTC.</param>
 /// <param name="LastSeen">When the player was last seen, in UTC.</param>
-internal sealed record PlayerRow(ulong SteamId, string Name, long RankXp, int Rank, DateTime FirstSeen, DateTime LastSeen);
+/// <param name="WelcomeBackXp">The welcome-back bonus still to pay, rounded up.</param>
+internal sealed record PlayerRow(ulong SteamId, string Name, long RankXp, int Rank, DateTime FirstSeen, DateTime LastSeen, long WelcomeBackXp = 0);
 
 /// <summary>A weapon row as stored.</summary>
 /// <param name="SteamId">The 64-bit Steam ID.</param>
@@ -176,7 +177,7 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 	public static PlayerRow ToRow(PlayerProgress progress)
 	{
 		Ensure.NotNull(progress);
-		return new(progress.SteamId, progress.Name, progress.RankXp, progress.Rank, progress.FirstSeen, progress.LastSeen);
+		return new(progress.SteamId, progress.Name, progress.RankXp, progress.Rank, progress.FirstSeen, progress.LastSeen, (long)Math.Ceiling(progress.WelcomeBackXp));
 	}
 
 	/// <summary>
@@ -243,6 +244,7 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 			Rank = player.Rank,
 			FirstSeen = player.FirstSeen,
 			LastSeen = player.LastSeen,
+			WelcomeBackXp = player.WelcomeBackXp,
 			SeasonStart = season is null ? null : DateOnly.FromDateTime(season.Start),
 			SeasonXp = season?.Xp ?? 0,
 		};

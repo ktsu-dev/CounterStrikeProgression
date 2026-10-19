@@ -40,8 +40,11 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			rank_index INT NOT NULL DEFAULT 0,
 			first_seen DATETIME NOT NULL,
 			last_seen DATETIME NOT NULL,
+			welcome_back_xp BIGINT NOT NULL DEFAULT 0,
 			KEY idx_csp_players_rank_xp (rank_xp)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+		ALTER TABLE csp_players ADD COLUMN IF NOT EXISTS welcome_back_xp BIGINT NOT NULL DEFAULT 0;
 
 		CREATE TABLE IF NOT EXISTS csp_weapons (
 			steam_id BIGINT UNSIGNED NOT NULL,
@@ -121,9 +124,9 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		""";
 
 	private const string UpsertPlayer = """
-		INSERT INTO csp_players (steam_id, name, rank_xp, rank_index, first_seen, last_seen)
-		VALUES (@SteamId, @Name, @RankXp, @Rank, @FirstSeen, @LastSeen)
-		ON DUPLICATE KEY UPDATE name = VALUES(name), rank_xp = VALUES(rank_xp), rank_index = VALUES(rank_index), last_seen = VALUES(last_seen);
+		INSERT INTO csp_players (steam_id, name, rank_xp, rank_index, first_seen, last_seen, welcome_back_xp)
+		VALUES (@SteamId, @Name, @RankXp, @Rank, @FirstSeen, @LastSeen, @WelcomeBackXp)
+		ON DUPLICATE KEY UPDATE name = VALUES(name), rank_xp = VALUES(rank_xp), rank_index = VALUES(rank_index), last_seen = VALUES(last_seen), welcome_back_xp = VALUES(welcome_back_xp);
 		""";
 
 	private const string UpsertDaily = """
@@ -290,7 +293,7 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		object parameters = new { steamId };
 
 		PlayerRow? player = await connection.QuerySingleOrDefaultAsync<PlayerRow>(new CommandDefinition(
-			"SELECT steam_id AS SteamId, name AS Name, rank_xp AS RankXp, rank_index AS `Rank`, first_seen AS FirstSeen, last_seen AS LastSeen FROM csp_players WHERE steam_id = @steamId",
+			"SELECT steam_id AS SteamId, name AS Name, rank_xp AS RankXp, rank_index AS `Rank`, first_seen AS FirstSeen, last_seen AS LastSeen, welcome_back_xp AS WelcomeBackXp FROM csp_players WHERE steam_id = @steamId",
 			parameters,
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 		if (player is null)
