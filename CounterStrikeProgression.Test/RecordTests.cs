@@ -336,7 +336,7 @@ public sealed class RecordTests
 		RecordBook book = new();
 		RecordKeeper keeper = new(store, book, OnGameThread, _ => true, _ => Assert.Fail("The load failed."));
 
-		Assert.IsTrue(await keeper.LoadAsync(() => false, TimeSpan.Zero).ConfigureAwait(false));
+		Assert.IsTrue(await keeper.LoadAsync(Task.CompletedTask, () => false, TimeSpan.Zero).ConfigureAwait(false));
 		Assert.IsTrue(book.IsLoaded);
 		Assert.AreEqual(9, book.Holder(RecordCatalog.LifeKillsId)!.Value);
 	}
@@ -348,7 +348,7 @@ public sealed class RecordTests
 		int failures = 0;
 		RecordKeeper keeper = new(new SeasonTests.FailingStore(), book, OnGameThread, e => e is DbException, _ => failures++);
 
-		Assert.IsFalse(await keeper.LoadAsync(() => failures >= 2, TimeSpan.Zero).ConfigureAwait(false));
+		Assert.IsFalse(await keeper.LoadAsync(Task.CompletedTask, () => failures >= 2, TimeSpan.Zero).ConfigureAwait(false));
 		Assert.AreEqual(2, failures);
 		Assert.IsFalse(book.IsLoaded);
 	}

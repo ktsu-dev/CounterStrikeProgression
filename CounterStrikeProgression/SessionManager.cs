@@ -93,11 +93,7 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 				delay *= 2;
 			}
 		});
-		_ = Task.Run(async () =>
-		{
-			await initialized.ConfigureAwait(false);
-			await records.LoadAsync(() => stopped, LoadRetryDelay).ConfigureAwait(false);
-		});
+		_ = Task.Run(() => records.LoadAsync(initialized, () => stopped, LoadRetryDelay));
 	}
 
 	/// <summary>
@@ -105,7 +101,7 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 	/// </summary>
 	public void SaveRecords()
 	{
-		if (records.TakeSave(write => SaveWithRetriesAsync(exception => Log.RecordsSaveFailed(logger, exception), write)) is { } save)
+		if (records.TakeSave(write => SaveWithRetriesAsync(RecordsChain, write)) is { } save)
 		{
 			Chain(RecordsChain, save);
 		}
@@ -251,7 +247,7 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 			ProgressSnapshot rows = ProgressSnapshot.Capture(progress);
 			Chain(steamId, async () =>
 			{
-				bool written = await SaveWithRetriesAsync(exception => Log.SaveFailed(logger, steamId, exception), () => correction.WriteAsync(Store, rows, CancellationToken.None)).ConfigureAwait(false);
+				bool written = await SaveWithRetriesAsync(steamId, () => correction.WriteAsync(Store, rows, CancellationToken.None)).ConfigureAwait(false);
 				if (!written)
 				{
 					await Server.NextFrameAsync(() => rows.Restore(progress)).ConfigureAwait(false);
@@ -268,7 +264,7 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 			try
 			{
 				if (await correction.ApplyToStoredAsync(Store, steamId, ranks, CancellationToken.None).ConfigureAwait(false) is (CorrectionOutcome applied, ProgressSnapshot rows)
-					&& await SaveWithRetriesAsync(exception => Log.SaveFailed(logger, steamId, exception), () => correction.WriteAsync(Store, rows, CancellationToken.None)).ConfigureAwait(false))
+					&& await SaveWithRetriesAsync(steamId, () => correction.WriteAsync(Store, rows, CancellationToken.None)).ConfigureAwait(false))
 				{
 					outcome = applied;
 				}
@@ -341,7 +337,7 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 
 		Chain(progress.SteamId, async () =>
 		{
-			if (!await SaveWithRetriesAsync(exception => Log.SaveFailed(logger, progress.SteamId, exception), () => Store.SaveAsync(snapshot, CancellationToken.None)).ConfigureAwait(false))
+			if (!await SaveWithRetriesAsync(progress.SteamId, () => Store.SaveAsync(snapshot, CancellationToken.None)).ConfigureAwait(false))
 			{
 				// Out of retries: flag the rows again, so whichever save comes next for this player writes them.
 				await Server.NextFrameAsync(() => snapshot.Restore(progress)).ConfigureAwait(false);
@@ -372,7 +368,7 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 	}
 
 	[SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "A save runs unobserved on the thread pool, so anything it throws must be logged here or it vanishes.")]
-	private async Task<bool> SaveWithRetriesAsync(Action<Exception> logFailure, Func<Task> write)
+	private async Task<bool> SaveWithRetriesAsync(ulong steamId, Func<Task> write)
 	{
 		TimeSpan delay = FirstSaveRetryDelay;
 		for (int attempt = 1; ; attempt++)
@@ -384,7 +380,14 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 			}
 			catch (Exception exception)
 			{
-				logFailure(exception);
+				if (steamId == RecordsChain)
+				{
+					Log.RecordsSaveFailed(logger, exception);
+				}
+				else
+				{
+					Log.SaveFailed(logger, steamId, exception);
+				}
 				if (attempt >= SaveAttempts)
 				{
 					Interlocked.Increment(ref saveFailures);

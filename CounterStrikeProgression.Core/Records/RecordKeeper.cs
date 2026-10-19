@@ -17,12 +17,14 @@ internal sealed class RecordKeeper(IProgressionStore store, RecordBook book, Fun
 	/// <summary>
 	/// Loads the stored records, retrying until it works or it's told to stop.
 	/// </summary>
+	/// <param name="ready">Finishes when the store's tables exist.</param>
 	/// <param name="stopped">Whether to give up, checked before each attempt.</param>
 	/// <param name="retryDelay">How long to wait after a failure.</param>
 	/// <returns>Whether the records loaded.</returns>
-	public async Task<bool> LoadAsync(Func<bool> stopped, TimeSpan retryDelay)
+	public async Task<bool> LoadAsync(Task ready, Func<bool> stopped, TimeSpan retryDelay)
 	{
 		Ensure.NotNull(stopped);
+		await ready.ConfigureAwait(false);
 		while (!stopped())
 		{
 			try

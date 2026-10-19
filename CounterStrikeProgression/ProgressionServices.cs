@@ -98,11 +98,8 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 		Floaties.Show(player, result, floatieKey, at);
 		announcer.Announce(player, session, result);
 
-		// Records are rare and the site reads them from the database, so they're written straight away.
-		if (result.Notices.Any(n => n.Kind == NoticeKind.RecordBroken))
-		{
-			Sessions.SaveRecords();
-		}
+		// Records are rare and the site reads them from the database, so a broken one is written straight away.
+		Sessions.SaveRecords();
 	}
 
 	/// <summary>
