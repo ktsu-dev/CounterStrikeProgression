@@ -123,6 +123,12 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		ON DUPLICATE KEY UPDATE rank_xp = VALUES(rank_xp);
 		""";
 
+	/// <summary>
+	/// Every daily row of a player, which the play streak is worked out from. A player has one row per day they
+	/// played, so reading them all stays small.
+	/// </summary>
+	private const string SelectDaily = "SELECT day AS Day, rank_xp AS RankXp FROM csp_daily WHERE steam_id = @steamId ORDER BY day";
+
 	private const string SelectHistory = """
 		(SELECT day AS Day, rank_xp AS RankXp FROM csp_daily WHERE steam_id = @steamId AND day < @from ORDER BY day DESC LIMIT 1)
 		UNION
@@ -288,11 +294,7 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			new { steamId, day = DailyRotation.DayKey(today), week = DailyRotation.WeekKey(today) },
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-		// A player has one row per day they played, so reading them all to find the streak stays small.
-		IEnumerable<DailyRow> daily = await connection.QueryAsync<DailyRow>(new CommandDefinition(
-			"SELECT day AS Day, rank_xp AS RankXp FROM csp_daily WHERE steam_id = @steamId ORDER BY day",
-			parameters,
-			cancellationToken: cancellationToken)).ConfigureAwait(false);
+		IEnumerable<DailyRow> daily = await connection.QueryAsync<DailyRow>(new CommandDefinition(SelectDaily, parameters, cancellationToken: cancellationToken)).ConfigureAwait(false);
 
 		return ProgressSnapshot.Rebuild(player, weapons, challenges, season, contracts, daily);
 	}
