@@ -45,10 +45,13 @@ internal static class Endpoints
 	/// <summary>The ingest route.</summary>
 	public const string IngestRoute = "/api/ingest";
 
+	/// <summary>The Prometheus metrics route, served on <see cref="IngestPort"/> only.</summary>
+	public const string MetricsRoute = "/metrics";
+
 	/// <summary>
-	/// Checks whether a path may be served on a port. The ingest route answers only on <see cref="IngestPort"/>,
-	/// and that port answers nothing else. This reads the port the connection arrived on, not the
-	/// <c>Host</c> header, which the client controls.
+	/// Checks whether a path may be served on a port. The ingest and metrics routes answer only on
+	/// <see cref="IngestPort"/>, and that port answers nothing else. This reads the port the connection
+	/// arrived on, not the <c>Host</c> header, which the client controls.
 	/// </summary>
 	/// <param name="localPort">The port the connection arrived on.</param>
 	/// <param name="path">The request path.</param>
@@ -56,7 +59,8 @@ internal static class Endpoints
 	public static bool IsAllowedOnPort(int localPort, PathString path)
 	{
 		bool onIngestPort = localPort == IngestPort;
-		bool isIngestRoute = path.StartsWithSegments(IngestRoute, StringComparison.OrdinalIgnoreCase);
+		bool isIngestRoute = path.StartsWithSegments(IngestRoute, StringComparison.OrdinalIgnoreCase)
+			|| path.StartsWithSegments(MetricsRoute, StringComparison.OrdinalIgnoreCase);
 		return onIngestPort == isIngestRoute;
 	}
 

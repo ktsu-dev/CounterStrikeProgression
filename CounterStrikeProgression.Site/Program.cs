@@ -27,6 +27,7 @@ internal static class Program
 		AddServices(builder);
 
 		WebApplication app = builder.Build();
+		MetricsEndpoints.Map(app);
 		MapRoutes(app);
 		app.Run();
 	}
@@ -43,6 +44,7 @@ internal static class Program
 		services.AddSingleton(TimeProvider.System);
 		services.AddSingleton(new FeedStore(Path.Combine(options.DataPath, "feed.json")));
 		services.AddSingleton<LiveState>();
+		services.AddSingleton<SiteMetrics>();
 		services.AddSingleton<Broadcaster>();
 		services.AddSingleton<IProgressionStore>(hasDatabase ? new MySqlProgressionStore(options.Database) : new InMemoryProgressionStore());
 		services.AddSingleton(provider => new ProgressReader(provider.GetRequiredService<IProgressionStore>(), provider.GetRequiredService<TimeProvider>()));

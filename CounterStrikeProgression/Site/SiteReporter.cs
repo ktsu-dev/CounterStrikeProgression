@@ -203,7 +203,8 @@ internal sealed class SiteReporter : IDisposable
 		ulong[] corrected = [.. pendingCorrected];
 		pendingCorrected.Clear();
 
-		sender.TryEnqueue(new LiveBatch(snapshot, feed, progress, pluginConfig.Progression, recaps, corrected));
+		PluginStats stats = new(sender.SendFailures, sender.BatchesDropped, sessionManager.SaveFailures);
+		sender.TryEnqueue(new LiveBatch(snapshot, feed, progress, pluginConfig.Progression, recaps, corrected, stats));
 	}
 
 	private List<LivePlayer> ReadPlayers()

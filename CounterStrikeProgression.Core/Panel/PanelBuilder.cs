@@ -198,8 +198,10 @@ internal sealed class PanelBuilder(ProgressionEngine engine)
 		WeaponProgress? progress = player.Weapons.GetValueOrDefault(weapon.Key);
 		long xp = progress?.Xp ?? 0;
 		int level = engine.Levels.LevelFor(xp);
-		string progressLabel = level >= engine.Levels.MaxLevel
-			? "Max level"
+		int stars = engine.Levels.StarsFor(xp);
+		bool maxed = level >= engine.Levels.MaxLevel;
+		string progressLabel = maxed
+			? $"{Number(engine.Levels.XpTowardStar(xp))} / {Number(engine.Levels.StarXp)} XP to star {stars + 1}"
 			: $"{Number(xp - engine.Levels.ThresholdFor(level))} / {Number(engine.Levels.CostOf(level))} XP to level {level + 1}";
 
 		IReadOnlyList<ChallengeDefinition> ladder = engine.Challenges.For(weapon);
@@ -208,10 +210,12 @@ internal sealed class PanelBuilder(ProgressionEngine engine)
 		lines.Add(PanelLine.Heading("Skill"));
 		lines.AddRange(ladder.Where(c => c.Kind == ChallengeKind.Skill).Select(c => ChallengeLine(c, progress)));
 
+		string levelText = stars > 0 ? $"Level {level} · {WeaponLevelCurve.StarsText(stars)}" : $"Level {level}";
 		string subtitle = engine.IsFeatured(weapon)
-			? $"Level {level} · {FeaturedWeapon.Times(engine.Settings.FeaturedWeaponMultiplier)} today"
-			: $"Level {level}";
-		return new PanelPage(weapon.DisplayName, subtitle, engine.Levels.ProgressToNext(xp), progressLabel, lines);
+			? $"{levelText} · {FeaturedWeapon.Times(engine.Settings.FeaturedWeaponMultiplier)} today"
+			: levelText;
+		double fill = maxed ? engine.Levels.ProgressToNextStar(xp) : engine.Levels.ProgressToNext(xp);
+		return new PanelPage(weapon.DisplayName, subtitle, fill, progressLabel, lines);
 	}
 
 	/// <summary>
