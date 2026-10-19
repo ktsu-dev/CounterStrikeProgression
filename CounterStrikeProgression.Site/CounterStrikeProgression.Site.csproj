@@ -33,5 +33,13 @@
     <ProjectReference Include="..\CounterStrikeProgression.Core\CounterStrikeProgression.Core.csproj" />
     <PackageReference Include="ktsu.Semantics.Strings" />
     <PackageReference Include="Polyfill" PrivateAssets="all" />
+    <PackageReference Include="SkiaSharp" />
+    <!-- The chiseled image has no fontconfig, and the cards draw only the embedded fonts, so the build without native dependencies is enough. -->
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />
+  </ItemGroup>
+
+  <!-- The share cards draw with these, because the container has no fonts. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Cards\Fonts\*.ttf" LogicalName="Fonts.%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

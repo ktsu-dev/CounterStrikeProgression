@@ -112,6 +112,7 @@ internal sealed class FloatieMerger(double mergeSeconds)
 				NoticeKind.SkillShot => notice.SkillShot?.Name,
 				NoticeKind.TierCompleted => $"{notice.ChallengeName} {PanelBuilder.Numeral(notice.Value)}",
 				NoticeKind.WeaponLevelUp => $"{notice.Weapon?.DisplayName} level {notice.Value}",
+				NoticeKind.MasteryStar => WeaponLevelCurve.StarTitle(notice.Weapon, notice.Value),
 				NoticeKind.RankUp => $"Rank up: {RankLadder.Names[notice.Value]}",
 				NoticeKind.FeatEarned => notice.Feat is null ? null : $"Feat: {notice.Feat.Name}",
 				NoticeKind.BountyCollected => "Bounty",

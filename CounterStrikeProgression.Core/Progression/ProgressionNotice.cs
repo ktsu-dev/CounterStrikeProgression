@@ -18,6 +18,7 @@ internal enum NoticeKind
 	RankUp,
 	FeatEarned,
 	ContractCompleted,
+	MasteryStar,
 	BountyCollected,
 }
 
@@ -47,7 +48,7 @@ internal sealed record ProgressionNotice
 	/// <summary>Gets the player whose bounty was collected, for bounty notices.</summary>
 	public string? Target { get; init; }
 
-	/// <summary>Gets the tier reached, the weapon level reached, the rank reached, or the streak a bounty ended.</summary>
+	/// <summary>Gets the tier reached, the weapon level reached, the mastery star reached, the rank reached, or the streak a bounty ended.</summary>
 	public int Value { get; init; }
 
 	/// <summary>Gets the rank XP the moment paid.</summary>
