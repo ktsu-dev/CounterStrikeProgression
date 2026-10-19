@@ -157,6 +157,11 @@ internal sealed class PanelBuilder(ProgressionEngine engine)
 			lines.Add(new($"Featured: {FeaturedWeapon.Title(featured)}", $"{FeaturedWeapon.Times(engine.Settings.FeaturedWeaponMultiplier)} weapon XP", LineState.InProgress));
 		}
 
+		if (player.WelcomeBackXp > 0)
+		{
+			lines.Add(new("Welcome back: 2x rank XP", $"{Number((long)Math.Ceiling(player.WelcomeBackXp))} XP left", LineState.InProgress));
+		}
+
 		lines.AddRange(
 		[
 			new("Kills", Number(kills), LineState.InProgress),
