@@ -18,6 +18,7 @@ Players climb an up-only rank ladder from Silver I to Global Elite. Every weapon
 
 - **Up-only ranks**: 12 matchmaking-style ranks with five stages each, from Silver · I to Global Elite · V. Numbered ranks such as Silver I to IV are one rank here, because the stages number it. The first stage takes 5,000 XP, each one after costs about 7.7% more, and Global Elite · V takes about 5 million XP in total. Nobody loses progress for a bad night.
 - **Weapon levels**: every weapon, grenade, the knife, and the Zeus levels up to 40, and each level-up pays rank XP.
+- **Mastery stars**: past level 40, weapon XP keeps counting toward mastery stars, one for each 40 levels' worth of XP. They're cosmetic and pay no rank XP, but they show next to the weapon on the panel, in `!stats` and `!top`, and on the site, and each one is announced.
 - **Chickens**: every weapon has a Chickens challenge (1, 5, 15, 40, and 100 chickens), and each chicken pays 2 XP to the weapon and to rank. Twelve chicken skill shots sit on the weapon ladders too, from Nugget (headshot a chicken) and Fowl play (through a wall) to Fried chicken, Rotisserie, and Crossed the road (from long range).
 - **Weapon ladders**: Kills, Headshots, and Hits, plus one challenge for every skill shot the weapon can earn, each with five tiers. Skill tiers pay more than volume tiers.
 - **Skill shots**: about 50, covering movement, distance, wallbangs and smokes, scopes, utility and melee, timing and aim, multi-kills, and round situations.
@@ -29,7 +30,7 @@ Players climb an up-only rank ladder from Silver I to Global Elite. Every weapon
 - **XP floaties**: every XP gain floats up as "+XP" text from the center of your screen. Only you see your own. Quick gains add up in one floatie, and skill shots, tiers, and level-ups are named under the number in gold. A `World` mode floats them above the target instead.
 - **Feats**: ten really difficult feats, such as Global Elite, Millionaire, Weapon master, Full ladder, Collector, Chicken overlord, Arsenal (every gun to level 10), and Polymath (a skill shot tier on 20 weapons). They are worked out from the stored progress, announced to the server when earned, and shown as medallions on the progression site.
 - **Rank tags**: everyone's rank, such as `[GN III]`, shows as their scoreboard clan tag and before their name in chat.
-- **Announcements**: rank-ups, finished tiers, and every fifth weapon level go to the whole server.
+- **Announcements**: rank-ups, finished tiers, mastery stars, and every fifth weapon level go to the whole server.
 - **Map recap**: when the map ends, each player gets one chat line with the XP, kills and deaths, skill shots, levels, and tiers they earned, and their best moment. The recap also goes to the progression site, which shows it as "Last session" on the player page, and a player who leaves early still gets one there. `AnnounceMapRecap` turns the chat line off.
 - **Durable storage**: progress is kept in MariaDB or MySQL in `csp_` tables, saved off the game thread, and retried after a failed save without double counting.
 - **Configurable**: every XP value, multiplier, and detection threshold is a setting.
@@ -148,7 +149,7 @@ Sending runs on the thread pool with a 3 second timeout, and a failure is logged
 
 ### Discord announcements
 
-`Discord` posts the server's big moments to a Discord channel through a webhook: earned feats, epic skill shots, and rank-ups from Gold Nova up. It's off by default, because it sends player names and progress outside the server. With an empty `WebhookUrl`, nothing is posted.
+`Discord` posts the server's big moments to a Discord channel through a webhook: earned feats, epic skill shots, weapon mastery stars, and rank-ups from Gold Nova up. It's off by default, because it sends player names and progress outside the server. With an empty `WebhookUrl`, nothing is posted.
 
 ```json
 {
@@ -157,6 +158,7 @@ Sending runs on the thread pool with a 3 second timeout, and a failure is logged
     "Username": "CS2 Progression",
     "Feats": true,
     "EpicSkillShots": true,
+    "MasteryStars": true,
     "RankUps": true,
     "MinimumRank": "Gold Nova",
     "QueueLimit": 50
@@ -166,7 +168,7 @@ Sending runs on the thread pool with a 3 second timeout, and a failure is logged
 
 - **`WebhookUrl`:** the channel's webhook URL, from the channel's Integrations settings in Discord. It must be https, and because it holds the webhook's secret it is never written to the log.
 - **`Username`:** the name posts appear under. Empty keeps the name set on the webhook.
-- **`Feats`, `EpicSkillShots`, `RankUps`:** which moments to post.
+- **`Feats`, `EpicSkillShots`, `MasteryStars`, `RankUps`:** which moments to post.
 - **`MinimumRank`:** the lowest rank whose rank-ups are posted, either a whole rank such as `Gold Nova` (all of its stages) or one stage such as `Gold Nova · III`. A name that matches neither counts as `Gold Nova`.
 - **`QueueLimit`:** how many lines wait to post. When Discord is slow or down, the oldest is dropped.
 
@@ -179,9 +181,17 @@ The site is a small ASP.NET Core app, published as the image `ghcr.io/ktsu-dev/c
 The image listens on two ports:
 
 - **8080 (public):** `/`, `/ranks`, `/leaderboards`, `/skillshots`, `/players/{steamId}`, `/api/live`, `/api/ranks`, `/api/leaderboards`, `/api/skillshots`, `/api/players/{id}`, `/api/stream`, and `/healthz`. Route this port to visitors.
-- **8081 (ingest):** `POST /api/ingest` with the header `Authorization: Bearer <token>`. Keep this port inside your network, because only the plugin needs it.
+- **8081 (ingest):** `POST /api/ingest` with the header `Authorization: Bearer <token>`, and `GET /metrics` for Prometheus. Keep this port inside your network, because only the plugin and your scraper need it.
 
-Point the health probe at `/healthz` on port 8080. Port 8081 answers nothing but the ingest route, so a probe there always fails.
+Point the health probe at `/healthz` on port 8080. Port 8081 answers nothing but the ingest and metrics routes, so a probe there always fails.
+
+`/metrics` has these series:
+
+- `csp_site_server_online`: 1 when a batch arrived within the offline window.
+- `csp_site_players_online{kind="human"|"bot"}`: players in the last batch.
+- `csp_site_last_batch_age_seconds`: seconds since the last batch, or since the site started when none has arrived. Alert on this while the game server is up.
+- `csp_site_ingest_batches_total` and `csp_site_ingest_failures_total{reason="unauthorized"|"too_large"|"bad_request"}`: batches applied and turned away.
+- `csp_plugin_send_failures_total`, `csp_plugin_batches_dropped_total`, and `csp_plugin_save_failures_total`: the plugin's own counts since it loaded, as of its last batch. They reset when the plugin reloads, and are absent until a batch carries them.
 
 The site reads progress from the plugin's database and never writes to it. Give it a user with `SELECT` on `csp_players`, `csp_weapons`, `csp_challenges`, and `csp_seasons` and nothing else. The live state and the feed history live in the site's memory and in a file under `/data`, so mount a volume there if the feed should survive a restart. The image runs as the non-root user with UID 1654, so that user must be able to write to the volume (in Kubernetes, set the pod's `fsGroup` to 1654).
 

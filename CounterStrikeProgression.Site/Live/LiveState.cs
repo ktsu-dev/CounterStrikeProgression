@@ -32,6 +32,7 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 	private readonly Dictionary<ulong, MapRecap> recaps = LoadRecaps(feed, options);
 	private ServerSnapshot? snapshot;
 	private DateTimeOffset lastBatchAt;
+	private PluginStats? pluginStats;
 	private bool feedSaveFailing;
 
 	/// <summary>Gets the latest server snapshot, or <see langword="null"/> before the first batch.</summary>
@@ -54,6 +55,30 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 			lock (gate)
 			{
 				return IsOnlineLocked();
+			}
+		}
+	}
+
+	/// <summary>Gets when the last batch arrived, or <see langword="null"/> before the first one.</summary>
+	public DateTimeOffset? LastBatchAt
+	{
+		get
+		{
+			lock (gate)
+			{
+				return snapshot is null ? null : lastBatchAt;
+			}
+		}
+	}
+
+	/// <summary>Gets the plugin's health counters from the last batch that carried them.</summary>
+	public PluginStats? PluginStats
+	{
+		get
+		{
+			lock (gate)
+			{
+				return pluginStats;
 			}
 		}
 	}
@@ -124,6 +149,7 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 		{
 			lastBatchAt = time.GetUtcNow();
 			Settings = batch.Settings;
+			pluginStats = batch.Stats ?? pluginStats;
 
 			bool snapshotChanged = snapshot is null || batch.Snapshot.SentAt >= snapshot.SentAt;
 			if (snapshotChanged)

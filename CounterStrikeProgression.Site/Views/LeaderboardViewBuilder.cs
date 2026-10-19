@@ -14,7 +14,8 @@ using ktsu.CounterStrikeProgression.Core.Weapons;
 /// <param name="Level">The weapon level.</param>
 /// <param name="Xp">The XP earned with the weapon.</param>
 /// <param name="Kills">Kills with the weapon.</param>
-internal readonly record struct WeaponTally(int Level, long Xp, long Kills);
+/// <param name="Stars">The mastery stars earned with the weapon.</param>
+internal readonly record struct WeaponTally(int Level, long Xp, long Kills, int Stars = 0);
 
 /// <summary>What the leaderboards need to know about one player.</summary>
 /// <param name="SteamId">The 64-bit Steam ID.</param>
@@ -55,7 +56,7 @@ internal sealed record PlayerTally(
 			}
 
 			int level = Math.Min(curve.MaxLevel, Math.Max(weapon.Level, curve.LevelFor(weapon.Xp)));
-			weapons[weapon.Weapon.WeakString] = new(level, weapon.Xp, weapon.Kills);
+			weapons[weapon.Weapon.WeakString] = new(level, weapon.Xp, weapon.Kills, curve.StarsFor(weapon.Xp));
 			foreach ((string id, ChallengeProgress challenge) in weapon.Challenges)
 			{
 				if ((challenge.Count > 0) && SkillShotIds.Contains(id))
@@ -76,7 +77,8 @@ internal sealed record PlayerTally(
 /// <param name="Value">The number the board ranks by: a weapon level, a skill shot count, or a feat count.</param>
 /// <param name="Xp">On a weapon board, the XP with the weapon, which breaks ties between levels. Otherwise 0.</param>
 /// <param name="Kills">On a weapon board, kills with the weapon. Otherwise 0.</param>
-internal sealed record BoardRow(int Position, string SteamId, string Name, long Value, long Xp, long Kills);
+/// <param name="Stars">On a weapon board, the mastery stars earned with the weapon. Otherwise 0.</param>
+internal sealed record BoardRow(int Position, string SteamId, string Name, long Value, long Xp, long Kills, int Stars = 0);
 
 /// <summary>One weapon's leaderboard, by level.</summary>
 /// <param name="Key">The weapon key.</param>
@@ -143,7 +145,7 @@ internal static class LeaderboardViewBuilder
 				.ThenByDescending(u => u.Weapon.Kills)
 				.ThenBy(u => u.Player.SteamId)
 				.Take(BoardSize)
-				.Select((u, i) => Row(i, u.Player, u.Weapon.Level, u.Weapon.Xp, u.Weapon.Kills));
+				.Select((u, i) => Row(i, u.Player, u.Weapon.Level, u.Weapon.Xp, u.Weapon.Kills, u.Weapon.Stars));
 			weapons.Add(new(key, weapon.DisplayName, weapon.Class, users.Count, [.. rows]));
 		}
 
@@ -211,6 +213,6 @@ internal static class LeaderboardViewBuilder
 		return new(id, skillShot.Name, skillShot.Rarity, earners.Count, earners.Sum(e => e.Count), [.. rows]);
 	}
 
-	private static BoardRow Row(int index, PlayerTally player, long value, long xp = 0, long kills = 0) =>
-		new(index + 1, player.SteamId.ToString(CultureInfo.InvariantCulture), player.Name, value, xp, kills);
+	private static BoardRow Row(int index, PlayerTally player, long value, long xp = 0, long kills = 0, int stars = 0) =>
+		new(index + 1, player.SteamId.ToString(CultureInfo.InvariantCulture), player.Name, value, xp, kills, stars);
 }

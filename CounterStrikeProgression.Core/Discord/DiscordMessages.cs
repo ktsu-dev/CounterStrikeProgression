@@ -42,6 +42,8 @@ internal static class DiscordMessages
 					$"🏅 {name} earned the feat **{feat.Name}**: {feat.Description}!",
 				{ Kind: NoticeKind.RankUp, Value: int rank } when settings.RankUps && (rank >= minimumRank) && (rank < RankLadder.Names.Count) =>
 					$"⬆️ {name} ranked up to **{RankLadder.Names[rank]}**!",
+				{ Kind: NoticeKind.MasteryStar, Weapon: { } starred } when settings.MasteryStars =>
+					$"⭐ {name}'s {starred.DisplayName} earned mastery star **{notice.Value}**!",
 				{ Kind: NoticeKind.SkillShot, SkillShot: { Rarity: Rarity.Epic } shot } when settings.EpicSkillShots =>
 					$"💥 {name} landed **{shot.Name}**{(notice.Weapon is { } weapon ? $" with the {weapon.DisplayName}" : "")} (+{notice.Xp.ToString("N0", CultureInfo.InvariantCulture)} XP)",
 				_ => null,
