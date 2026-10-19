@@ -53,7 +53,7 @@
 	const REFETCH_EVERY_MS = 2000;
 	const STREAM_GRACE_MS = 15000;
 	const STEAM_ID = /^\d{17}$/;
-	const GOLD_KINDS = new Set(["RankUp", "WeaponLevelUp", "TierCompleted", "FeatEarned", "ContractCompleted", "MasteryStar"]);
+	const GOLD_KINDS = new Set(["RankUp", "WeaponLevelUp", "TierCompleted", "FeatEarned", "ContractCompleted", "MasteryStar", "RecordBroken"]);
 	const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 
 	function el(tag, className, text) {
@@ -1692,9 +1692,10 @@
 		const overview = el("div", "live-grid");
 		const head = el("div", "panel");
 		head.append(top, overview);
+		const recordPanel = el("div", "panel");
 		const weaponPanel = el("div", "panel");
 		const shotPanel = el("div", "panel");
-		root.replaceChildren(head, weaponPanel, shotPanel);
+		root.replaceChildren(head, recordPanel, weaponPanel, shotPanel);
 
 		let last = null;
 		let weaponKey = hashParams().get("weapon");
@@ -1824,6 +1825,35 @@
 			shotPanel.replaceChildren(strip, body);
 		}
 
+		// Server records: one row per record, with the holder it was taken from.
+		function renderRecords(records) {
+			const strip = el("div", "top");
+			const label = el("span");
+			label.append(el("b", null, "Server records"));
+			const held = records.filter((r) => r.holder).length;
+			strip.append(label, el("span", null, `${held}/${records.length} set`));
+			const rows = records.map((record) => {
+				const tr = el("tr");
+				const name = cell("name");
+				name.append(el("b", null, record.name), el("div", "muted", record.description));
+				if (!record.holder) {
+					tr.append(name, cell("muted", "Not set yet"), cell("num", "—"), cell("muted", ""));
+					return tr;
+				}
+				const holder = cell("name", playerLink(record.steamId, record.holder));
+				if (record.previousHolder) {
+					holder.append(el("div", "muted", `Took it from ${record.previousHolder} (${record.previousValue})`));
+				}
+				const when = el("time", "muted", ago(record.setAt));
+				when.dateTime = String(record.setAt);
+				tr.append(name, holder, cell("num", record.value), cell(null, when));
+				return tr;
+			});
+			const body = el("div", "pad");
+			body.append(table([["Record"], ["Holder"], ["Best", "num"], ["Set"]], rows));
+			recordPanel.replaceChildren(strip, body);
+		}
+
 		function render(view) {
 			last = view;
 			if (!view.updated) {
@@ -1836,12 +1866,25 @@
 			renderShot(view);
 		}
 
-		async function load() {
+		async function loadRecords() {
+			try {
+				const records = await getJson("/api/records");
+				renderRecords(Array.isArray(records) ? records : []);
+			} catch {
+				recordPanel.replaceChildren(message("The server records can't be loaded right now."));
+			}
+		}
+
+		async function loadBoards() {
 			try {
 				render(await getJson("/api/leaderboards"));
 			} catch {
 				overview.replaceChildren(message("The leaderboards can't be loaded right now."));
 			}
+		}
+
+		async function load() {
+			await Promise.all([loadBoards(), loadRecords()]);
 		}
 
 		window.addEventListener("hashchange", () => {

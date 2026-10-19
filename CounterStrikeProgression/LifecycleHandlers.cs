@@ -86,14 +86,7 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 		}
 
 		// A player who survived the last round never died, so their previous life's accuracy is settled here.
-		IReadOnlyList<WeaponLifeStats> lives = session.Life.EndLife();
-		if (!GameState.IsWarmup && (session.Progress is PlayerProgress progress))
-		{
-			foreach (WeaponLifeStats life in lives)
-			{
-				services.Apply(player, session, services.Engine.ApplyLifeEnd(progress, life));
-			}
-		}
+		services.EndLife(player, session, GameState.IsWarmup);
 
 		RankTags.Refresh(session);
 		session.Combat.Reset();
