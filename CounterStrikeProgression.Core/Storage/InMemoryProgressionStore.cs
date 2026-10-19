@@ -18,6 +18,7 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 	private readonly ConcurrentDictionary<(ulong, string, string), ContractRow> contracts = new();
 	private readonly ConcurrentDictionary<(ulong SteamId, DateOnly Day), long> daily = new();
 	private readonly ConcurrentDictionary<(ulong, DateTime), SeasonRow> seasons = new();
+	private readonly ConcurrentDictionary<DateOnly, DateTime> digests = new();
 
 	/// <summary>Gets the number of successful saves, for tests.</summary>
 	public int SaveCount { get; private set; }
@@ -166,6 +167,29 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 			.Take(count)];
 		return Task.FromResult(gains);
 	}
+
+	/// <inheritdoc/>
+	public Task<IReadOnlyList<PeriodGain>> GainsBetweenAsync(DateOnly start, DateOnly end, CancellationToken cancellationToken)
+	{
+		DateTime since = start.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+		DateTime until = end.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+		List<PeriodGain> gains = [];
+		foreach (PlayerRow p in players.Values.Where(p => p.LastSeen >= since && p.FirstSeen < until))
+		{
+			List<DailyXp> rows = RowsOf(p.SteamId);
+			if ((XpHistory.Baseline(rows, start, p.FirstSeen) is long startXp) && (rows.LastOrDefault(r => r.Day < end) is { } last) && (last.RankXp > startXp))
+			{
+				gains.Add(new(p.SteamId, p.Name, startXp, last.RankXp));
+			}
+		}
+
+		IReadOnlyList<PeriodGain> ordered = [.. gains.OrderByDescending(g => g.Gained).ThenBy(g => g.SteamId)];
+		return Task.FromResult(ordered);
+	}
+
+	/// <inheritdoc/>
+	public Task<bool> ClaimDigestAsync(DateOnly week, DateTime at, CancellationToken cancellationToken) =>
+		Task.FromResult(digests.TryAdd(week, at));
 
 	private List<DailyXp> RowsOf(ulong steamId) =>
 		[.. daily.Where(d => d.Key.SteamId == steamId).Select(d => new DailyXp(d.Key.Day, d.Value)).OrderBy(d => d.Day)];

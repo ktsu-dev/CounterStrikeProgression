@@ -50,4 +50,7 @@ internal static partial class Log
 
 	[LoggerMessage(EventId = 14, Level = LogLevel.Error, Message = "The Discord webhook URL isn't an absolute https URL, so nothing is posted to Discord")]
 	public static partial void DiscordUrlInvalid(ILogger logger);
+
+	[LoggerMessage(EventId = 15, Level = LogLevel.Warning, Message = "Posting the weekly Discord digest failed, so it's tried again at the next map start")]
+	public static partial void DigestFailed(ILogger logger, Exception exception);
 }

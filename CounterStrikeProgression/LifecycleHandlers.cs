@@ -174,6 +174,8 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 		{
 			session.Recap.Restart(DateTime.UtcNow);
 		}
+
+		services.PostWeeklyDigest();
 	}
 
 	private void OnTick()
