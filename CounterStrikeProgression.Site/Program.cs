@@ -64,14 +64,24 @@ internal static class Program
 			await next(context).ConfigureAwait(false);
 		});
 		app.UseStaticFiles();
+		MapPages(app);
+		MapApi(app);
+	}
 
+	private static void MapPages(WebApplication app)
+	{
 		app.MapGet("/", (IWebHostEnvironment environment) => Endpoints.Page(environment, "index.html"));
 		app.MapGet("/ranks", (IWebHostEnvironment environment) => Endpoints.Page(environment, "ranks.html"));
 		app.MapGet("/ladder", (IWebHostEnvironment environment) => Endpoints.Page(environment, "ladder.html"));
 		app.MapGet("/leaderboards", (IWebHostEnvironment environment) => Endpoints.Page(environment, "leaderboards.html"));
 		app.MapGet("/skillshots", (IWebHostEnvironment environment) => Endpoints.Page(environment, "skillshots.html"));
 		app.MapGet("/seasons", (IWebHostEnvironment environment) => Endpoints.Page(environment, "seasons.html"));
+		app.MapGet("/compare", (IWebHostEnvironment environment) => Endpoints.Page(environment, "compare.html"));
 		app.MapGet("/players/{id}", Endpoints.PlayerPage);
+	}
+
+	private static void MapApi(WebApplication app)
+	{
 		app.MapGet("/healthz", Endpoints.Health);
 		app.MapGet("/api/live", Endpoints.Live);
 		app.MapGet("/api/ranks", Endpoints.RanksAsync);
@@ -83,6 +93,7 @@ internal static class Program
 		app.MapGet("/api/weekly", HistoryEndpoints.WeeklyAsync);
 		app.MapGet("/api/players/{id}/seasons", SeasonEndpoints.PlayerSeasonsAsync);
 		app.MapGet("/api/seasons", SeasonEndpoints.SeasonsAsync);
+		app.MapGet("/api/compare", CompareEndpoints.CompareAsync);
 		app.MapGet("/api/stream", Endpoints.Stream);
 		app.MapPost(Endpoints.IngestRoute, Endpoints.IngestAsync);
 	}

@@ -965,3 +965,25 @@ tr.place-3 td.num:first-child {
 	fill: transparent;
 	pointer-events: all;
 }
+
+.compare-heads {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 24px;
+}
+
+.compare-side {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.compare-side .name a {
+	color: var(--orange);
+}
+
+td.win {
+	color: var(--green);
+	font-weight: bold;
+}
