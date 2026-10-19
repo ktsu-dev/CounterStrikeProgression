@@ -80,15 +80,6 @@ internal static class Endpoints
 	}
 
 	/// <summary>
-	/// Serves the player page for a well-formed SteamID64.
-	/// </summary>
-	/// <param name="id">The SteamID64 from the URL.</param>
-	/// <param name="environment">The host environment.</param>
-	/// <returns>The page, or 404 when the id isn't a SteamID64 or the file is missing.</returns>
-	public static IResult PlayerPage(string id, IWebHostEnvironment environment) =>
-		ProgressReader.TryParseSteamId(id, out _) ? Page(environment, "player.html") : TypedResults.NotFound();
-
-	/// <summary>
 	/// Gets the live state for the live page.
 	/// </summary>
 	/// <param name="live">The live state.</param>
