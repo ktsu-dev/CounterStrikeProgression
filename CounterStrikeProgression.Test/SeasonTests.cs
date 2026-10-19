@@ -10,6 +10,7 @@ using ktsu.CounterStrikeProgression.Core.Admin;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Rivals;
 using ktsu.CounterStrikeProgression.Core.Rotation;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Core.Weapons;
@@ -424,9 +425,15 @@ public sealed class SeasonTests
 
 		public Task<IReadOnlyList<SeasonResult>> SeasonResultsAsync(ulong steamId, CancellationToken cancellationToken) => throw new DatabaseDown();
 
+		public Task<IReadOnlyList<PeriodGain>> GainsBetweenAsync(DateOnly start, DateOnly end, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task<bool> ClaimDigestAsync(DateOnly week, DateTime at, CancellationToken cancellationToken) => throw new DatabaseDown();
+
 		public Task<IReadOnlyList<DailyXp>> HistoryAsync(ulong steamId, DateOnly from, CancellationToken cancellationToken) => throw new DatabaseDown();
 
 		public Task<IReadOnlyList<XpGainEntry>> GainsSinceAsync(DateOnly start, int count, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task<IReadOnlyList<HeadToHead>> HeadToHeadAsync(ulong steamId, int count, CancellationToken cancellationToken) => throw new DatabaseDown();
 	}
 
 	private sealed class DatabaseDown : DbException

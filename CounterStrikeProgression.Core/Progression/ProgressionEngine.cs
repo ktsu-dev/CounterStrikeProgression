@@ -6,6 +6,7 @@ using ktsu.CounterStrikeProgression.Core.Challenges;
 using ktsu.CounterStrikeProgression.Core.Contracts;
 using ktsu.CounterStrikeProgression.Core.Events;
 using ktsu.CounterStrikeProgression.Core.Feats;
+using ktsu.CounterStrikeProgression.Core.Rivals;
 using ktsu.CounterStrikeProgression.Core.Rotation;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
 using ktsu.CounterStrikeProgression.Core.Weapons;
@@ -167,6 +168,37 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 
 		Credit(player, weapon, award, result);
 		return Settle(player, result);
+	}
+
+	/// <summary>
+	/// Counts a kill of one human by another toward their head-to-head, and pays
+	/// <see cref="ProgressionSettings.NemesisKillXp"/> when the victim was the killer's nemesis. Call it alongside
+	/// <see cref="ApplyCombat"/> for kills between humans who aren't teammates. Bots never count.
+	/// </summary>
+	/// <param name="killer">The killer's progress.</param>
+	/// <param name="victim">The victim's progress.</param>
+	/// <returns>What it earned the killer.</returns>
+	public ProgressionResult ApplyRivalKill(PlayerProgress killer, PlayerProgress victim)
+	{
+		Ensure.NotNull(killer);
+		Ensure.NotNull(victim);
+
+		ProgressionResult result = new();
+		if (killer.SteamId == victim.SteamId)
+		{
+			return result;
+		}
+
+		// The nemesis is decided before this kill counts, so a kill can't turn someone into a nemesis and pay for it at once.
+		HeadToHead? nemesis = Rivalry.Nemesis(Rivalry.Of(killer), Settings.NemesisMinimumKills);
+		Rivalry.Count(killer, victim);
+		if ((nemesis?.SteamId == victim.SteamId) && (Settings.NemesisKillXp > 0))
+		{
+			result.Notices.Add(new() { Kind = NoticeKind.NemesisKilled, PlayerName = victim.Name, Value = (int)Math.Min(int.MaxValue, nemesis.Deaths), Xp = Settings.NemesisKillXp });
+			CreditRankXp(killer, Settings.NemesisKillXp, result);
+		}
+
+		return Settle(killer, result);
 	}
 
 	/// <summary>
@@ -361,6 +393,30 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 	}
 
 	/// <summary>
+	/// Pays a bounty to the player who ended its holder's streak. It's paid in full, because the holder is always human.
+	/// </summary>
+	/// <param name="player">The collector's progress.</param>
+	/// <param name="holderName">The name of the player whose streak ended.</param>
+	/// <param name="kills">The streak that ended.</param>
+	/// <param name="xp">What the bounty was worth.</param>
+	/// <returns>What it earned.</returns>
+	public ProgressionResult ApplyBounty(PlayerProgress player, string holderName, int kills, long xp)
+	{
+		Ensure.NotNull(player);
+		Ensure.NotNull(holderName);
+
+		ProgressionResult result = new();
+		if (xp <= 0)
+		{
+			return result;
+		}
+
+		result.Notices.Add(new() { Kind = NoticeKind.BountyCollected, PlayerName = holderName, Value = kills, Xp = xp, Broadcast = true });
+		CreditRankXp(player, xp, result);
+		return Settle(player, result);
+	}
+
+	/// <summary>
 	/// Gets the rank XP a skill shot of a rarity pays.
 	/// </summary>
 	/// <param name="rarity">The rarity.</param>
@@ -551,6 +607,23 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		int before = Math.Max(player.Rank, Ranks.RankFor(player.RankXp));
 		player.RankXp += whole;
 		player.IsDirty = true;
+
+		// The save writes the day's row under the day of LastSeen, so XP earned after midnight lands on the new day
+		// and the streak counts it.
+		DateTime now = Time.GetUtcNow().UtcDateTime;
+		player.LastSeen = now;
+		PlayStreak streak = player.Streak.Record(DailyRotation.Day(now));
+		if (streak != player.Streak)
+		{
+			// A new day is often the session's first result, which CheckFeats would only record quietly, so the feats
+			// held before the day counted are taken first and a streak feat it earns is still announced.
+			player.EarnedFeats ??= new(Feats.Earned(player).Select(f => f.Id), StringComparer.Ordinal);
+			player.Streak = streak;
+			if (streak.Length > 1)
+			{
+				result.Notices.Add(new() { Kind = NoticeKind.StreakDay, Value = streak.Length });
+			}
+		}
 		result.XpGained += whole;
 		CreditSeasonXp(player, whole);
 

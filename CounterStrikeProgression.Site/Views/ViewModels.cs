@@ -73,6 +73,7 @@ internal sealed record WeaponView(
 /// <param name="Feed">The player's feed, newest first.</param>
 /// <param name="LastSession">The player's last finished map, or <see langword="null"/> when none has been seen.</param>
 /// <param name="Contracts">The contracts running now, today's first, with the player's progress on each.</param>
+/// <param name="Streak">The player's play streak.</param>
 internal sealed record PlayerView(
 	string SteamId,
 	string Name,
@@ -90,7 +91,15 @@ internal sealed record PlayerView(
 	IReadOnlyList<FeatView> Feats,
 	IReadOnlyList<FeedItem> Feed,
 	SessionView? LastSession,
-	IReadOnlyList<ContractView> Contracts);
+	IReadOnlyList<ContractView> Contracts,
+	StreakView Streak);
+
+/// <summary>A player's run of consecutive days with rank XP.</summary>
+/// <param name="Days">The current streak, or 0 once it has broken.</param>
+/// <param name="Best">The longest streak they've had.</param>
+/// <param name="PlayedToday">Whether today already counts, so the streak is safe until tomorrow ends.</param>
+/// <param name="Label">The streak as the player page's summary line shows it, or <see langword="null"/> when there's nothing to show.</param>
+internal sealed record StreakView(int Days, int Best, bool PlayedToday, string? Label);
 
 /// <summary>One running contract on a player's page.</summary>
 /// <param name="Id">The contract id.</param>

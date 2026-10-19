@@ -13,8 +13,8 @@ using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
 
 /// <summary>
-/// Turns what a player earned into chat lines. Rank-ups, finished tiers, milestone weapon levels, and weekly
-/// contracts go to everyone, other level-ups, daily contracts, and rare skill shots go to the player, and common skill shots stay quiet unless
+/// Turns what a player earned into chat lines. Rank-ups, finished tiers, milestone weapon levels, bounties, and weekly
+/// contracts go to everyone, other level-ups, daily contracts, play streak days, and rare skill shots go to the player, and common skill shots stay quiet unless
 /// the config turns them on.
 /// </summary>
 /// <param name="config">The chat prefix and announcement settings.</param>
@@ -74,6 +74,18 @@ internal sealed class Announcer(PluginConfig config)
 					player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} Daily contract done: {ChatColors.Yellow}{notice.Contract.Definition.Description}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
 					break;
 
+				case NoticeKind.BountyCollected:
+					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} ended {ChatColors.Red}{notice.PlayerName}{ChatColors.Default}'s {notice.Value}-kill streak and collected the {ChatColors.Gold}{Xp(notice.Xp)} XP{ChatColors.Default} bounty!");
+					break;
+
+				case NoticeKind.NemesisKilled:
+					player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} You took down your nemesis {ChatColors.LightRed}{notice.PlayerName}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
+					break;
+
+				case NoticeKind.StreakDay:
+					player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} Play streak: {ChatColors.Yellow}{notice.Value} days{ChatColors.Default} in a row. Come back tomorrow to keep it going.");
+					break;
+
 				case NoticeKind.RankUp:
 					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} ranked up to {ChatColors.Gold}{RankLadder.Names[notice.Value]}{ChatColors.Default}!");
 					break;
@@ -87,6 +99,12 @@ internal sealed class Announcer(PluginConfig config)
 			player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.LightPurple}{string.Join(", ", skillShots)}{ChatColors.Default} +{Xp(skillShotXp)} XP");
 		}
 	}
+
+	/// <summary>
+	/// Tells the whole server a line, such as a bounty being placed.
+	/// </summary>
+	/// <param name="line">The line.</param>
+	public void AnnounceAll(string line) => Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {line}");
 
 	/// <summary>
 	/// Tells a player what they earned this map, when the config allows it.

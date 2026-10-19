@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Core.Storage;
 using System.Runtime.CompilerServices;
 using Dapper;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Rivals;
 using ktsu.CounterStrikeProgression.Core.Rotation;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 using MySqlConnector;
@@ -90,6 +91,19 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			KEY idx_csp_seasons_xp (season_start, xp)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+		CREATE TABLE IF NOT EXISTS csp_digests (
+			week DATE NOT NULL PRIMARY KEY,
+			posted_at DATETIME NOT NULL
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+		CREATE TABLE IF NOT EXISTS csp_rivals (
+			steam_id BIGINT UNSIGNED NOT NULL,
+			victim_id BIGINT UNSIGNED NOT NULL,
+			kills BIGINT NOT NULL DEFAULT 0,
+			PRIMARY KEY (steam_id, victim_id),
+			KEY idx_csp_rivals_victim (victim_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 		INSERT IGNORE INTO csp_schema (id, version) VALUES (1, @version);
 		""";
 
@@ -123,6 +137,12 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		ON DUPLICATE KEY UPDATE rank_xp = VALUES(rank_xp);
 		""";
 
+	/// <summary>
+	/// Every daily row of a player, which the play streak is worked out from. A player has one row per day they
+	/// played, so reading them all stays small.
+	/// </summary>
+	private const string SelectDaily = "SELECT day AS Day, rank_xp AS RankXp FROM csp_daily WHERE steam_id = @steamId ORDER BY day";
+
 	private const string SelectHistory = """
 		(SELECT day AS Day, rank_xp AS RankXp FROM csp_daily WHERE steam_id = @steamId AND day < @from ORDER BY day DESC LIMIT 1)
 		UNION
@@ -152,6 +172,27 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		LIMIT @count
 		""";
 
+	/// <summary>
+	/// Each player's rank XP before a span, by the same rule as <see cref="SelectGains"/>, and at its end, which is
+	/// their latest row before the day after it.
+	/// </summary>
+	private const string SelectGainsBetween = """
+		SELECT SteamId, Name, StartXp, EndXp FROM (
+			SELECT p.steam_id AS SteamId, p.name AS Name,
+				COALESCE(
+					(SELECT d.rank_xp FROM csp_daily d WHERE d.steam_id = p.steam_id AND d.day < @start ORDER BY d.day DESC LIMIT 1),
+					IF(p.first_seen >= @start, 0, NULL),
+					(SELECT d.rank_xp FROM csp_daily d WHERE d.steam_id = p.steam_id ORDER BY d.day ASC LIMIT 1)) AS StartXp,
+				(SELECT d.rank_xp FROM csp_daily d WHERE d.steam_id = p.steam_id AND d.day < @end ORDER BY d.day DESC LIMIT 1) AS EndXp
+			FROM csp_players p
+			WHERE p.last_seen >= @start AND p.first_seen < @end
+		) g
+		WHERE EndXp > StartXp
+		ORDER BY EndXp - StartXp DESC, SteamId ASC
+		""";
+
+	private const string ClaimDigest = "INSERT IGNORE INTO csp_digests (week, posted_at) VALUES (@week, @at)";
+
 	private const string UpsertWeapon = """
 		INSERT INTO csp_weapons (steam_id, weapon, xp, level, kills, headshots, hits, shots)
 		VALUES (@SteamId, @Weapon, @Xp, @Level, @Kills, @Headshots, @Hits, @Shots)
@@ -174,6 +215,28 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		INSERT INTO csp_seasons (steam_id, season_start, xp)
 		VALUES (@SteamId, @Start, @Xp)
 		ON DUPLICATE KEY UPDATE xp = VALUES(xp);
+		""";
+
+	private const string UpsertRival = """
+		INSERT INTO csp_rivals (steam_id, victim_id, kills)
+		VALUES (@SteamId, @VictimId, @Kills)
+		ON DUPLICATE KEY UPDATE kills = VALUES(kills);
+		""";
+
+	/// <summary>
+	/// A player's kills of each other player and that player's kills of them, from both sides of <c>csp_rivals</c>.
+	/// </summary>
+	private const string SelectHeadToHead = """
+		SELECT o.other AS SteamId, COALESCE(MAX(p.name), '') AS Name, CAST(SUM(o.kills) AS SIGNED) AS Kills, CAST(SUM(o.deaths) AS SIGNED) AS Deaths
+		FROM (
+			SELECT victim_id AS other, kills, 0 AS deaths FROM csp_rivals WHERE steam_id = @steamId AND kills > 0
+			UNION ALL
+			SELECT steam_id AS other, 0 AS kills, kills AS deaths FROM csp_rivals WHERE victim_id = @steamId AND kills > 0
+		) o
+		LEFT JOIN csp_players p ON p.steam_id = o.other
+		GROUP BY o.other
+		ORDER BY Kills + Deaths DESC, SteamId ASC
+		LIMIT @count
 		""";
 
 	private const string SelectLatestSeason =
@@ -206,10 +269,16 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		DELETE FROM csp_challenges WHERE steam_id = @SteamId;
 		DELETE FROM csp_weapons WHERE steam_id = @SteamId;
 		DELETE FROM csp_contracts WHERE steam_id = @SteamId;
+		DELETE FROM csp_rivals WHERE steam_id = @SteamId;
 		DELETE FROM csp_seasons WHERE steam_id = @SteamId;
 		DELETE FROM csp_daily WHERE steam_id = @SteamId;
 		INSERT INTO csp_daily (steam_id, day, rank_xp) VALUES (@SteamId, DATE(@LastSeen) - INTERVAL 1 DAY, @RankXp);
 		""";
+
+	/// <summary>
+	/// The most rivals a load reads. Players only meet the people on the server with them, so real counts stay far below it.
+	/// </summary>
+	private const int MaxRivalsLoaded = 5000;
 
 	private readonly string connectionString = ConnectionStringFor(settings);
 
@@ -288,7 +357,20 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			new { steamId, day = DailyRotation.DayKey(today), week = DailyRotation.WeekKey(today) },
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-		return ProgressSnapshot.Rebuild(player, weapons, challenges, season, contracts);
+		IEnumerable<DailyRow> daily = await connection.QueryAsync<DailyRow>(new CommandDefinition(SelectDaily, parameters, cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+		PlayerProgress progress = ProgressSnapshot.Rebuild(player, weapons, challenges, season, contracts, daily);
+		try
+		{
+			Rivalry.Load(progress, await QueryHeadToHeadAsync(connection, steamId, MaxRivalsLoaded, cancellationToken).ConfigureAwait(false));
+		}
+		catch (MySqlException exception) when (exception.ErrorCode == MySqlErrorCode.TableAccessDenied)
+		{
+			// The site's read-only user gets its grant on csp_rivals after the plugin creates the table. Until then
+			// its pages still load, without rivals, which they read separately anyway.
+		}
+
+		return progress;
 	}
 
 	/// <inheritdoc/>
@@ -329,6 +411,11 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		if (snapshot.Seasons.Count > 0)
 		{
 			await connection.ExecuteAsync(new CommandDefinition(UpsertSeason, snapshot.Seasons, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+		}
+
+		if (snapshot.Rivals.Count > 0)
+		{
+			await connection.ExecuteAsync(new CommandDefinition(UpsertRival, snapshot.Rivals, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
 		}
 
 		await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
@@ -432,6 +519,47 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			new { steamId },
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 		return [.. results];
+	}
+
+	/// <inheritdoc/>
+	public async Task<IReadOnlyList<PeriodGain>> GainsBetweenAsync(DateOnly start, DateOnly end, CancellationToken cancellationToken)
+	{
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		IEnumerable<PeriodGain> gains = await connection.QueryAsync<PeriodGain>(new CommandDefinition(
+			SelectGainsBetween,
+			new { start = start.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc), end = end.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc) },
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+		return [.. gains];
+	}
+
+	/// <inheritdoc/>
+	public async Task<bool> ClaimDigestAsync(DateOnly week, DateTime at, CancellationToken cancellationToken)
+	{
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		int inserted = await connection.ExecuteAsync(new CommandDefinition(
+			ClaimDigest,
+			new { week = week.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc), at },
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+		return inserted > 0;
+	}
+
+	/// <inheritdoc/>
+	public async Task<IReadOnlyList<HeadToHead>> HeadToHeadAsync(ulong steamId, int count, CancellationToken cancellationToken)
+	{
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		return await QueryHeadToHeadAsync(connection, steamId, count, cancellationToken).ConfigureAwait(false);
+	}
+
+	private static async Task<IReadOnlyList<HeadToHead>> QueryHeadToHeadAsync(MySqlConnection connection, ulong steamId, int count, CancellationToken cancellationToken)
+	{
+		IEnumerable<HeadToHead> rows = await connection.QueryAsync<HeadToHead>(new CommandDefinition(
+			SelectHeadToHead,
+			new { steamId, count },
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+		return [.. rows];
 	}
 
 	private async Task<MySqlConnection> OpenAsync(CancellationToken cancellationToken)

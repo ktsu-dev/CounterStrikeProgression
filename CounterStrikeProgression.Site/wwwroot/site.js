@@ -45,6 +45,8 @@
 		chicken_connoisseur: "Chicken connoisseur",
 		arsenal: "Arsenal",
 		polymath: "Polymath",
+		regular: "Regular",
+		devoted: "Devoted",
 	};
 
 	const FEED_LIMIT = 50;
@@ -236,6 +238,8 @@
 			svgNode("path", { d: "M14 6 L21 10 L21 18 L14 22 L7 18 L7 10 Z", fill: "none", stroke: c, "stroke-width": 1.5 }),
 			svgNode("circle", { cx: 14, cy: 14, r: 2.4, fill: c }),
 		],
+		regular: (c) => [svgNode("text", { x: 14, y: 17.5, "text-anchor": "middle", "font-size": 9, "font-weight": "bold", "font-family": "Consolas, monospace", fill: c, textContent: "7d" })],
+		devoted: (c) => [svgNode("text", { x: 14, y: 17.5, "text-anchor": "middle", "font-size": 8, "font-weight": "bold", "font-family": "Consolas, monospace", fill: c, textContent: "30d" })],
 	};
 
 	// A challenge's icon, drawn in the text color. The markup comes from icons.js, which the site ships itself.
@@ -1082,7 +1086,21 @@
 		["weapons", "Weapons"],
 		["feats", "Feats"],
 		["history", "History"],
+		["rivals", "Rivals"],
 	];
+
+	// A head-to-head written as the player's kills first, the way !stats writes it.
+	function headToHead(rival) {
+		return `${formatXp(rival.kills)}-${formatXp(rival.deaths)}`;
+	}
+
+	function rivalCard(title, rival, note) {
+		const card = el("div", `suggestion rival ${title === "Nemesis" ? "nemesis" : "victim"}`);
+		const head = el("div", "head");
+		head.append(el("b", null, title), el("span", "xp", headToHead(rival)));
+		card.append(head, playerLink(rival.steamId, rival.name || "Unknown player"), el("div", "muted", note));
+		return card;
+	}
 
 	function initPlayer(root) {
 		const match = /^\/players\/(\d{17})\/?$/.exec(window.location.pathname);
@@ -1099,6 +1117,8 @@
 		let history = null;
 		let historySpan = HISTORY_SPANS[0];
 		let historyLoading = false;
+		// Nemesis, victim, and head-to-heads, fetched with the page.
+		let rivals = null;
 
 		function tabFromHash() {
 			const name = window.location.hash.replace(/^#/, "");
@@ -1287,6 +1307,43 @@
 			return box;
 		}
 
+		function renderRivals() {
+			if (rivals === null) {
+				return message("Loading…");
+			}
+			if (rivals.failed) {
+				return message("Rivals can't be loaded right now.");
+			}
+			const list = Array.isArray(rivals.rivals) ? rivals.rivals : [];
+			if (list.length === 0) {
+				return message("No head-to-heads yet. Kills between players show up here.");
+			}
+			const box = el("div", "pad");
+			const cards = el("div", "suggestions");
+			if (rivals.nemesis) {
+				cards.append(rivalCard("Nemesis", rivals.nemesis, `Has killed them ${formatXp(rivals.nemesis.deaths)} times. Killing a nemesis pays bonus XP.`));
+			}
+			if (rivals.victim) {
+				cards.append(rivalCard("Favourite victim", rivals.victim, `Killed ${formatXp(rivals.victim.kills)} times.`));
+			}
+			if (cards.childElementCount > 0) {
+				box.append(cards);
+			} else {
+				box.append(el("div", "muted", `A nemesis or favourite victim shows up after ${formatXp(rivals.minimumKills)} kills either way.`));
+			}
+			const rows = list.map((rival) => {
+				const tr = el("tr");
+				tr.append(
+					cell(null, playerLink(rival.steamId, rival.name || "Unknown player")),
+					cell("num", formatXp(rival.kills)),
+					cell("num", formatXp(rival.deaths)),
+				);
+				return tr;
+			});
+			box.append(el("h2", "section-title", "Head-to-head"), table([["Player"], ["Kills", "num"], ["Deaths", "num"]], rows));
+			return box;
+		}
+
 		function renderLastSession(session) {
 			const box = el("section", "pad last-session");
 			const minutes = Math.round((new Date(session.endedAt) - new Date(session.startedAt)) / 60000);
@@ -1333,6 +1390,8 @@
 					return renderFeats(player);
 				case "history":
 					return renderHistory();
+				case "rivals":
+					return renderRivals();
 				default:
 					return renderNext(player);
 			}
@@ -1383,7 +1442,7 @@
 				loadHistory();
 			}
 			if (updateHash) {
-				history.replaceState(null, "", `#${key}`);
+				window.history.replaceState(null, "", `#${key}`);
 			}
 			if (last) {
 				render(last);
@@ -1412,13 +1471,18 @@
 			card.target = "_blank";
 			card.title = "An image of this page, for chats and forum signatures";
 			const links = el("span", "player-links");
-			links.append(compare, card, steam);
+			const heat = el("a", null, "Heatmap");
+			heat.href = `/heatmaps?player=${id}`;
+			links.append(compare, heat, card, steam);
 			head.append(left, links);
 
 			const summary = el("div", "pad");
 			const atTop = player.nextRankName === null || player.nextRankName === undefined;
 			const details = [`${formatXp(player.rankXp)} XP`];
 			details.push(atTop ? "top rank" : `${formatXp(player.xpToNextRank)} XP to ${player.nextRankName}`);
+			if (player.streak?.label) {
+				details.push(player.streak.label);
+			}
 			details.push(`first seen ${formatDate(player.firstSeen)}`);
 			summary.append(rankBadge(player.rank, player.rankName, true), bar(atTop ? 1 : player.rankProgress), el("div", "muted", details.join(" · ")));
 			const badges = seasonBadges(seasons);
@@ -1447,11 +1511,13 @@
 		async function load() {
 			try {
 				// The badges are extra, so the page still shows without them.
-				const [player, playerSeasons] = await Promise.all([
+				const [player, playerSeasons, playerRivals] = await Promise.all([
 					getJson(`/api/players/${id}`),
 					getJson(`/api/players/${id}/seasons`).catch(() => seasons),
+					getJson(`/api/players/${id}/rivals`).catch(() => rivals ?? { failed: true }),
 				]);
 				seasons = playerSeasons;
+				rivals = playerRivals;
 				render(player);
 			} catch (error) {
 				if (error.status === 404) {

@@ -72,6 +72,7 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 			services.Site?.Forget(session.SteamId);
 		}
 
+		services.ApplyBounty(services.Bounties.Drop(playerSlot));
 		services.Floaties.RemoveOwner(playerSlot);
 		Sessions.DisconnectSlot(playerSlot);
 	}
@@ -170,10 +171,13 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 	{
 		MapName = map;
 		recapSent = false;
+		services.Bounties.Clear();
 		foreach (PlayerSession session in Sessions.All)
 		{
 			session.Recap.Restart(DateTime.UtcNow);
 		}
+
+		services.Digest?.Check(DateTime.UtcNow);
 	}
 
 	private void OnTick()

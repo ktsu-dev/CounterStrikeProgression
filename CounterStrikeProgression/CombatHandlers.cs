@@ -235,9 +235,20 @@ internal sealed class CombatHandlers(ProgressionServices services)
 		NoteLastAlive(teammatesAreEnemies, victim.Slot);
 		if ((attacker is null) || !attacker.IsValid || (attacker == victim))
 		{
+			services.ApplyBounty(services.Bounties.Drop(victim.Slot));
 			return HookResult.Continue;
 		}
 
+		// The kill is credited before the bounty, so its skill shots are announced first.
+		IReadOnlyList<BountyChange> bounty = services.Bounties.Kill(
+			attacker.Slot, victim.Slot, attacker.IsBot, ProgressionServices.IsTeammate(attacker, victim), Sessions.Get(attacker)?.Progress is not null);
+		CreditKill(@event, attacker, victim, teammatesAreEnemies);
+		services.ApplyBounty(bounty);
+		return HookResult.Continue;
+	}
+
+	private void CreditKill(EventPlayerDeath @event, CCSPlayerController attacker, CCSPlayerController victim, bool teammatesAreEnemies)
+	{
 		KillContext context = services.Round.RegisterKill(
 			attacker.Slot,
 			GameState.SideOf(attacker, teammatesAreEnemies),
@@ -247,23 +258,29 @@ internal sealed class CombatHandlers(ProgressionServices services)
 			Server.TickCount);
 
 		CreditAssist(@event, victim);
-		if (Sessions.Get(attacker) is not { Progress: PlayerProgress progress } session)
-		{
-			return HookResult.Continue;
-		}
-
 		CCSPlayerPawn? attackerPawn = GameState.PawnOf(attacker);
 		WeaponInfo? weapon = GameState.ResolveWeapon(@event.Weapon, attackerPawn);
-		if (weapon is null)
+		if ((weapon is not null) && !ProgressionServices.IsTeammate(attacker, victim))
 		{
-			return HookResult.Continue;
+			services.KillMaps?.Record(Server.MapName ?? string.Empty, attacker, victim, weapon, @event.Headshot);
+		}
+
+		if ((weapon is null) || (Sessions.Get(attacker) is not { Progress: PlayerProgress progress } session))
+		{
+			return;
 		}
 
 		CombatEvent kill = BuildKill(@event, victim, attackerPawn, weapon, session.Combat.Read(Server.CurrentTime), context, session.LastHitVictim);
 		session.Combat.KillMade();
 		session.LastKillWeapon = weapon;
-		services.Apply(attacker, session, Engine.ApplyCombat(progress, kill), victim.Slot, Copy(GameState.PawnOf(victim)?.AbsOrigin));
-		return HookResult.Continue;
+		Vector? at = Copy(GameState.PawnOf(victim)?.AbsOrigin);
+		services.Apply(attacker, session, Engine.ApplyCombat(progress, kill), victim.Slot, at);
+
+		// Only humans have sessions, so a bot victim never counts toward a head-to-head.
+		if (!kill.IsTeammate && (Sessions.Get(victim) is { Progress: PlayerProgress victimProgress }))
+		{
+			services.Apply(attacker, session, Engine.ApplyRivalKill(progress, victimProgress), victim.Slot, at);
+		}
 	}
 
 	private HookResult OnPlayerBlind(EventPlayerBlind @event, GameEventInfo info)
