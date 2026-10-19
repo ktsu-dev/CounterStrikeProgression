@@ -43,6 +43,12 @@ internal sealed record ChallengeRow(ulong SteamId, string Weapon, string Challen
 /// <param name="Completed">Whether the contract is finished and paid.</param>
 internal sealed record ContractRow(ulong SteamId, string Period, string Contract, long Count, bool Completed);
 
+/// <summary>A player's kills of one other human, as stored.</summary>
+/// <param name="SteamId">The killer's 64-bit Steam ID.</param>
+/// <param name="VictimId">The victim's 64-bit Steam ID.</param>
+/// <param name="Kills">How many times the killer has killed the victim.</param>
+internal sealed record RivalRow(ulong SteamId, ulong VictimId, long Kills);
+
 /// <summary>A player's XP in one season, as stored.</summary>
 /// <param name="SteamId">The 64-bit Steam ID.</param>
 /// <param name="Start">The season's first day, at midnight UTC.</param>
@@ -71,8 +77,11 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 	/// <summary>Gets the map rows that changed.</summary>
 	public IReadOnlyList<MapRow> Maps { get; init; } = [];
 
+	/// <summary>Gets the rival rows that changed.</summary>
+	public IReadOnlyList<RivalRow> Rivals { get; init; } = [];
+
 	/// <summary>Gets a value indicating whether there's nothing to save.</summary>
-	public bool IsEmpty => (Player is null) && (Weapons.Count == 0) && (Challenges.Count == 0) && (Contracts.Count == 0) && (Seasons.Count == 0) && (Maps.Count == 0);
+	public bool IsEmpty => (Player is null) && (Weapons.Count == 0) && (Challenges.Count == 0) && (Contracts.Count == 0) && (Seasons.Count == 0) && (Maps.Count == 0) && (Rivals.Count == 0);
 
 	/// <summary>
 	/// Copies a player's changed rows and clears their dirty flags.
@@ -143,7 +152,17 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 			}
 		}
 
-		return new(player, weapons, challenges) { Contracts = contracts, Seasons = seasons, Maps = maps };
+		List<RivalRow> rivals = [];
+		foreach ((ulong victim, RivalProgress rival) in progress.Victims)
+		{
+			if (rival.IsDirty)
+			{
+				rivals.Add(new(progress.SteamId, victim, rival.Kills));
+				rival.IsDirty = false;
+			}
+		}
+
+		return new(player, weapons, challenges) { Contracts = contracts, Seasons = seasons, Maps = maps, Rivals = rivals };
 	}
 
 	/// <summary>
@@ -168,7 +187,8 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 
 		List<ContractRow> contracts = [.. progress.Contracts.Select(c => new ContractRow(progress.SteamId, c.Key.Period, c.Key.Contract, c.Value.Count, c.Value.Completed))];
 		List<MapRow> maps = [.. progress.Maps.Select(m => ToMapRow(progress.SteamId, m.Key, m.Value))];
-		return new(ToRow(progress), weapons, challenges) { Contracts = contracts, Seasons = ToSeasonRow(progress) is { } season ? [season] : [], Maps = maps };
+		List<RivalRow> rivals = [.. progress.Victims.Select(v => new RivalRow(progress.SteamId, v.Key, v.Value.Kills))];
+		return new(ToRow(progress), weapons, challenges) { Contracts = contracts, Seasons = ToSeasonRow(progress) is { } season ? [season] : [], Maps = maps, Rivals = rivals };
 	}
 
 	/// <summary>
@@ -239,6 +259,11 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 		foreach (MapRow row in Maps)
 		{
 			progress.Map(row.Map).IsDirty = true;
+		}
+
+		foreach (RivalRow row in Rivals)
+		{
+			progress.Victim(row.VictimId).IsDirty = true;
 		}
 
 		foreach (SeasonRow row in Seasons)

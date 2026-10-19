@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Core.Storage;
 using System.Collections.Concurrent;
 using ktsu.CounterStrikeProgression.Core.Maps;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Rivals;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
 /// <summary>
@@ -20,6 +21,7 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 	private readonly ConcurrentDictionary<(ulong SteamId, DateOnly Day), long> daily = new();
 	private readonly ConcurrentDictionary<(ulong, DateTime), SeasonRow> seasons = new();
 	private readonly ConcurrentDictionary<(ulong SteamId, string Map), MapRow> maps = new();
+	private readonly ConcurrentDictionary<(ulong SteamId, ulong VictimId), long> rivals = new();
 
 	/// <summary>Gets the number of successful saves, for tests.</summary>
 	public int SaveCount { get; private set; }
@@ -42,6 +44,7 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 			seasons.Values.Where(s => s.SteamId == steamId).MaxBy(s => s.Start),
 			contracts.Values.Where(c => c.SteamId == steamId),
 			maps.Values.Where(m => m.SteamId == steamId));
+		Rivalry.Load(progress, HeadToHeadOf(steamId));
 		return Task.FromResult<PlayerProgress?>(progress);
 	}
 
@@ -81,6 +84,11 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 			maps[(row.SteamId, row.Map)] = row;
 		}
 
+		foreach (RivalRow row in snapshot.Rivals)
+		{
+			rivals[(row.SteamId, row.VictimId)] = row.Kills;
+		}
+
 		SaveCount++;
 		return Task.CompletedTask;
 	}
@@ -103,6 +111,11 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 		foreach ((ulong, string, string) key in contracts.Keys.Where(k => k.Item1 == player.SteamId).ToList())
 		{
 			contracts.TryRemove(key, out _);
+		}
+
+		foreach ((ulong SteamId, ulong VictimId) key in rivals.Keys.Where(k => k.SteamId == player.SteamId).ToList())
+		{
+			rivals.TryRemove(key, out _);
 		}
 
 		foreach ((ulong, DateTime) key in seasons.Keys.Where(k => k.Item1 == player.SteamId).ToList())
@@ -179,6 +192,24 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 			.Take(count)];
 		return Task.FromResult(gains);
 	}
+
+	/// <inheritdoc/>
+	public Task<IReadOnlyList<HeadToHead>> HeadToHeadAsync(ulong steamId, int count, CancellationToken cancellationToken) =>
+		Task.FromResult<IReadOnlyList<HeadToHead>>([.. HeadToHeadOf(steamId).Take(count)]);
+
+	private List<HeadToHead> HeadToHeadOf(ulong steamId) =>
+	[
+		.. rivals
+			.Where(r => (r.Value > 0) && ((r.Key.SteamId == steamId) || (r.Key.VictimId == steamId)))
+			.GroupBy(r => r.Key.SteamId == steamId ? r.Key.VictimId : r.Key.SteamId)
+			.Select(g => new HeadToHead(
+				g.Key,
+				players.TryGetValue(g.Key, out PlayerRow? p) ? p.Name : string.Empty,
+				g.Where(r => r.Key.SteamId == steamId).Sum(r => r.Value),
+				g.Where(r => r.Key.VictimId == steamId).Sum(r => r.Value)))
+			.OrderByDescending(h => h.Kills + h.Deaths)
+			.ThenBy(h => h.SteamId),
+	];
 
 	private List<DailyXp> RowsOf(ulong steamId) =>
 		[.. daily.Where(d => d.Key.SteamId == steamId).Select(d => new DailyXp(d.Key.Day, d.Value)).OrderBy(d => d.Day)];

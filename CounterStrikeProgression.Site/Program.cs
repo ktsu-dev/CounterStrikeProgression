@@ -76,6 +76,7 @@ internal static class Program
 		app.MapGet("/skillshots", (IWebHostEnvironment environment) => Endpoints.Page(environment, "skillshots.html"));
 		app.MapGet("/seasons", (IWebHostEnvironment environment) => Endpoints.Page(environment, "seasons.html"));
 		app.MapGet("/healthz", Endpoints.Health);
+		MapPlayerApi(app);
 		MapApiRoutes(app);
 	}
 
@@ -86,10 +87,7 @@ internal static class Program
 		app.MapGet("/api/ladder", Endpoints.LadderAsync);
 		app.MapGet("/api/leaderboards", Endpoints.LeaderboardsAsync);
 		app.MapGet("/api/skillshots", Endpoints.SkillShotsAsync);
-		app.MapGet("/api/players/{id}", Endpoints.PlayerAsync);
-		app.MapGet("/api/players/{id}/history", HistoryEndpoints.PlayerHistoryAsync);
 		app.MapGet("/api/weekly", HistoryEndpoints.WeeklyAsync);
-		app.MapGet("/api/players/{id}/seasons", SeasonEndpoints.PlayerSeasonsAsync);
 		app.MapGet("/api/seasons", SeasonEndpoints.SeasonsAsync);
 		app.MapGet("/api/maps", MapEndpoints.MapsAsync);
 		app.MapGet("/api/players/{id}/maps", MapEndpoints.PlayerMapsAsync);
@@ -102,5 +100,14 @@ internal static class Program
 	{
 		app.MapGet("/players/{id}", CardEndpoints.PlayerPageAsync);
 		app.MapGet(CardEndpoints.CardRoute, CardEndpoints.CardAsync);
+	}
+
+	// Kept apart from MapRoutes so neither method couples to too many types.
+	private static void MapPlayerApi(WebApplication app)
+	{
+		app.MapGet("/api/players/{id}", Endpoints.PlayerAsync);
+		app.MapGet("/api/players/{id}/history", HistoryEndpoints.PlayerHistoryAsync);
+		app.MapGet("/api/players/{id}/seasons", SeasonEndpoints.PlayerSeasonsAsync);
+		app.MapGet("/api/players/{id}/rivals", RivalEndpoints.PlayerRivalsAsync);
 	}
 }

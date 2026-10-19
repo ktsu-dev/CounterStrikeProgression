@@ -83,6 +83,7 @@ internal sealed record AdminCorrection(CorrectionKind Kind, long Xp = 0)
 			player.Weapons.Clear();
 			player.Contracts.Clear();
 			player.Maps.Clear();
+			player.Victims.Clear();
 			player.RankXp = 0;
 			player.Rank = 0;
 			player.PendingXp = 0;
