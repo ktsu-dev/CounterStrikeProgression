@@ -104,10 +104,6 @@
 		return formatDate(then);
 	}
 
-	function dayCount(days) {
-		return days === 1 ? "1 day" : `${days} days`;
-	}
-
 	function formatDate(date) {
 		const value = new Date(date);
 		return Number.isFinite(value.getTime())
@@ -1418,12 +1414,8 @@
 			const atTop = player.nextRankName === null || player.nextRankName === undefined;
 			const details = [`${formatXp(player.rankXp)} XP`];
 			details.push(atTop ? "top rank" : `${formatXp(player.xpToNextRank)} XP to ${player.nextRankName}`);
-			const streak = player.streak;
-			if (streak && streak.days > 0) {
-				details.push(streak.playedToday ? `${streak.days}-day streak` : `${streak.days}-day streak, play today to keep it`);
-			}
-			if (streak && streak.best > (streak.days ?? 0)) {
-				details.push(`best streak ${dayCount(streak.best)}`);
+			if (player.streak?.label) {
+				details.push(player.streak.label);
 			}
 			details.push(`first seen ${formatDate(player.firstSeen)}`);
 			summary.append(rankBadge(player.rank, player.rankName, true), bar(atTop ? 1 : player.rankProgress), el("div", "muted", details.join(" · ")));

@@ -102,7 +102,20 @@ internal static class PlayerViewBuilder
 	internal static StreakView Streak(PlayStreak streak, DateTime now)
 	{
 		DateOnly today = DailyRotation.Day(now);
-		return new(streak.CurrentOn(today), streak.Best, streak.PlayedOn(today));
+		int days = streak.CurrentOn(today);
+		bool playedToday = streak.PlayedOn(today);
+		List<string> parts = [];
+		if (days > 0)
+		{
+			parts.Add(playedToday ? $"{days}-day streak" : $"{days}-day streak, play today to keep it");
+		}
+
+		if (streak.Best > days)
+		{
+			parts.Add(streak.Best == 1 ? "best streak 1 day" : $"best streak {streak.Best} days");
+		}
+
+		return new(days, streak.Best, playedToday, parts.Count > 0 ? string.Join(" · ", parts) : null);
 	}
 
 	private static SessionView BuildSession(MapRecap recap) =>

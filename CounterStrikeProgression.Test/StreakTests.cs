@@ -170,7 +170,11 @@ public sealed class StreakTests
 		Assert.AreEqual(3, merged.Streak.Length);
 
 		StreakView view = PlayerViewBuilder.Streak(merged.Streak, now);
-		Assert.AreEqual(new StreakView(3, 3, true), view);
-		Assert.AreEqual(new StreakView(0, 2, false), PlayerViewBuilder.Streak(stored.Streak, now.AddDays(2)));
+		Assert.AreEqual(new StreakView(3, 3, true, "3-day streak"), view);
+		Assert.AreEqual(new StreakView(0, 2, false, "best streak 2 days"), PlayerViewBuilder.Streak(stored.Streak, now.AddDays(2)));
+		Assert.AreEqual("2-day streak, play today to keep it", PlayerViewBuilder.Streak(stored.Streak, now).Label);
+		Assert.AreEqual("1-day streak, play today to keep it · best streak 2 days", PlayerViewBuilder.Streak(stored.Streak.Record(Day.AddDays(5)), Day.AddDays(6).ToDateTime(TimeOnly.MinValue)).Label);
+		Assert.AreEqual("best streak 1 day", PlayerViewBuilder.Streak(default(PlayStreak).Record(Day), now).Label);
+		Assert.IsNull(PlayerViewBuilder.Streak(default, now).Label);
 	}
 }

@@ -98,7 +98,8 @@ internal sealed record PlayerView(
 /// <param name="Days">The current streak, or 0 once it has broken.</param>
 /// <param name="Best">The longest streak they've had.</param>
 /// <param name="PlayedToday">Whether today already counts, so the streak is safe until tomorrow ends.</param>
-internal sealed record StreakView(int Days, int Best, bool PlayedToday);
+/// <param name="Label">The streak as the player page's summary line shows it, or <see langword="null"/> when there's nothing to show.</param>
+internal sealed record StreakView(int Days, int Best, bool PlayedToday, string? Label);
 
 /// <summary>One running contract on a player's page.</summary>
 /// <param name="Id">The contract id.</param>
