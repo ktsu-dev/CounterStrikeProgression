@@ -9,6 +9,7 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using ktsu.CounterStrikeProgression.Core.Admin;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Rivals;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using Microsoft.Extensions.Logging;
 
@@ -290,6 +291,7 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 		progress.Name = name;
 		progress.LastSeen = DateTime.UtcNow;
 		progress.IsDirty = true;
+		Rivalry.Join(progress, sessions.Values.Select(s => s.Progress).OfType<PlayerProgress>());
 		session.Progress = progress;
 	}
 

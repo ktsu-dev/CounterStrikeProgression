@@ -3,6 +3,7 @@
 namespace ktsu.CounterStrikeProgression.Core.Storage;
 
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Rivals;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
 /// <summary>
@@ -138,6 +139,15 @@ internal interface IProgressionStore
 	/// <param name="cancellationToken">Cancels the operation.</param>
 	/// <returns>The standings, highest first.</returns>
 	public Task<IReadOnlyList<SeasonStanding>> SeasonStandingsAsync(DateOnly start, int count, CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Gets a player's record against the humans they've killed or been killed by.
+	/// </summary>
+	/// <param name="steamId">The 64-bit Steam ID.</param>
+	/// <param name="count">How many to return.</param>
+	/// <param name="cancellationToken">Cancels the operation.</param>
+	/// <returns>One row per other player, most kills and deaths together first, then by Steam ID.</returns>
+	public Task<IReadOnlyList<HeadToHead>> HeadToHeadAsync(ulong steamId, int count, CancellationToken cancellationToken);
 
 	/// <summary>
 	/// Gets where a player finished in every season they earned XP in.

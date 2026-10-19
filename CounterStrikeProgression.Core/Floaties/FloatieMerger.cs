@@ -114,6 +114,7 @@ internal sealed class FloatieMerger(double mergeSeconds)
 				NoticeKind.WeaponLevelUp => $"{notice.Weapon?.DisplayName} level {notice.Value}",
 				NoticeKind.RankUp => $"Rank up: {RankLadder.Names[notice.Value]}",
 				NoticeKind.FeatEarned => notice.Feat is null ? null : $"Feat: {notice.Feat.Name}",
+				NoticeKind.NemesisKilled => "Nemesis down",
 				_ => null,
 			};
 

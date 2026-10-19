@@ -262,7 +262,15 @@ internal sealed class CombatHandlers(ProgressionServices services)
 		CombatEvent kill = BuildKill(@event, victim, attackerPawn, weapon, session.Combat.Read(Server.CurrentTime), context, session.LastHitVictim);
 		session.Combat.KillMade();
 		session.LastKillWeapon = weapon;
-		services.Apply(attacker, session, Engine.ApplyCombat(progress, kill), victim.Slot, Copy(GameState.PawnOf(victim)?.AbsOrigin));
+		Vector? at = Copy(GameState.PawnOf(victim)?.AbsOrigin);
+		services.Apply(attacker, session, Engine.ApplyCombat(progress, kill), victim.Slot, at);
+
+		// Only humans have sessions, so a bot victim never counts toward a head-to-head.
+		if (!kill.IsTeammate && (Sessions.Get(victim) is { Progress: PlayerProgress victimProgress }))
+		{
+			services.Apply(attacker, session, Engine.ApplyRivalKill(progress, victimProgress), victim.Slot, at);
+		}
+
 		return HookResult.Continue;
 	}
 

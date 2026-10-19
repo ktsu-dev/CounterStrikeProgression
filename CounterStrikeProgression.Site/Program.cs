@@ -73,17 +73,24 @@ internal static class Program
 		app.MapGet("/seasons", (IWebHostEnvironment environment) => Endpoints.Page(environment, "seasons.html"));
 		app.MapGet("/players/{id}", Endpoints.PlayerPage);
 		app.MapGet("/healthz", Endpoints.Health);
+		MapPlayerApi(app);
 		app.MapGet("/api/live", Endpoints.Live);
 		app.MapGet("/api/ranks", Endpoints.RanksAsync);
 		app.MapGet("/api/ladder", Endpoints.LadderAsync);
 		app.MapGet("/api/leaderboards", Endpoints.LeaderboardsAsync);
 		app.MapGet("/api/skillshots", Endpoints.SkillShotsAsync);
-		app.MapGet("/api/players/{id}", Endpoints.PlayerAsync);
-		app.MapGet("/api/players/{id}/history", HistoryEndpoints.PlayerHistoryAsync);
 		app.MapGet("/api/weekly", HistoryEndpoints.WeeklyAsync);
-		app.MapGet("/api/players/{id}/seasons", SeasonEndpoints.PlayerSeasonsAsync);
 		app.MapGet("/api/seasons", SeasonEndpoints.SeasonsAsync);
 		app.MapGet("/api/stream", Endpoints.Stream);
 		app.MapPost(Endpoints.IngestRoute, Endpoints.IngestAsync);
+	}
+
+	// Kept apart from MapRoutes so neither method couples to too many types.
+	private static void MapPlayerApi(WebApplication app)
+	{
+		app.MapGet("/api/players/{id}", Endpoints.PlayerAsync);
+		app.MapGet("/api/players/{id}/history", HistoryEndpoints.PlayerHistoryAsync);
+		app.MapGet("/api/players/{id}/seasons", SeasonEndpoints.PlayerSeasonsAsync);
+		app.MapGet("/api/players/{id}/rivals", RivalEndpoints.PlayerRivalsAsync);
 	}
 }

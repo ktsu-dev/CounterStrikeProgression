@@ -186,6 +186,15 @@ public sealed class ProgressionSettings
 	/// <summary>Gets or sets the rank XP for finishing the weekly contract.</summary>
 	public int WeeklyContractXp { get; set; } = 2500;
 
+	/// <summary>
+	/// Gets or sets how many times a human must have killed a player to be that player's nemesis, and how many kills
+	/// make a favourite victim.
+	/// </summary>
+	public int NemesisMinimumKills { get; set; } = 3;
+
+	/// <summary>Gets or sets the rank XP for killing your nemesis. 0 turns the bonus off.</summary>
+	public int NemesisKillXp { get; set; } = 50;
+
 	/// <summary>Gets or sets how long each season lasts, in months. Seasons start on 1 January and every this many months after.</summary>
 	public int SeasonMonths { get; set; } = 3;
 }
