@@ -9,6 +9,7 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using ktsu.CounterStrikeProgression.Core.Admin;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using Microsoft.Extensions.Logging;
 
@@ -25,11 +26,19 @@ using Microsoft.Extensions.Logging;
 /// that, two saves could commit out of order and put an older value back. A load also waits for the player's
 /// chain, so a quick reconnect can't read a row that's about to be overwritten.
 /// </para>
+/// <para>
+/// The server records have a chain of their own. They load once at startup, and until they have, none are
+/// checked, so an empty book can't hand out records below the stored ones.
+/// </para>
 /// </remarks>
 /// <param name="store">Where progress is kept.</param>
 /// <param name="logger">Where failures are reported.</param>
-internal sealed class SessionManager(IProgressionStore store, ILogger logger)
+/// <param name="records">The server records to load and save.</param>
+internal sealed class SessionManager(IProgressionStore store, ILogger logger, RecordBook records)
 {
+	// No player has Steam ID 0, so the records' saves can share the per-player chains without meeting one.
+	private const ulong RecordsChain = 0;
+
 	private const int SaveAttempts = 5;
 	private const int InitializeAttempts = 6;
 
@@ -42,6 +51,7 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 	private readonly Dictionary<ulong, Task> saveChains = [];
 	private readonly Dictionary<ulong, PlayerProgress> recentlyLeft = [];
 	private Task initialized = Task.CompletedTask;
+	private volatile bool stopped;
 
 	/// <summary>Gets every current session.</summary>
 	public IEnumerable<PlayerSession> All => sessions.Values;
@@ -76,6 +86,27 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 
 				await Task.Delay(delay).ConfigureAwait(false);
 				delay *= 2;
+			}
+		});
+		_ = Task.Run(LoadRecordsAsync);
+	}
+
+	/// <summary>
+	/// Writes the server records that changed, in the background.
+	/// </summary>
+	public void SaveRecords()
+	{
+		IReadOnlyList<RecordRow> rows = records.TakeDirty();
+		if (rows.Count == 0)
+		{
+			return;
+		}
+
+		Chain(RecordsChain, async () =>
+		{
+			if (!await SaveWithRetriesAsync(exception => Log.RecordsSaveFailed(logger, exception), () => Store.SaveRecordsAsync(rows, CancellationToken.None)).ConfigureAwait(false))
+			{
+				await Server.NextFrameAsync(() => records.Restore(rows)).ConfigureAwait(false);
 			}
 		});
 	}
@@ -151,6 +182,8 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 			}
 		}
 
+		SaveRecords();
+
 		// Players who left are kept so a quick reconnect reuses their progress, and so rows whose save ran out
 		// of retries get another try. Once they're saved and have been gone a while, they're dropped.
 		DateTime cutoff = DateTime.UtcNow - RecentlyLeftKeepFor;
@@ -171,10 +204,13 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 	/// <param name="timeout">How long to wait.</param>
 	public void Shutdown(TimeSpan timeout)
 	{
+		stopped = true;
 		foreach (int slot in sessions.Keys.ToList())
 		{
 			DisconnectSlot(slot);
 		}
+
+		SaveRecords();
 
 		Task[] pending = [.. saveChains.Values];
 		if (pending.Length > 0)
@@ -215,7 +251,7 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 			ProgressSnapshot rows = ProgressSnapshot.Capture(progress);
 			Chain(steamId, async () =>
 			{
-				bool written = await SaveWithRetriesAsync(steamId, () => correction.WriteAsync(Store, rows, CancellationToken.None)).ConfigureAwait(false);
+				bool written = await SaveWithRetriesAsync(exception => Log.SaveFailed(logger, steamId, exception), () => correction.WriteAsync(Store, rows, CancellationToken.None)).ConfigureAwait(false);
 				if (!written)
 				{
 					await Server.NextFrameAsync(() => rows.Restore(progress)).ConfigureAwait(false);
@@ -232,7 +268,7 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 			try
 			{
 				if (await correction.ApplyToStoredAsync(Store, steamId, ranks, CancellationToken.None).ConfigureAwait(false) is (CorrectionOutcome applied, ProgressSnapshot rows)
-					&& await SaveWithRetriesAsync(steamId, () => correction.WriteAsync(Store, rows, CancellationToken.None)).ConfigureAwait(false))
+					&& await SaveWithRetriesAsync(exception => Log.SaveFailed(logger, steamId, exception), () => correction.WriteAsync(Store, rows, CancellationToken.None)).ConfigureAwait(false))
 				{
 					outcome = applied;
 				}
@@ -279,6 +315,26 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 		}
 	}
 
+	private async Task LoadRecordsAsync()
+	{
+		await initialized.ConfigureAwait(false);
+		while (!stopped)
+		{
+			try
+			{
+				IReadOnlyList<RecordRow> rows = await Store.RecordsAsync(CancellationToken.None).ConfigureAwait(false);
+				await Server.NextFrameAsync(() => records.Load(rows)).ConfigureAwait(false);
+				return;
+			}
+			catch (Exception exception) when (IsStorageFailure(exception))
+			{
+				Log.RecordsLoadFailed(logger, exception);
+			}
+
+			await Task.Delay(LoadRetryDelay).ConfigureAwait(false);
+		}
+	}
+
 	private void Attach(PlayerSession session, PlayerProgress? loaded, string name)
 	{
 		if (!sessions.TryGetValue(session.Slot, out PlayerSession? current) || !ReferenceEquals(current, session))
@@ -303,7 +359,7 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 
 		Chain(progress.SteamId, async () =>
 		{
-			if (!await SaveWithRetriesAsync(progress.SteamId, () => Store.SaveAsync(snapshot, CancellationToken.None)).ConfigureAwait(false))
+			if (!await SaveWithRetriesAsync(exception => Log.SaveFailed(logger, progress.SteamId, exception), () => Store.SaveAsync(snapshot, CancellationToken.None)).ConfigureAwait(false))
 			{
 				// Out of retries: flag the rows again, so whichever save comes next for this player writes them.
 				await Server.NextFrameAsync(() => snapshot.Restore(progress)).ConfigureAwait(false);
@@ -334,7 +390,7 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 	}
 
 	[SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "A save runs unobserved on the thread pool, so anything it throws must be logged here or it vanishes.")]
-	private async Task<bool> SaveWithRetriesAsync(ulong steamId, Func<Task> write)
+	private static async Task<bool> SaveWithRetriesAsync(Action<Exception> logFailure, Func<Task> write)
 	{
 		TimeSpan delay = FirstSaveRetryDelay;
 		for (int attempt = 1; ; attempt++)
@@ -346,7 +402,7 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 			}
 			catch (Exception exception)
 			{
-				Log.SaveFailed(logger, steamId, exception);
+				logFailure(exception);
 				if (attempt >= SaveAttempts)
 				{
 					return false;

@@ -6,6 +6,7 @@ using ktsu.CounterStrikeProgression.Core.Challenges;
 using ktsu.CounterStrikeProgression.Core.Contracts;
 using ktsu.CounterStrikeProgression.Core.Events;
 using ktsu.CounterStrikeProgression.Core.Feats;
+using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.Rotation;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
 using ktsu.CounterStrikeProgression.Core.Weapons;
@@ -76,6 +77,9 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 
 	/// <summary>Gets the feats.</summary>
 	public FeatCatalog Feats { get; } = new(settings);
+
+	/// <summary>Gets the server records, which the plugin loads from the store once at startup.</summary>
+	public RecordBook Records { get; } = new();
 
 	/// <summary>
 	/// Adds a notice for each feat a result just earned. Call it after every result.
@@ -164,8 +168,61 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 			}
 		}
 
+		if (combat.IsKill)
+		{
+			CheckKillRecords(player, combat, result);
+		}
+
 		Credit(player, weapon, award, result);
 		return Settle(player, result);
+	}
+
+	/// <summary>
+	/// Checks a whole life for Most kills in one life and Best life accuracy.
+	/// </summary>
+	/// <param name="player">The player's progress.</param>
+	/// <param name="life">What they did that life.</param>
+	/// <returns>Any record it set.</returns>
+	public ProgressionResult ApplyLifeRecords(PlayerProgress player, LifeTotals life)
+	{
+		Ensure.NotNull(player);
+		Ensure.NotNull(life);
+
+		ProgressionResult result = new();
+		int kills = Settings.RecordsCountBots ? life.Kills : life.Kills - life.BotKills;
+		if (kills >= Settings.RecordMinimumLifeKills)
+		{
+			TryRecord(player, RecordCatalog.LifeKillsId, kills, result);
+		}
+
+		bool mostlyBots = (life.BotHits * 2) > life.Hits;
+		if ((life.Shots >= Math.Max(1, Settings.RecordAccuracyMinimumShots)) && (Settings.RecordsCountBots || !mostlyBots))
+		{
+			TryRecord(player, RecordCatalog.LifeAccuracyId, Math.Min(1.0, (double)life.Hits / life.Shots), result);
+		}
+
+		return result;
+	}
+
+	/// <summary>
+	/// Checks a finished map for Most skill shots in one map.
+	/// </summary>
+	/// <param name="player">The player's progress.</param>
+	/// <param name="skillShots">The skill shots they earned that map.</param>
+	/// <param name="botSkillShots">How many of those were against bots.</param>
+	/// <returns>Any record it set.</returns>
+	public ProgressionResult ApplyMapRecords(PlayerProgress player, int skillShots, int botSkillShots)
+	{
+		Ensure.NotNull(player);
+
+		ProgressionResult result = new();
+		int counted = Settings.RecordsCountBots ? skillShots : skillShots - botSkillShots;
+		if (counted >= Math.Max(1, Settings.RecordMinimumMapSkillShots))
+		{
+			TryRecord(player, RecordCatalog.MapSkillShotsId, counted, result);
+		}
+
+		return result;
 	}
 
 	/// <summary>
@@ -390,9 +447,38 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 	{
 		int xp = SkillShotXp(skillShot.Rarity);
 		award.EventXp += xp;
-		result.Notices.Add(new() { Kind = NoticeKind.SkillShot, Weapon = award.Weapon, SkillShot = skillShot, Xp = (long)Math.Round(ScaleForBots(xp, award.VsBot)) });
+		result.Notices.Add(new() { Kind = NoticeKind.SkillShot, Weapon = award.Weapon, SkillShot = skillShot, Xp = (long)Math.Round(ScaleForBots(xp, award.VsBot)), VsBot = award.VsBot });
 		result.Signals.Add(new(SignalKind.SkillShot, award.Weapon, SkillShot: skillShot));
 		Advance(weapon, award, skillShot.Id.WeakString, result);
+	}
+
+	private void CheckKillRecords(PlayerProgress player, CombatEvent kill, ProgressionResult result)
+	{
+		if (kill.VictimIsBot && !Settings.RecordsCountBots)
+		{
+			return;
+		}
+
+		WeaponClass weaponClass = kill.Weapon.Class;
+		if (RecordCatalog.DistanceClasses.Contains(weaponClass)
+			&& (kill.Distance >= SkillShotCatalog.LongShotDistance(weaponClass, Settings) * Settings.RecordMinimumDistanceShare))
+		{
+			TryRecord(player, RecordCatalog.LongestKillId(weaponClass), kill.Distance, result, kill.Weapon);
+		}
+
+		if (kill.NoScope && kill.Weapon.IsScoped && (kill.Distance >= Settings.RecordMinimumNoScopeDistance))
+		{
+			TryRecord(player, RecordCatalog.NoScopeId, kill.Distance, result, kill.Weapon);
+		}
+	}
+
+	private void TryRecord(PlayerProgress player, string id, double value, ProgressionResult result, WeaponInfo? weapon = null)
+	{
+		if (Settings.RecordsEnabled
+			&& (Records.TryBreak(RecordCatalog.Get(id), player.SteamId, player.Name, value, Time.GetUtcNow().UtcDateTime) is { } broken))
+		{
+			result.Notices.Add(new() { Kind = NoticeKind.RecordBroken, Record = broken, Weapon = weapon, Broadcast = true });
+		}
 	}
 
 	private void Advance(WeaponProgress weapon, Award award, string challengeId, ProgressionResult result)

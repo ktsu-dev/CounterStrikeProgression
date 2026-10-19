@@ -23,6 +23,9 @@ public sealed class DiscordSettings
 	/// <summary>Gets or sets a value indicating whether earned feats are posted.</summary>
 	public bool Feats { get; set; } = true;
 
+	/// <summary>Gets or sets a value indicating whether server records set or broken are posted.</summary>
+	public bool Records { get; set; } = true;
+
 	/// <summary>Gets or sets a value indicating whether epic skill shots are posted.</summary>
 	public bool EpicSkillShots { get; set; } = true;
 

@@ -46,7 +46,7 @@ public sealed class ProgressionPlugin : BasePlugin, IPluginConfig<PluginConfig>
 	public override void Load(bool hotReload)
 	{
 		ProgressionEngine engine = new(Config.Progression);
-		SessionManager sessions = new(CreateStore(), Logger);
+		SessionManager sessions = new(CreateStore(), Logger, engine.Records);
 		PanelPresenter panel = new(Config.Panel, new PanelBuilder(engine), Logger, Config.ChatPrefix);
 		services = new ProgressionServices(Config, engine, sessions, panel, new Announcer(Config), Logger);
 

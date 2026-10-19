@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Core.Discord;
 using System.Globalization;
 using System.Text;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
 
 /// <summary>
@@ -38,6 +39,8 @@ internal static class DiscordMessages
 		{
 			string? line = notice switch
 			{
+				{ Kind: NoticeKind.RecordBroken, Record: { } record } when settings.Records =>
+					$"🏆 {name} {RecordLine(record)}",
 				{ Kind: NoticeKind.FeatEarned, Feat: { } feat } when settings.Feats =>
 					$"🏅 {name} earned the feat **{feat.Name}**: {feat.Description}!",
 				{ Kind: NoticeKind.RankUp, Value: int rank } when settings.RankUps && (rank >= minimumRank) && (rank < RankLadder.Names.Count) =>
@@ -54,6 +57,24 @@ internal static class DiscordMessages
 		}
 
 		return lines;
+	}
+
+	/// <summary>
+	/// Describes a record set or broken, after the player's name.
+	/// </summary>
+	private static string RecordLine(RecordBreak record)
+	{
+		RecordRow holder = record.Holder;
+		string value = record.Definition.Format(holder.Value);
+		if (holder.PreviousValue is not { } previous)
+		{
+			return $"set the server record for **{record.Definition.Name}**: {value}";
+		}
+
+		string was = record.Definition.Format(previous);
+		return record.BeatOwn
+			? $"beat their own server record for **{record.Definition.Name}**: {value} (was {was})"
+			: $"broke **{Escape(holder.PreviousName ?? string.Empty)}**'s server record for **{record.Definition.Name}**: {value} (was {was})";
 	}
 
 	/// <summary>

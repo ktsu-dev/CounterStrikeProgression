@@ -4,6 +4,7 @@ namespace ktsu.CounterStrikeProgression.Core.Storage;
 
 using System.Collections.Concurrent;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
 /// <summary>
@@ -18,6 +19,7 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 	private readonly ConcurrentDictionary<(ulong, string, string), ContractRow> contracts = new();
 	private readonly ConcurrentDictionary<(ulong SteamId, DateOnly Day), long> daily = new();
 	private readonly ConcurrentDictionary<(ulong, DateTime), SeasonRow> seasons = new();
+	private readonly ConcurrentDictionary<string, RecordRow> records = new(StringComparer.Ordinal);
 
 	/// <summary>Gets the number of successful saves, for tests.</summary>
 	public int SaveCount { get; private set; }
@@ -195,5 +197,24 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 				return new SeasonResult(s.Start, s.Xp, season.LongCount(o => o.Xp > s.Xp) + 1, season.LongLength);
 			})];
 		return Task.FromResult(results);
+	}
+
+	/// <inheritdoc/>
+	public Task<IReadOnlyList<RecordRow>> RecordsAsync(CancellationToken cancellationToken)
+	{
+		IReadOnlyList<RecordRow> rows = [.. records.Values];
+		return Task.FromResult(rows);
+	}
+
+	/// <inheritdoc/>
+	public Task SaveRecordsAsync(IReadOnlyList<RecordRow> rows, CancellationToken cancellationToken)
+	{
+		Ensure.NotNull(rows);
+		foreach (RecordRow row in rows)
+		{
+			records.AddOrUpdate(row.Record, row, (_, stored) => row.Value > stored.Value ? row : stored);
+		}
+
+		return Task.CompletedTask;
 	}
 }

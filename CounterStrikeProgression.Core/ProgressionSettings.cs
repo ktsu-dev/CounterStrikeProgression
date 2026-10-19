@@ -188,4 +188,31 @@ public sealed class ProgressionSettings
 
 	/// <summary>Gets or sets how long each season lasts, in months. Seasons start on 1 January and every this many months after.</summary>
 	public int SeasonMonths { get; set; } = 3;
+
+	/// <summary>Gets or sets a value indicating whether server records are kept and announced.</summary>
+	public bool RecordsEnabled { get; set; } = true;
+
+	/// <summary>
+	/// Gets or sets a value indicating whether kills and skill shots against bots count toward server records.
+	/// Off by default, because a record set against bots says little.
+	/// </summary>
+	public bool RecordsCountBots { get; set; }
+
+	/// <summary>
+	/// Gets or sets the share of the class's Long shot distance a kill must reach before it can set that class's
+	/// longest kill record, so the first records aren't ordinary kills.
+	/// </summary>
+	public double RecordMinimumDistanceShare { get; set; } = 0.5;
+
+	/// <summary>Gets or sets the distance, in units, a no-scope kill must reach before it can set Longest no-scope.</summary>
+	public double RecordMinimumNoScopeDistance { get; set; } = 500;
+
+	/// <summary>Gets or sets the kills in one life needed before Most kills in one life can be set.</summary>
+	public int RecordMinimumLifeKills { get; set; } = 5;
+
+	/// <summary>Gets or sets the gun shots one life must fire before it can set Best life accuracy.</summary>
+	public int RecordAccuracyMinimumShots { get; set; } = 30;
+
+	/// <summary>Gets or sets the skill shots in one map needed before Most skill shots in one map can be set.</summary>
+	public int RecordMinimumMapSkillShots { get; set; } = 10;
 }

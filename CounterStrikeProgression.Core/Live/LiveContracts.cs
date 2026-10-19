@@ -16,6 +16,7 @@ internal enum FeedKind
 	TierCompleted,
 	FeatEarned,
 	ContractCompleted,
+	RecordBroken,
 }
 
 /// <summary>One line of the live feed.</summary>
@@ -26,7 +27,8 @@ internal enum FeedKind
 /// <param name="Title">The text to show, such as a skill shot name or "Rank up: Gold Nova I".</param>
 /// <param name="Weapon">The weapon's display name, if one was involved.</param>
 /// <param name="Xp">The rank XP the moment paid.</param>
-internal sealed record FeedEntry(DateTime At, ulong SteamId, string PlayerName, FeedKind Kind, string Title, string? Weapon, long Xp);
+/// <param name="Detail">More about the moment, such as whose record was broken, or <see langword="null"/>.</param>
+internal sealed record FeedEntry(DateTime At, ulong SteamId, string PlayerName, FeedKind Kind, string Title, string? Weapon, long Xp, string? Detail = null);
 
 /// <summary>One player on the server right now.</summary>
 /// <param name="Slot">The player's slot.</param>

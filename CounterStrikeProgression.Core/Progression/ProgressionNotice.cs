@@ -4,6 +4,7 @@ namespace ktsu.CounterStrikeProgression.Core.Progression;
 
 using ktsu.CounterStrikeProgression.Core.Contracts;
 using ktsu.CounterStrikeProgression.Core.Feats;
+using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
@@ -18,6 +19,7 @@ internal enum NoticeKind
 	RankUp,
 	FeatEarned,
 	ContractCompleted,
+	RecordBroken,
 }
 
 /// <summary>
@@ -40,6 +42,9 @@ internal sealed record ProgressionNotice
 	/// <summary>Gets the contract finished, for contract notices.</summary>
 	public ActiveContract? Contract { get; init; }
 
+	/// <summary>Gets the record set or broken, for record notices.</summary>
+	public RecordBreak? Record { get; init; }
+
 	/// <summary>Gets the challenge name, for tier notices.</summary>
 	public string? ChallengeName { get; init; }
 
@@ -51,6 +56,9 @@ internal sealed record ProgressionNotice
 
 	/// <summary>Gets a value indicating whether the whole server should hear about it.</summary>
 	public bool Broadcast { get; init; }
+
+	/// <summary>Gets a value indicating whether a skill shot was earned against a bot, which server records don't count by default.</summary>
+	public bool VsBot { get; init; }
 }
 
 /// <summary>

@@ -10,6 +10,7 @@ using ktsu.CounterStrikeProgression.Core.Admin;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.Rotation;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Core.Weapons;
@@ -423,6 +424,10 @@ public sealed class SeasonTests
 		public Task<IReadOnlyList<SeasonStanding>> SeasonStandingsAsync(DateOnly start, int count, CancellationToken cancellationToken) => throw new DatabaseDown();
 
 		public Task<IReadOnlyList<SeasonResult>> SeasonResultsAsync(ulong steamId, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task<IReadOnlyList<RecordRow>> RecordsAsync(CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task SaveRecordsAsync(IReadOnlyList<RecordRow> rows, CancellationToken cancellationToken) => throw new DatabaseDown();
 
 		public Task<IReadOnlyList<DailyXp>> HistoryAsync(ulong steamId, DateOnly from, CancellationToken cancellationToken) => throw new DatabaseDown();
 

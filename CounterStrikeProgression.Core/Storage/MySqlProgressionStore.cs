@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Core.Storage;
 using System.Runtime.CompilerServices;
 using Dapper;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.Rotation;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 using MySqlConnector;
@@ -85,6 +86,17 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			xp BIGINT NOT NULL DEFAULT 0,
 			PRIMARY KEY (steam_id, season_start),
 			KEY idx_csp_seasons_xp (season_start, xp)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+		CREATE TABLE IF NOT EXISTS csp_records (
+			record VARCHAR(48) NOT NULL PRIMARY KEY,
+			steam_id BIGINT UNSIGNED NOT NULL,
+			name VARCHAR(128) NOT NULL DEFAULT '',
+			value DOUBLE NOT NULL,
+			set_at DATETIME NOT NULL,
+			previous_steam_id BIGINT UNSIGNED NULL,
+			previous_name VARCHAR(128) NULL,
+			previous_value DOUBLE NULL
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 		INSERT IGNORE INTO csp_schema (id, version) VALUES (1, @version);
@@ -190,6 +202,29 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		FROM csp_seasons s
 		WHERE s.steam_id = @steamId AND s.xp > 0
 		ORDER BY s.season_start DESC
+		""";
+
+	/// <summary>
+	/// Writes a record only when it beats the stored one. MariaDB applies the assignments in order, so
+	/// <c>value</c> goes last, and every assignment before it still compares against the stored value.
+	/// </summary>
+	private const string UpsertRecord = """
+		INSERT INTO csp_records (record, steam_id, name, value, set_at, previous_steam_id, previous_name, previous_value)
+		VALUES (@Record, @SteamId, @Name, @Value, @SetAt, @PreviousSteamId, @PreviousName, @PreviousValue)
+		ON DUPLICATE KEY UPDATE
+			steam_id = IF(VALUES(value) > value, VALUES(steam_id), steam_id),
+			name = IF(VALUES(value) > value, VALUES(name), name),
+			set_at = IF(VALUES(value) > value, VALUES(set_at), set_at),
+			previous_steam_id = IF(VALUES(value) > value, VALUES(previous_steam_id), previous_steam_id),
+			previous_name = IF(VALUES(value) > value, VALUES(previous_name), previous_name),
+			previous_value = IF(VALUES(value) > value, VALUES(previous_value), previous_value),
+			value = GREATEST(value, VALUES(value));
+		""";
+
+	private const string SelectRecords = """
+		SELECT record AS Record, steam_id AS SteamId, name AS Name, value AS Value, set_at AS SetAt,
+			previous_steam_id AS PreviousSteamId, previous_name AS PreviousName, previous_value AS PreviousValue
+		FROM csp_records
 		""";
 
 	private const string SelectContracts =
@@ -429,6 +464,29 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			new { steamId },
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 		return [.. results];
+	}
+
+	/// <inheritdoc/>
+	public async Task<IReadOnlyList<RecordRow>> RecordsAsync(CancellationToken cancellationToken)
+	{
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		IEnumerable<RecordRow> rows = await connection.QueryAsync<RecordRow>(new CommandDefinition(SelectRecords, cancellationToken: cancellationToken)).ConfigureAwait(false);
+		return [.. rows];
+	}
+
+	/// <inheritdoc/>
+	public async Task SaveRecordsAsync(IReadOnlyList<RecordRow> rows, CancellationToken cancellationToken)
+	{
+		Ensure.NotNull(rows);
+		if (rows.Count == 0)
+		{
+			return;
+		}
+
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		await connection.ExecuteAsync(new CommandDefinition(UpsertRecord, rows, cancellationToken: cancellationToken)).ConfigureAwait(false);
 	}
 
 	private async Task<MySqlConnection> OpenAsync(CancellationToken cancellationToken)
