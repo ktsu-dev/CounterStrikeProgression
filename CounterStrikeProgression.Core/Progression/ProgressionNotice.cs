@@ -19,6 +19,7 @@ internal enum NoticeKind
 	FeatEarned,
 	ContractCompleted,
 	MasteryStar,
+	BountyCollected,
 	NemesisKilled,
 }
 
@@ -42,13 +43,13 @@ internal sealed record ProgressionNotice
 	/// <summary>Gets the contract finished, for contract notices.</summary>
 	public ActiveContract? Contract { get; init; }
 
-	/// <summary>Gets the other player's name, for nemesis notices.</summary>
+	/// <summary>Gets the other player's name, for nemesis notices and the player whose bounty was collected.</summary>
 	public string? PlayerName { get; init; }
 
 	/// <summary>Gets the challenge name, for tier notices.</summary>
 	public string? ChallengeName { get; init; }
 
-	/// <summary>Gets the tier reached, the weapon level reached, the mastery star reached, or the rank reached.</summary>
+	/// <summary>Gets the tier reached, the weapon level reached, the mastery star reached, the rank reached, or the streak a bounty ended.</summary>
 	public int Value { get; init; }
 
 	/// <summary>Gets the rank XP the moment paid.</summary>

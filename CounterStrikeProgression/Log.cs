@@ -51,6 +51,9 @@ internal static partial class Log
 	[LoggerMessage(EventId = 14, Level = LogLevel.Error, Message = "The Discord webhook URL isn't an absolute https URL, so nothing is posted to Discord")]
 	public static partial void DiscordUrlInvalid(ILogger logger);
 
+	[LoggerMessage(EventId = 15, Level = LogLevel.Warning, Message = "Posting the weekly Discord digest failed, so it's tried again at the next map start")]
+	public static partial void DigestFailed(ILogger logger, Exception exception);
+
 	[LoggerMessage(EventId = 1301, Level = LogLevel.Warning, Message = "Writing {Count} kill positions for the heatmaps failed, retrying on the next write")]
 	public static partial void HeatmapWriteFailed(ILogger logger, int count, Exception exception);
 

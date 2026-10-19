@@ -2,6 +2,7 @@
 
 namespace ktsu.CounterStrikeProgression;
 
+using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using ktsu.CounterStrikeProgression.Core.Discord;
@@ -53,6 +54,9 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	/// <summary>Gets the round's kills.</summary>
 	public RoundTracker Round { get; } = new(config.Progression);
 
+	/// <summary>Gets the bounty on the leading life streak.</summary>
+	public BountyBoard Bounties { get; } = new(config.Progression);
+
 	/// <summary>Gets where failures are reported.</summary>
 	public ILogger Logger { get; } = logger;
 
@@ -64,6 +68,9 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 
 	/// <summary>Gets the Discord poster, which is <see langword="null"/> when no webhook is configured.</summary>
 	public DiscordSender? Discord { get; } = CreateDiscord(config, logger);
+
+	/// <summary>Gets the weekly Discord digest, which is <see langword="null"/> when there's no webhook or it's turned off.</summary>
+	public WeeklyDigestPoster? Digest { get; private set; }
 
 	/// <summary>
 	/// Refreshes a player's panel, shows a floatie, announces what they earned, and adds it to this map's XP,
@@ -103,6 +110,13 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	}
 
 	/// <summary>
+	/// Announces what happened to the bounty and pays a collected one. Call it while the players involved are still
+	/// connected, so their names can be read.
+	/// </summary>
+	/// <param name="changes">What the bounty board returned.</param>
+	public void ApplyBounty(IReadOnlyList<BountyChange> changes) => BountyBoard.Settle(changes, NameOf, PayBounty, announcer.AnnounceAll);
+
+	/// <summary>
 	/// Ends a player's map recap, sends it to the site, and tells them about it. A session that earned
 	/// nothing just starts over.
 	/// </summary>
@@ -129,6 +143,18 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	}
 
 	/// <summary>
+	/// Creates the weekly digest, which posts through <see cref="Discord"/>.
+	/// </summary>
+	public void CreateDigest()
+	{
+		DiscordSettings settings = Config.Discord ?? new();
+		if ((Discord is { } discord) && settings.WeeklyDigest)
+		{
+			Digest = new(Sessions.Store, Engine.Ranks, Config.Progression, settings, discord.TryEnqueue, exception => Log.DigestFailed(Logger, exception));
+		}
+	}
+
+	/// <summary>
 	/// Gets a value indicating whether two players are on the same side, which means damage between them never pays.
 	/// </summary>
 	/// <param name="attacker">The attacker.</param>
@@ -140,6 +166,23 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 		Ensure.NotNull(victim);
 		return !GameState.TeammatesAreEnemies && (attacker.TeamNum == victim.TeamNum);
 	}
+
+	private bool PayBounty(BountyChange change, string holder)
+	{
+		if ((change.CollectorSlot is not int slot) || (Utilities.GetPlayerFromSlot(slot) is not { IsValid: true } collector)
+			|| (Sessions.Get(collector) is not { Progress: PlayerProgress progress } session))
+		{
+			return false;
+		}
+
+		Apply(collector, session, Engine.ApplyBounty(progress, holder, change.Kills, change.Xp), change.HolderSlot);
+		return true;
+	}
+
+	private string NameOf(int slot) =>
+		(Utilities.GetPlayerFromSlot(slot) is { IsValid: true } player ? player.PlayerName : null)
+		?? Sessions.All.FirstOrDefault(s => s.Slot == slot)?.Progress?.Name
+		?? "Someone";
 
 	private static DiscordSender? CreateDiscord(PluginConfig config, ILogger logger)
 	{

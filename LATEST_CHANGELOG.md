@@ -2,6 +2,10 @@
 
 Changes since v1.14.0:
 
+- [minor] Nemesis and rivals (#35) (matt-edmondson)
+- Append the rune directly when filtering card names (Claude)
+- Merge main into share cards (Claude)
+- [minor] Add share cards and link previews for player pages (Claude)
 - Cover the stars in !stats and !top (Claude)
 - Test the ingest counting middleware and the metrics route (Claude)
 - Merge main into claude/project-thread-88d2z4 (Claude)
