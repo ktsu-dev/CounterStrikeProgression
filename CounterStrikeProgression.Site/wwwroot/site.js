@@ -45,6 +45,8 @@
 		chicken_connoisseur: "Chicken connoisseur",
 		arsenal: "Arsenal",
 		polymath: "Polymath",
+		regular: "Regular",
+		devoted: "Devoted",
 	};
 
 	const FEED_LIMIT = 50;
@@ -236,6 +238,8 @@
 			svgNode("path", { d: "M14 6 L21 10 L21 18 L14 22 L7 18 L7 10 Z", fill: "none", stroke: c, "stroke-width": 1.5 }),
 			svgNode("circle", { cx: 14, cy: 14, r: 2.4, fill: c }),
 		],
+		regular: (c) => [svgNode("text", { x: 14, y: 17.5, "text-anchor": "middle", "font-size": 9, "font-weight": "bold", "font-family": "Consolas, monospace", fill: c, textContent: "7d" })],
+		devoted: (c) => [svgNode("text", { x: 14, y: 17.5, "text-anchor": "middle", "font-size": 8, "font-weight": "bold", "font-family": "Consolas, monospace", fill: c, textContent: "30d" })],
 	};
 
 	// A challenge's icon, drawn in the text color. The markup comes from icons.js, which the site ships itself.
@@ -1472,6 +1476,9 @@
 			const atTop = player.nextRankName === null || player.nextRankName === undefined;
 			const details = [`${formatXp(player.rankXp)} XP`];
 			details.push(atTop ? "top rank" : `${formatXp(player.xpToNextRank)} XP to ${player.nextRankName}`);
+			if (player.streak?.label) {
+				details.push(player.streak.label);
+			}
 			details.push(`first seen ${formatDate(player.firstSeen)}`);
 			summary.append(rankBadge(player.rank, player.rankName, true), bar(atTop ? 1 : player.rankProgress), el("div", "muted", details.join(" · ")));
 			const badges = seasonBadges(seasons);

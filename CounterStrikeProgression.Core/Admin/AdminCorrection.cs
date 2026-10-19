@@ -91,6 +91,7 @@ internal sealed record AdminCorrection(CorrectionKind Kind, long Xp = 0)
 			player.SeasonXp = 0;
 			player.IsSeasonDirty = false;
 			player.EndedSeason = null;
+			player.Streak = default;
 		}
 		else
 		{

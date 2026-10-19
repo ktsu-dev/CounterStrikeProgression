@@ -255,8 +255,9 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 	/// <param name="challenges">The player's challenge rows.</param>
 	/// <param name="season">The player's latest season row, if they have one.</param>
 	/// <param name="contracts">The player's contract rows, if any.</param>
+	/// <param name="daily">The player's daily rows, earliest first, which the play streak is worked out from.</param>
 	/// <returns>The progress, with nothing flagged dirty.</returns>
-	public static PlayerProgress Rebuild(PlayerRow player, IEnumerable<WeaponRow> weapons, IEnumerable<ChallengeRow> challenges, SeasonRow? season = null, IEnumerable<ContractRow>? contracts = null)
+	public static PlayerProgress Rebuild(PlayerRow player, IEnumerable<WeaponRow> weapons, IEnumerable<ChallengeRow> challenges, SeasonRow? season = null, IEnumerable<ContractRow>? contracts = null, IEnumerable<DailyRow>? daily = null)
 	{
 		Ensure.NotNull(player);
 		Ensure.NotNull(weapons);
@@ -272,6 +273,7 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 			WelcomeBackXp = player.WelcomeBackXp,
 			SeasonStart = season is null ? null : DateOnly.FromDateTime(season.Start),
 			SeasonXp = season?.Xp ?? 0,
+			Streak = PlayStreak.FromHistory([.. (daily ?? []).Select(r => new DailyXp(DateOnly.FromDateTime(r.Day), r.RankXp))], player.FirstSeen),
 		};
 
 		foreach (WeaponRow row in weapons)

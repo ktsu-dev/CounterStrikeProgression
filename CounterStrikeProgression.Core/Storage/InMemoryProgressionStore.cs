@@ -41,7 +41,8 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 			weapons.Values.Where(w => w.SteamId == steamId),
 			challenges.Values.Where(c => c.SteamId == steamId),
 			seasons.Values.Where(s => s.SteamId == steamId).MaxBy(s => s.Start),
-			contracts.Values.Where(c => c.SteamId == steamId));
+			contracts.Values.Where(c => c.SteamId == steamId),
+			RowsOf(steamId).Select(r => new DailyRow(r.Day.ToDateTime(TimeOnly.MinValue), r.RankXp)));
 		Rivalry.Load(progress, HeadToHeadOf(steamId));
 		return Task.FromResult<PlayerProgress?>(progress);
 	}
