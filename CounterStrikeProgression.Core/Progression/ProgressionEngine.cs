@@ -19,7 +19,8 @@ using ktsu.CounterStrikeProgression.Core.Weapons;
 /// level-up bonuses are paid in full, because they reward the ladder rather than one event. The day's featured
 /// weapon class earns <see cref="ProgressionSettings.FeaturedWeaponMultiplier"/> times the weapon XP and ladder
 /// progress, but not the rank XP. Every point of rank XP also counts toward the current season, which starts again
-/// from 0 when the next season begins. Contracts count what each event did once it's applied.
+/// from 0 when the next season begins. Contracts count what each event did once it's applied. A player back after
+/// <see cref="ProgressionSettings.WelcomeBackDays"/> away earns double rank XP until the welcome-back bonus is paid out.
 /// </remarks>
 /// <param name="settings">The XP values and thresholds.</param>
 /// <param name="time">The clock that decides the day and the season, or the system clock when omitted.</param>
@@ -506,8 +507,36 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		}
 	}
 
+	/// <summary>
+	/// Gives a returning player the welcome-back bonus when they've been away long enough. Call it with their
+	/// stored progress before <see cref="PlayerProgress.LastSeen"/> moves to now.
+	/// </summary>
+	/// <param name="player">The player's stored progress.</param>
+	/// <param name="now">The time they joined, in UTC.</param>
+	/// <returns>Whether the bonus was granted.</returns>
+	public bool GrantWelcomeBack(PlayerProgress player, DateTime now)
+	{
+		Ensure.NotNull(player);
+		if ((Settings.WelcomeBackXp <= 0) || (player.RankXp <= 0) || ((now - player.LastSeen).TotalDays < Settings.WelcomeBackDays))
+		{
+			return false;
+		}
+
+		// A bonus left over from the last time away tops up rather than stacks.
+		player.WelcomeBackXp = Math.Max(player.WelcomeBackXp, Settings.WelcomeBackXp);
+		player.IsDirty = true;
+		return true;
+	}
+
 	private void CreditRankXp(PlayerProgress player, double xp, ProgressionResult result)
 	{
+		if ((xp > 0) && (player.WelcomeBackXp > 0))
+		{
+			double bonus = Math.Min(xp, player.WelcomeBackXp);
+			player.WelcomeBackXp -= bonus;
+			xp += bonus;
+		}
+
 		result.XpEarned += Math.Max(0, xp);
 		double total = player.PendingXp + xp;
 		long whole = (long)Math.Floor(total);
