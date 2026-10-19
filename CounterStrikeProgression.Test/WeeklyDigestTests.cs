@@ -151,12 +151,12 @@ public sealed class WeeklyDigestTests
 
 		WeeklyDigestPoster poster = new(store, Ranks, Progression, new DiscordSettings(), Send, failures.Add);
 
-		await poster.Check(At(Monday))!.ConfigureAwait(false);
+		await poster.Check(At(Monday)).ConfigureAwait(false);
 		Assert.HasCount(1, failures);
 
 		// The failed send had already claimed the week, so the retry finds it posted and gives up on it.
-		await poster.Check(At(Monday, 13))!.ConfigureAwait(false);
-		Assert.IsNull(poster.Check(At(Monday, 14)));
+		await poster.Check(At(Monday, 13)).ConfigureAwait(false);
+		Assert.AreSame(Task.CompletedTask, poster.Check(At(Monday, 14)));
 		Assert.IsEmpty(sent);
 		Assert.HasCount(1, failures);
 	}
@@ -174,9 +174,9 @@ public sealed class WeeklyDigestTests
 			return true;
 		}, e => Assert.Fail(e.Message));
 
-		await poster.Check(At(Monday))!.ConfigureAwait(false);
-		Assert.IsNull(poster.Check(At(Monday.AddDays(6))));
-		await poster.Check(At(Monday.AddDays(7)))!.ConfigureAwait(false);
+		await poster.Check(At(Monday)).ConfigureAwait(false);
+		Assert.AreSame(Task.CompletedTask, poster.Check(At(Monday.AddDays(6))));
+		await poster.Check(At(Monday.AddDays(7))).ConfigureAwait(false);
 
 		Assert.HasCount(2, sent);
 		Assert.Contains("+800 XP", sent[0]);

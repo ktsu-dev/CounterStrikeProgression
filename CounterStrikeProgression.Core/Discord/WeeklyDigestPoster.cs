@@ -27,13 +27,13 @@ internal sealed class WeeklyDigestPoster(IProgressionStore store, RankLadder ran
 	/// Starts a check on the thread pool, unless this week's digest is handled or a check is already running.
 	/// </summary>
 	/// <param name="utcNow">The time now, in UTC.</param>
-	/// <returns>The check, or <see langword="null"/> when none was started.</returns>
-	public Task? Check(DateTime utcNow)
+	/// <returns>The check, or <see cref="Task.CompletedTask"/> when none was started.</returns>
+	public Task Check(DateTime utcNow)
 	{
 		int week = DailyRotation.WeekStart(DailyRotation.Day(utcNow)).DayNumber;
 		if ((Volatile.Read(ref handledWeek) == week) || (Interlocked.Exchange(ref busy, 1) == 1))
 		{
-			return null;
+			return Task.CompletedTask;
 		}
 
 		return Task.Run(() => RunAsync(week, utcNow));
