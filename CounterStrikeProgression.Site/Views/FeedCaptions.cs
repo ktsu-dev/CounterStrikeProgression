@@ -53,6 +53,7 @@ internal static class FeedCaptions
 			FeedKind.SkillShot => SkillShotsByName.GetValueOrDefault(entry.Title)?.Description,
 			FeedKind.TierCompleted => TierCaption(entry, settings),
 			FeedKind.FeatEarned => FeatCatalog.FindByName(entry.Title)?.Description,
+			FeedKind.RecordBroken => entry.Detail,
 			_ => null,
 		};
 

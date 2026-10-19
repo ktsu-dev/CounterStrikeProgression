@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using ktsu.CounterStrikeProgression.Core.Discord;
+using ktsu.CounterStrikeProgression.Core.Events;
 using ktsu.CounterStrikeProgression.Core.Floaties;
 using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
@@ -97,6 +98,36 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 		PanelPresenter.Invalidate(session);
 		Floaties.Show(player, result, floatieKey, at);
 		announcer.Announce(player, session, result);
+
+		// Records are rare and the site reads them from the database, so they're written straight away.
+		if (result.Notices.Any(n => n.Kind == NoticeKind.RecordBroken))
+		{
+			Sessions.SaveRecords();
+		}
+	}
+
+	/// <summary>
+	/// Ends a player's life: each weapon's accuracy skill shots, then the whole life's records.
+	/// </summary>
+	/// <param name="player">The player.</param>
+	/// <param name="session">The player's session.</param>
+	/// <param name="warmup">Whether it's warmup, when the life is forgotten without earning anything.</param>
+	public void EndLife(CCSPlayerController player, PlayerSession session, bool warmup)
+	{
+		Ensure.NotNull(session);
+		LifeTotals totals = session.Life.Totals;
+		IReadOnlyList<WeaponLifeStats> lives = session.Life.EndLife();
+		if (warmup || (session.Progress is not PlayerProgress progress))
+		{
+			return;
+		}
+
+		foreach (WeaponLifeStats life in lives)
+		{
+			Apply(player, session, Engine.ApplyLifeEnd(progress, life));
+		}
+
+		Apply(player, session, Engine.ApplyLifeRecords(progress, totals));
 	}
 
 	/// <summary>
@@ -113,6 +144,12 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 		CCSPlayerController? valid = player is { IsValid: true } ? player : null;
 		CSMatchStats_t? stats = valid?.ActionTrackingServices?.MatchStats;
 		string name = valid?.PlayerName ?? session.Progress?.Name ?? string.Empty;
+		if ((valid is not null) && (session.Progress is PlayerProgress progress))
+		{
+			// Before the recap ends, so a record set here is its best moment.
+			Apply(valid, session, Engine.ApplyMapRecords(progress, session.Recap.SkillShots, session.Recap.BotSkillShots));
+		}
+
 		if (session.Recap.TryFinish(session.SteamId, name, map, stats?.Kills ?? 0, stats?.Deaths ?? 0, DateTime.UtcNow) is not { } recap)
 		{
 			return;

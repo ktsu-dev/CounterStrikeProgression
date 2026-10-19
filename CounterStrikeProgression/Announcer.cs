@@ -10,6 +10,7 @@ using ktsu.CounterStrikeProgression.Core.Contracts;
 using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Recap;
+using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
 
 /// <summary>
@@ -70,6 +71,10 @@ internal sealed class Announcer(PluginConfig config)
 					player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} Daily contract done: {ChatColors.Yellow}{notice.Contract.Definition.Description}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
 					break;
 
+				case NoticeKind.RecordBroken when notice.Record is { } record:
+					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} {RecordText(record)}");
+					break;
+
 				case NoticeKind.RankUp:
 					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} ranked up to {ChatColors.Gold}{RankLadder.Names[notice.Value]}{ChatColors.Default}!");
 					break;
@@ -98,6 +103,22 @@ internal sealed class Announcer(PluginConfig config)
 		{
 			player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {PanelFormatter.ToRecapChat(recap)}");
 		}
+	}
+
+	private static string RecordText(RecordBreak record)
+	{
+		RecordRow holder = record.Holder;
+		string name = $"{ChatColors.Gold}{record.Definition.Name}{ChatColors.Default}";
+		string value = $"{ChatColors.Yellow}{record.Definition.Format(holder.Value)}{ChatColors.Default}";
+		if (holder.PreviousValue is not { } previous)
+		{
+			return $"set the server record for {name}: {value}!";
+		}
+
+		string was = record.Definition.Format(previous);
+		return record.BeatOwn
+			? $"beat their own server record for {name}: {value} (was {was})!"
+			: $"broke {ChatColors.Green}{holder.PreviousName}{ChatColors.Default}'s server record for {name}: {value} (was {was})!";
 	}
 
 	private static string Xp(long xp) => xp.ToString("N0", CultureInfo.InvariantCulture);
