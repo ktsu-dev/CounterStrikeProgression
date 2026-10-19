@@ -27,6 +27,8 @@ internal sealed class LiveSender : IDisposable
 	private readonly CancellationToken stopping;
 	private readonly Task reader;
 	private DateTimeOffset? lastFailureReport;
+	private long sendFailures;
+	private long batchesDropped;
 
 	/// <summary>
 	/// Creates a sender and starts its reader loop.
@@ -53,13 +55,21 @@ internal sealed class LiveSender : IDisposable
 		client.Timeout = timeout;
 		client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-		queue = Channel.CreateBounded<LiveBatch>(new BoundedChannelOptions(queueLimit)
-		{
-			FullMode = BoundedChannelFullMode.DropOldest,
-			SingleReader = true,
-		});
+		queue = Channel.CreateBounded<LiveBatch>(
+			new BoundedChannelOptions(queueLimit)
+			{
+				FullMode = BoundedChannelFullMode.DropOldest,
+				SingleReader = true,
+			},
+			_ => Interlocked.Increment(ref batchesDropped));
 		reader = Task.Run(ReadLoopAsync);
 	}
+
+	/// <summary>Gets how many batches the site didn't accept, or that never reached it.</summary>
+	public long SendFailures => Interlocked.Read(ref sendFailures);
+
+	/// <summary>Gets how many batches were dropped unsent because the queue was full.</summary>
+	public long BatchesDropped => Interlocked.Read(ref batchesDropped);
 
 	/// <summary>
 	/// Queues a batch without waiting.
@@ -125,6 +135,7 @@ internal sealed class LiveSender : IDisposable
 				}
 				catch (Exception exception)
 				{
+					Interlocked.Increment(ref sendFailures);
 					Report(exception);
 				}
 			}

@@ -29,6 +29,9 @@ public sealed class DiscordSettings
 	/// <summary>Gets or sets a value indicating whether epic skill shots are posted.</summary>
 	public bool EpicSkillShots { get; set; } = true;
 
+	/// <summary>Gets or sets a value indicating whether weapon mastery stars are posted.</summary>
+	public bool MasteryStars { get; set; } = true;
+
 	/// <summary>Gets or sets a value indicating whether rank-ups from <see cref="MinimumRank"/> up are posted.</summary>
 	public bool RankUps { get; set; } = true;
 

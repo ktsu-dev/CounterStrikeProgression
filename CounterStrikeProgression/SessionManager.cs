@@ -52,10 +52,14 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 	private readonly Dictionary<ulong, PlayerProgress> recentlyLeft = [];
 	private readonly RecordKeeper records = new(store, engine.Records, Server.NextFrameAsync, IsStorageFailure, exception => Log.RecordsLoadFailed(logger, exception));
 	private Task initialized = Task.CompletedTask;
+	private long saveFailures;
 	private volatile bool stopped;
 
 	/// <summary>Gets every current session.</summary>
 	public IEnumerable<PlayerSession> All => sessions.Values;
+
+	/// <summary>Gets how many saves failed every retry since the plugin loaded.</summary>
+	public long SaveFailures => Interlocked.Read(ref saveFailures);
 
 	/// <summary>Gets the store, for the leaderboard.</summary>
 	public IProgressionStore Store { get; } = store;
@@ -368,7 +372,7 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 	}
 
 	[SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "A save runs unobserved on the thread pool, so anything it throws must be logged here or it vanishes.")]
-	private static async Task<bool> SaveWithRetriesAsync(Action<Exception> logFailure, Func<Task> write)
+	private async Task<bool> SaveWithRetriesAsync(Action<Exception> logFailure, Func<Task> write)
 	{
 		TimeSpan delay = FirstSaveRetryDelay;
 		for (int attempt = 1; ; attempt++)
@@ -383,6 +387,7 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 				logFailure(exception);
 				if (attempt >= SaveAttempts)
 				{
+					Interlocked.Increment(ref saveFailures);
 					return false;
 				}
 			}

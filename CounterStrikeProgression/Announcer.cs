@@ -59,6 +59,10 @@ internal sealed class Announcer(PluginConfig config)
 					player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {notice.Weapon?.DisplayName} reached level {ChatColors.Yellow}{notice.Value}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
 					break;
 
+				case NoticeKind.MasteryStar:
+					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default}'s {notice.Weapon?.DisplayName} earned mastery star {ChatColors.Gold}{notice.Value}{ChatColors.Default}!");
+					break;
+
 				case NoticeKind.FeatEarned when notice.Feat is not null:
 					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} earned the feat {ChatColors.Gold}{notice.Feat.Name}{ChatColors.Default}: {notice.Feat.Description}!");
 					break;

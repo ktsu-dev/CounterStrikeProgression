@@ -35,6 +35,7 @@ internal static class FeedBuilder
 				NoticeKind.WeaponLevelUp => (FeedKind.WeaponLevelUp, $"{notice.Weapon?.DisplayName} level {notice.Value}"),
 				NoticeKind.TierCompleted => (FeedKind.TierCompleted, $"{notice.ChallengeName} {PanelBuilder.Numeral(notice.Value)}"),
 				NoticeKind.FeatEarned => (FeedKind.FeatEarned, notice.Feat?.Name),
+				NoticeKind.MasteryStar => (FeedKind.MasteryStar, WeaponLevelCurve.StarTitle(notice.Weapon, notice.Value)),
 				NoticeKind.ContractCompleted => (FeedKind.ContractCompleted, notice.Contract is { } contract ? ContractTitle(contract) : null),
 				NoticeKind.RecordBroken => (FeedKind.RecordBroken, notice.Record is { } record ? RecordTitle(record) : null),
 				_ => (FeedKind.SkillShot, null),
