@@ -138,6 +138,25 @@ public sealed class TrackerTests
 	}
 
 	[TestMethod]
+	public void KillsCountTowardTheLife_AndTheUnhurtRunStartsOverWhenHurt()
+	{
+		PlayerCombatTracker tracker = new();
+		tracker.KillMade();
+		tracker.KillMade();
+		Assert.AreEqual(2, tracker.Read(0).EarlierLifeKills);
+		Assert.AreEqual(2, tracker.Read(0).EarlierKillsUnhurt);
+
+		tracker.Hurt(1);
+		tracker.KillMade();
+		Assert.AreEqual(3, tracker.Read(2).EarlierLifeKills);
+		Assert.AreEqual(1, tracker.Read(2).EarlierKillsUnhurt);
+
+		tracker.Reset();
+		Assert.AreEqual(0, tracker.Read(3).EarlierLifeKills);
+		Assert.AreEqual(0, tracker.Read(3).EarlierKillsUnhurt);
+	}
+
+	[TestMethod]
 	public void FlicksMeasureTheLargestRecentTurnAcrossTheWrap()
 	{
 		PlayerCombatTracker tracker = new();

@@ -12,6 +12,8 @@ namespace ktsu.CounterStrikeProgression.Core.Tracking;
 /// <param name="FirstShotAfterReload">Whether the latest shot was the first after a reload.</param>
 /// <param name="RecentTurnDegrees">The largest turn in the last few ticks.</param>
 /// <param name="EarlierKillsInSpray">Kills earlier in the current spray.</param>
+/// <param name="EarlierLifeKills">Kills earlier this life.</param>
+/// <param name="EarlierKillsUnhurt">Kills earlier this life since the player last took damage.</param>
 internal readonly record struct CombatTiming(
 	double SecondsSinceLanded,
 	double SecondsSinceScoped,
@@ -19,7 +21,9 @@ internal readonly record struct CombatTiming(
 	double SecondsSinceHurt,
 	bool FirstShotAfterReload,
 	double RecentTurnDegrees,
-	int EarlierKillsInSpray);
+	int EarlierKillsInSpray,
+	int EarlierLifeKills,
+	int EarlierKillsUnhurt);
 
 /// <summary>
 /// Follows one player's movement, scope, weapon switches, reloads, and aim, so a kill can be checked for the
@@ -41,6 +45,8 @@ internal sealed class PlayerCombatTracker
 	private bool reloadPending;
 	private bool lastShotAfterReload;
 	private int sprayKills;
+	private int lifeKills;
+	private int killsUnhurt;
 
 	/// <summary>
 	/// Records the player's state on a tick.
@@ -84,7 +90,11 @@ internal sealed class PlayerCombatTracker
 	/// Records the player taking damage.
 	/// </summary>
 	/// <param name="time">The game time in seconds.</param>
-	public void Hurt(double time) => hurtAt = time;
+	public void Hurt(double time)
+	{
+		hurtAt = time;
+		killsUnhurt = 0;
+	}
 
 	/// <summary>
 	/// Records the start of a reload, so the next shot can count as the first after it.
@@ -106,9 +116,14 @@ internal sealed class PlayerCombatTracker
 	}
 
 	/// <summary>
-	/// Records a kill, which counts toward the current spray once it has been read.
+	/// Records a kill, which counts toward the current spray, life, and unhurt run once it has been read.
 	/// </summary>
-	public void KillMade() => sprayKills++;
+	public void KillMade()
+	{
+		sprayKills++;
+		lifeKills++;
+		killsUnhurt++;
+	}
 
 	/// <summary>
 	/// Clears everything when the player dies or respawns.
@@ -125,6 +140,8 @@ internal sealed class PlayerCombatTracker
 		reloadPending = false;
 		lastShotAfterReload = false;
 		sprayKills = 0;
+		lifeKills = 0;
+		killsUnhurt = 0;
 	}
 
 	/// <summary>
@@ -139,7 +156,9 @@ internal sealed class PlayerCombatTracker
 		time - hurtAt,
 		lastShotAfterReload,
 		RecentTurn(),
-		sprayKills);
+		sprayKills,
+		lifeKills,
+		killsUnhurt);
 
 	/// <summary>
 	/// Gets the smallest angle between two yaws, in degrees.
