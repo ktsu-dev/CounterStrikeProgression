@@ -74,6 +74,10 @@ internal sealed class Announcer(PluginConfig config)
 					player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} Daily contract done: {ChatColors.Yellow}{notice.Contract.Definition.Description}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
 					break;
 
+				case NoticeKind.NemesisKilled:
+					player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} You took down your nemesis {ChatColors.LightRed}{notice.PlayerName}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
+					break;
+
 				case NoticeKind.StreakDay:
 					player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} Play streak: {ChatColors.Yellow}{notice.Value} days{ChatColors.Default} in a row. Come back tomorrow to keep it going.");
 					break;

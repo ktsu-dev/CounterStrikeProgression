@@ -6,6 +6,7 @@ using ktsu.CounterStrikeProgression.Core.Challenges;
 using ktsu.CounterStrikeProgression.Core.Contracts;
 using ktsu.CounterStrikeProgression.Core.Events;
 using ktsu.CounterStrikeProgression.Core.Feats;
+using ktsu.CounterStrikeProgression.Core.Rivals;
 using ktsu.CounterStrikeProgression.Core.Rotation;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
 using ktsu.CounterStrikeProgression.Core.Weapons;
@@ -167,6 +168,37 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 
 		Credit(player, weapon, award, result);
 		return Settle(player, result);
+	}
+
+	/// <summary>
+	/// Counts a kill of one human by another toward their head-to-head, and pays
+	/// <see cref="ProgressionSettings.NemesisKillXp"/> when the victim was the killer's nemesis. Call it alongside
+	/// <see cref="ApplyCombat"/> for kills between humans who aren't teammates. Bots never count.
+	/// </summary>
+	/// <param name="killer">The killer's progress.</param>
+	/// <param name="victim">The victim's progress.</param>
+	/// <returns>What it earned the killer.</returns>
+	public ProgressionResult ApplyRivalKill(PlayerProgress killer, PlayerProgress victim)
+	{
+		Ensure.NotNull(killer);
+		Ensure.NotNull(victim);
+
+		ProgressionResult result = new();
+		if (killer.SteamId == victim.SteamId)
+		{
+			return result;
+		}
+
+		// The nemesis is decided before this kill counts, so a kill can't turn someone into a nemesis and pay for it at once.
+		HeadToHead? nemesis = Rivalry.Nemesis(Rivalry.Of(killer), Settings.NemesisMinimumKills);
+		Rivalry.Count(killer, victim);
+		if ((nemesis?.SteamId == victim.SteamId) && (Settings.NemesisKillXp > 0))
+		{
+			result.Notices.Add(new() { Kind = NoticeKind.NemesisKilled, PlayerName = victim.Name, Value = (int)Math.Min(int.MaxValue, nemesis.Deaths), Xp = Settings.NemesisKillXp });
+			CreditRankXp(killer, Settings.NemesisKillXp, result);
+		}
+
+		return Settle(killer, result);
 	}
 
 	/// <summary>

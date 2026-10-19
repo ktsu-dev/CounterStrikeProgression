@@ -26,6 +26,7 @@ Players climb an up-only rank ladder from Silver I to Global Elite. Every weapon
 - **Bots count, at a reduced rate**: rank XP against bots is scaled down, while weapon levels and ladders still move, so practice against bots isn't wasted.
 - **Featured weapon of the day**: one gun class (pistols, SMGs, rifles, snipers, shotguns, or machine guns) earns double weapon XP each UTC day. Challenge ladders move at the usual pace. The pick comes from the date, so the panel overview and the site's live page always agree. `FeaturedWeaponMultiplier` sets the multiplier, and 1 turns it off.
 - **Welcome-back bonus**: a player back after 7 or more days away earns double rank XP until they've had 2,000 bonus XP. The join message and the panel overview say how much is left, and what's left is saved, so it carries over between visits. `WelcomeBackDays` sets the gap, and `WelcomeBackXp` the bonus, where 0 turns it off.
+- **Nemesis and rivals**: kills between human players are counted per pair. Your nemesis is whoever has killed you most, at least 3 times, and killing them pays 50 bonus rank XP with a floatie. `!stats` names your nemesis and favourite victim, and the site's player page has a Rivals tab with every head-to-head. `NemesisMinimumKills` and `NemesisKillXp` set the numbers, where 0 XP turns the bonus off. Bots never count.
 - **In-game panel**: `!rank` opens a side panel to the right of the view. It falls back to a center-screen card and then to chat if a way of drawing fails.
 - **XP floaties**: every XP gain floats up as "+XP" text from the center of your screen. Only you see your own. Quick gains add up in one floatie, and skill shots, tiers, and level-ups are named under the number in gold. A `World` mode floats them above the target instead.
 - **Daily play streak**: every UTC day in a row with any rank XP adds to the streak. Each new day of a streak is told to the player in chat, and the streak shows on the panel overview and the player page. It's worked out from the daily XP rows already stored, so nothing new is saved.
@@ -58,7 +59,7 @@ With no database host set, progress is kept in memory and lost when the server r
 | `!top <weapon>` | Print the 10 players with the most XP with one weapon, such as `!top ak` or `!top awp` |
 | `!next` | Print your three challenges closest to their next tier |
 | `!feats` | Print every feat, with the ones you've earned and how close you are to the rest |
-| `!stats [name]` | Print your rank, XP, kills, headshot share, best weapon, and feats, or a connected player's |
+| `!stats [name]` | Print your rank, XP, kills, headshot share, best weapon, feats, nemesis, and favourite victim, or a connected player's |
 | `!site` | Print the link to your page on the progression site |
 
 When a player first spawns, they get a welcome line with their rank, a link to their page on the site (when `Site.PublicUrl` is set), and the commands. `"WelcomeMessage": false` turns it off.
@@ -194,7 +195,7 @@ Point the health probe at `/healthz` on port 8080. Port 8081 answers nothing but
 - `csp_site_ingest_batches_total` and `csp_site_ingest_failures_total{reason="unauthorized"|"too_large"|"bad_request"}`: batches applied and turned away.
 - `csp_plugin_send_failures_total`, `csp_plugin_batches_dropped_total`, and `csp_plugin_save_failures_total`: the plugin's own counts since it loaded, as of its last batch. They reset when the plugin reloads, and are absent until a batch carries them.
 
-The site reads progress from the plugin's database and never writes to it. Give it a user with `SELECT` on `csp_players`, `csp_weapons`, `csp_challenges`, and `csp_seasons` and nothing else. The live state and the feed history live in the site's memory and in a file under `/data`, so mount a volume there if the feed should survive a restart. The image runs as the non-root user with UID 1654, so that user must be able to write to the volume (in Kubernetes, set the pod's `fsGroup` to 1654).
+The site reads progress from the plugin's database and never writes to it. Give it a user with `SELECT` on `csp_players`, `csp_weapons`, `csp_challenges`, `csp_seasons`, and `csp_rivals` and nothing else. Until it has `csp_rivals`, player pages still load but show no rivals. The live state and the feed history live in the site's memory and in a file under `/data`, so mount a volume there if the feed should survive a restart. The image runs as the non-root user with UID 1654, so that user must be able to write to the volume (in Kubernetes, set the pod's `fsGroup` to 1654).
 
 Configure the site with environment variables:
 
@@ -235,6 +236,7 @@ Point the plugin's `Site.Url` at port 8081 and set `Site.Token` to the same valu
 | `csp_weapons` | Steam ID, weapon, weapon XP, level, kills, headshots, hits, shots |
 | `csp_challenges` | Steam ID, weapon, challenge, count, tier reached |
 | `csp_seasons` | Steam ID, season start, rank XP earned in the season |
+| `csp_rivals` | Killer's Steam ID, victim's Steam ID, kills |
 | `csp_schema` | The schema version |
 
 Skill shot ids double as challenge ids in `csp_challenges`, so an id is never renamed once released.
