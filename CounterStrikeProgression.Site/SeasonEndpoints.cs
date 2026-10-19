@@ -83,21 +83,33 @@ internal static class SeasonEndpoints
 			return TypedResults.NotFound();
 		}
 
-		ProgressionSettings settings = live.Settings;
-		Season current = CurrentSeason(time, settings);
-		IReadOnlyList<SeasonStanding> standings;
-		IReadOnlyList<SeasonResult> results;
-		PlayerProgress? stored;
 		try
 		{
-			standings = await reader.SeasonStandingsAsync(current.Start, cancellationToken).ConfigureAwait(false);
-			results = await reader.SeasonResultsAsync(steamId, cancellationToken).ConfigureAwait(false);
-			stored = await reader.PlayerAsync(steamId, cancellationToken).ConfigureAwait(false);
+			return TypedResults.Ok(await PlayerSeasonsViewAsync(steamId, reader, live, time, cancellationToken).ConfigureAwait(false));
 		}
 		catch (DbException)
 		{
 			return TypedResults.StatusCode(StatusCodes.Status503ServiceUnavailable);
 		}
+	}
+
+	/// <summary>
+	/// Builds a player's season badges: this season's place, and every top 3 finish before it.
+	/// </summary>
+	/// <param name="steamId">The player's SteamID64.</param>
+	/// <param name="reader">Reads the stored progress.</param>
+	/// <param name="live">The live state.</param>
+	/// <param name="time">The clock that decides the current season.</param>
+	/// <param name="cancellationToken">Stops waiting when the request is aborted.</param>
+	/// <returns>The badges.</returns>
+	/// <exception cref="DbException">The database can't be read.</exception>
+	internal static async Task<PlayerSeasonsView> PlayerSeasonsViewAsync(ulong steamId, ProgressReader reader, LiveState live, TimeProvider time, CancellationToken cancellationToken)
+	{
+		ProgressionSettings settings = live.Settings;
+		Season current = CurrentSeason(time, settings);
+		IReadOnlyList<SeasonStanding> standings = await reader.SeasonStandingsAsync(current.Start, cancellationToken).ConfigureAwait(false);
+		IReadOnlyList<SeasonResult> results = await reader.SeasonResultsAsync(steamId, cancellationToken).ConfigureAwait(false);
+		PlayerProgress? stored = await reader.PlayerAsync(steamId, cancellationToken).ConfigureAwait(false);
 
 		ProgressSnapshot? overlay = live.Overlay(steamId);
 		long seasonXp = 0;
@@ -108,7 +120,7 @@ internal static class SeasonEndpoints
 		}
 
 		SeasonView board = SeasonsViewBuilder.Build(current, current, settings, standings, live.Overlay, live.IsPlaying, live.OverlayIds);
-		return TypedResults.Ok(SeasonsViewBuilder.BuildPlayer(steamId, seasonXp, board, results, settings));
+		return SeasonsViewBuilder.BuildPlayer(steamId, seasonXp, board, results, settings);
 	}
 
 	private static Season CurrentSeason(TimeProvider time, ProgressionSettings settings) =>
