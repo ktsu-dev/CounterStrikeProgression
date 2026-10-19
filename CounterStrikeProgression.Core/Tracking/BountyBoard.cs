@@ -112,6 +112,30 @@ internal sealed class BountyBoard(ProgressionSettings settings)
 	}
 
 	/// <summary>
+	/// Pays each collected bounty to its collector, and tells everyone about every other change.
+	/// </summary>
+	/// <param name="changes">What the board returned.</param>
+	/// <param name="nameOf">Gets a player's name from their slot.</param>
+	/// <param name="pay">Pays a collected bounty, given the holder's name, and returns whether it found the collector to pay.</param>
+	/// <param name="announce">Tells the whole server a line.</param>
+	public static void Settle(IReadOnlyList<BountyChange> changes, Func<int, string> nameOf, Func<BountyChange, string, bool> pay, Action<string> announce)
+	{
+		Ensure.NotNull(changes);
+		Ensure.NotNull(nameOf);
+		Ensure.NotNull(pay);
+		Ensure.NotNull(announce);
+
+		foreach (BountyChange change in changes)
+		{
+			string holder = nameOf(change.HolderSlot);
+			if ((change.Kind != BountyChangeKind.Collected) || !pay(change, holder))
+			{
+				announce(Describe(change, holder));
+			}
+		}
+	}
+
+	/// <summary>
 	/// Gets the chat line for a bounty that was placed, grew, or went unclaimed. A collected bounty is announced with
 	/// the collector's result instead, so one with no collector to pay reads as unclaimed.
 	/// </summary>

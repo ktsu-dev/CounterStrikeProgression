@@ -108,23 +108,7 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	/// connected, so their names can be read.
 	/// </summary>
 	/// <param name="changes">What the bounty board returned.</param>
-	public void ApplyBounty(IReadOnlyList<BountyChange> changes)
-	{
-		Ensure.NotNull(changes);
-		foreach (BountyChange change in changes)
-		{
-			string holder = NameOf(change.HolderSlot);
-			if ((change.CollectorSlot is int slot) && (Utilities.GetPlayerFromSlot(slot) is { IsValid: true } collector)
-				&& (Sessions.Get(collector) is { Progress: PlayerProgress progress } session))
-			{
-				Apply(collector, session, Engine.ApplyBounty(progress, holder, change.Kills, change.Xp), change.HolderSlot);
-			}
-			else
-			{
-				announcer.AnnounceAll(BountyBoard.Describe(change, holder));
-			}
-		}
-	}
+	public void ApplyBounty(IReadOnlyList<BountyChange> changes) => BountyBoard.Settle(changes, NameOf, PayBounty, announcer.AnnounceAll);
 
 	/// <summary>
 	/// Ends a player's map recap, sends it to the site, and tells them about it. A session that earned
@@ -163,6 +147,18 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 		Ensure.NotNull(attacker);
 		Ensure.NotNull(victim);
 		return !GameState.TeammatesAreEnemies && (attacker.TeamNum == victim.TeamNum);
+	}
+
+	private bool PayBounty(BountyChange change, string holder)
+	{
+		if ((change.CollectorSlot is not int slot) || (Utilities.GetPlayerFromSlot(slot) is not { IsValid: true } collector)
+			|| (Sessions.Get(collector) is not { Progress: PlayerProgress progress } session))
+		{
+			return false;
+		}
+
+		Apply(collector, session, Engine.ApplyBounty(progress, holder, change.Kills, change.Xp), change.HolderSlot);
+		return true;
 	}
 
 	private string NameOf(int slot) =>

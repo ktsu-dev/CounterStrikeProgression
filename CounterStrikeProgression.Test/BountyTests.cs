@@ -201,4 +201,38 @@ public sealed class BountyTests
 		Assert.AreEqual("Ann's 6-kill streak ended and the 300 XP bounty went unclaimed.", BountyBoard.Describe(new(BountyChangeKind.Lost, Leader, 6, 300), "Ann"));
 		Assert.AreEqual("Ann's 6-kill streak ended and the 300 XP bounty went unclaimed.", BountyBoard.Describe(new(BountyChangeKind.Collected, Leader, 6, 300, Hunter), "Ann"));
 	}
+
+	[TestMethod]
+	public void SettlingPaysCollectedBountiesAndAnnouncesTheRest()
+	{
+		List<string> announced = [];
+		List<(BountyChange Change, string Holder)> paid = [];
+		BountyChange placed = new(BountyChangeKind.Placed, Leader, 5, 250);
+		BountyChange collected = new(BountyChangeKind.Collected, Leader, 7, 350, Hunter);
+
+		bool Pay(BountyChange change, string holder)
+		{
+			paid.Add((change, holder));
+			return true;
+		}
+
+		BountyBoard.Settle([collected, placed], slot => $"P{slot}", Pay, announced.Add);
+
+		Assert.HasCount(1, paid);
+		Assert.AreEqual((collected, "P1"), paid[0]);
+		Assert.HasCount(1, announced);
+		Assert.AreEqual(BountyBoard.Describe(placed, "P1"), announced[0]);
+	}
+
+	[TestMethod]
+	public void ABountyWithNoOneToPayIsAnnouncedAsUnclaimed()
+	{
+		List<string> announced = [];
+		BountyChange collected = new(BountyChangeKind.Collected, Leader, 7, 350, Hunter);
+
+		BountyBoard.Settle([collected], _ => "Ann", (_, _) => false, announced.Add);
+
+		Assert.HasCount(1, announced);
+		Assert.Contains("went unclaimed", announced[0]);
+	}
 }
