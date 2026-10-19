@@ -411,6 +411,12 @@ td.name {
 	align-items: baseline;
 }
 
+.player-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0 16px;
+}
+
 .player-head .name {
 	color: var(--orange);
 	font-weight: bold;

@@ -4,6 +4,7 @@ namespace ktsu.CounterStrikeProgression.Site;
 
 using ktsu.CounterStrikeProgression.Core.Heatmaps;
 using ktsu.CounterStrikeProgression.Core.Storage;
+using ktsu.CounterStrikeProgression.Site.Cards;
 using ktsu.CounterStrikeProgression.Site.Data;
 using ktsu.CounterStrikeProgression.Site.Live;
 using Microsoft.AspNetCore.Builder;
@@ -54,6 +55,7 @@ internal static class Program
 		services.AddSingleton<FeatIndex>();
 		services.AddSingleton(provider => new BoardIndex(provider.GetRequiredService<TimeProvider>()));
 		services.AddHostedService<FeatRefresher>();
+		services.AddSingleton(provider => new CardCache(provider.GetRequiredService<TimeProvider>()));
 	}
 
 	private static void UsePortFilter(WebApplication app) =>
@@ -79,7 +81,6 @@ internal static class Program
 		app.MapGet("/leaderboards", (IWebHostEnvironment environment) => Endpoints.Page(environment, "leaderboards.html"));
 		app.MapGet("/skillshots", (IWebHostEnvironment environment) => Endpoints.Page(environment, "skillshots.html"));
 		app.MapGet("/seasons", (IWebHostEnvironment environment) => Endpoints.Page(environment, "seasons.html"));
-		app.MapGet("/players/{id}", Endpoints.PlayerPage);
 		app.MapGet("/healthz", Endpoints.Health);
 		app.MapGet("/api/live", Endpoints.Live);
 		app.MapGet("/api/ranks", Endpoints.RanksAsync);
@@ -94,5 +95,12 @@ internal static class Program
 		app.MapGet("/api/stream", Endpoints.Stream);
 		app.MapPost(Endpoints.IngestRoute, Endpoints.IngestAsync);
 		HeatmapEndpoints.Map(app);
+		MapCardRoutes(app);
+	}
+
+	private static void MapCardRoutes(WebApplication app)
+	{
+		app.MapGet("/players/{id}", CardEndpoints.PlayerPageAsync);
+		app.MapGet(CardEndpoints.CardRoute, CardEndpoints.CardAsync);
 	}
 }

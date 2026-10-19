@@ -15,6 +15,9 @@ internal sealed class SiteOptions
 	/// <summary>Gets or sets the shared secret the plugin sends with every batch. Empty rejects all batches.</summary>
 	public string Token { get; set; } = string.Empty;
 
+	/// <summary>Gets or sets the site's public address, such as <c>https://cs2-progression.example.com</c>, for the links in the player page's preview tags. Empty uses the address each request came to.</summary>
+	public string PublicUrl { get; set; } = string.Empty;
+
 	/// <summary>Gets or sets the folder where the feed history is kept.</summary>
 	public string DataPath { get; set; } = "/data";
 

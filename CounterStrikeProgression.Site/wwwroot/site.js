@@ -1404,10 +1404,15 @@
 			steam.href = `https://steamcommunity.com/profiles/${id}`;
 			steam.rel = "noopener noreferrer";
 			steam.target = "_blank";
+			// The same image is the link preview, so it also works pasted as a forum signature.
+			const card = el("a", null, "Share card");
+			card.href = `/card/${id}.png`;
+			card.target = "_blank";
+			card.title = "An image of this page, for chats and forum signatures";
+			const links = el("span", "player-links");
 			const heat = el("a", null, "Heatmap");
 			heat.href = `/heatmaps?player=${id}`;
-			const links = el("span");
-			links.append(heat, " · ", steam);
+			links.append(heat, card, steam);
 			head.append(left, links);
 
 			const summary = el("div", "pad");
