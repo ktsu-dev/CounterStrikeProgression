@@ -112,6 +112,12 @@ internal sealed class PlayerProgress(ulong steamId)
 	/// </summary>
 	public double PendingXp { get; set; }
 
+	/// <summary>
+	/// Gets or sets the welcome-back bonus still to pay: rank XP earned counts double until this much extra has
+	/// been paid. Saved rounded up, so a fraction left over is never lost.
+	/// </summary>
+	public double WelcomeBackXp { get; set; }
+
 	/// <summary>Gets or sets when the player was first seen.</summary>
 	public DateTime FirstSeen { get; set; } = DateTime.UtcNow;
 

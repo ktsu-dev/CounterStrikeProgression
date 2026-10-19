@@ -8,6 +8,7 @@ using ktsu.CounterStrikeProgression.Core.Feats;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
+using ktsu.CounterStrikeProgression.Core.Weapons;
 using ktsu.CounterStrikeProgression.Site.Live;
 using ktsu.CounterStrikeProgression.Site.Views;
 
@@ -23,7 +24,7 @@ public sealed class FeatTests
 	public void ANewPlayer_HasNoFeats()
 	{
 		Assert.IsFalse(new FeatCatalog(new ProgressionSettings()).Earned(TestHelpers.Player()).Any());
-		Assert.HasCount(8, FeatCatalog.All);
+		Assert.HasCount(10, FeatCatalog.All);
 		Assert.IsGreaterThan(1, ProgressOf(TestHelpers.Player(), "full_ladder").Target);
 	}
 
@@ -73,6 +74,47 @@ public sealed class FeatTests
 		Assert.AreEqual(SkillShotCatalog.All.Count, ProgressOf(player, "collector").Target);
 		Assert.AreEqual(2, ProgressOf(player, "chicken_connoisseur").Current);
 		Assert.AreEqual(SkillShotCatalog.For(SkillTrigger.Chicken).Count(), ProgressOf(player, "chicken_connoisseur").Target);
+	}
+
+	[TestMethod]
+	public void Arsenal_NeedsEveryGunAtLevelTen_AndIgnoresOtherWeapons()
+	{
+		PlayerProgress player = TestHelpers.Player();
+		player.Weapon(TestHelpers.Weapon("knife").Key).Level = FeatCatalog.ArsenalLevel;
+		player.Weapon(TestHelpers.Weapon("ak47").Key).Level = FeatCatalog.ArsenalLevel;
+		player.Weapon(TestHelpers.Weapon("awp").Key).Level = FeatCatalog.ArsenalLevel - 1;
+
+		FeatProgress arsenal = ProgressOf(player, "arsenal");
+		Assert.AreEqual(1, arsenal.Current);
+		Assert.AreEqual(WeaponCatalog.All.Count(w => w.IsGun), arsenal.Target);
+
+		foreach (WeaponInfo gun in WeaponCatalog.All.Where(w => w.IsGun))
+		{
+			player.Weapon(gun.Key).Level = FeatCatalog.ArsenalLevel;
+		}
+
+		Assert.IsTrue(ProgressOf(player, "arsenal").IsEarned);
+	}
+
+	[TestMethod]
+	public void Polymath_CountsWeaponsWithAFinishedSkillShotTier()
+	{
+		ProgressionSettings settings = new();
+		PlayerProgress player = TestHelpers.Player();
+		SkillShotDefinition common = SkillShotCatalog.Get(SkillShotId.Create("crouch_kill"));
+		WeaponInfo[] weapons = [.. WeaponCatalog.All.Where(common.AppliesTo).Take(FeatCatalog.PolymathWeapons)];
+		Assert.HasCount(FeatCatalog.PolymathWeapons, weapons);
+		foreach (WeaponInfo weapon in weapons.Skip(1))
+		{
+			player.Weapon(weapon.Key).Challenge(common.Id.WeakString).Count = settings.CommonSkillTiers[0];
+		}
+
+		player.Weapon(weapons[0].Key).Challenge(common.Id.WeakString).Count = settings.CommonSkillTiers[0] - 1;
+		player.Weapon(weapons[0].Key).Challenge(ChallengeDefinition.KillsId).Count = settings.KillTiers[^1];
+		Assert.AreEqual(FeatCatalog.PolymathWeapons - 1, ProgressOf(player, "polymath").Current);
+
+		player.Weapon(weapons[0].Key).Challenge(common.Id.WeakString).Count = settings.CommonSkillTiers[0];
+		Assert.IsTrue(ProgressOf(player, "polymath").IsEarned);
 	}
 
 	[TestMethod]

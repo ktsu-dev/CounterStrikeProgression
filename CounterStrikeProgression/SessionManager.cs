@@ -28,8 +28,9 @@ using Microsoft.Extensions.Logging;
 /// </para>
 /// </remarks>
 /// <param name="store">Where progress is kept.</param>
+/// <param name="engine">The progression engine, which grants the welcome-back bonus on load.</param>
 /// <param name="logger">Where failures are reported.</param>
-internal sealed class SessionManager(IProgressionStore store, ILogger logger)
+internal sealed class SessionManager(IProgressionStore store, ProgressionEngine engine, ILogger logger)
 {
 	private const int SaveAttempts = 5;
 	private const int InitializeAttempts = 6;
@@ -288,8 +289,10 @@ internal sealed class SessionManager(IProgressionStore store, ILogger logger)
 		}
 
 		PlayerProgress progress = loaded ?? new PlayerProgress(session.SteamId);
+		DateTime now = DateTime.UtcNow;
+		_ = engine.GrantWelcomeBack(progress, now);
 		progress.Name = name;
-		progress.LastSeen = DateTime.UtcNow;
+		progress.LastSeen = now;
 		progress.IsDirty = true;
 		Rivalry.Join(progress, sessions.Values.Select(s => s.Progress).OfType<PlayerProgress>());
 		session.Progress = progress;

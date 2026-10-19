@@ -195,6 +195,15 @@ public sealed class ProgressionSettings
 	/// <summary>Gets or sets the rank XP for killing your nemesis. 0 turns the bonus off.</summary>
 	public int NemesisKillXp { get; set; } = 50;
 
+	/// <summary>Gets or sets how many whole days away earn the welcome-back bonus when a player returns.</summary>
+	public int WelcomeBackDays { get; set; } = 7;
+
+	/// <summary>
+	/// Gets or sets how much rank XP counts double for a player back from <see cref="WelcomeBackDays"/> or more days
+	/// away, which is also the most bonus XP they can get. 0 turns the bonus off.
+	/// </summary>
+	public int WelcomeBackXp { get; set; } = 2000;
+
 	/// <summary>Gets or sets how long each season lasts, in months. Seasons start on 1 January and every this many months after.</summary>
 	public int SeasonMonths { get; set; } = 3;
 }

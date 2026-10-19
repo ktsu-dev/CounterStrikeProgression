@@ -67,6 +67,11 @@ internal sealed class ChatReports(ProgressionEngine engine)
 	{
 		Ensure.NotNull(player);
 		List<string> lines = [Welcome(name, player)];
+		if (player.WelcomeBackXp > 0)
+		{
+			lines.Add($"Welcome-back bonus: your next {Number((long)Math.Ceiling(player.WelcomeBackXp))} rank XP counts double.");
+		}
+
 		if (PlayerPage(siteUrl, player.SteamId) is string page)
 		{
 			lines.Add($"Your progress page: {page}");
