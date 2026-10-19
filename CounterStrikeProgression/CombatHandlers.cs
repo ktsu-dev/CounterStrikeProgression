@@ -240,9 +240,8 @@ internal sealed class CombatHandlers(ProgressionServices services)
 		}
 
 		// The kill is credited before the bounty, so its skill shots are announced first.
-		bool teamkill = ProgressionServices.IsTeammate(attacker, victim);
-		bool collects = !teamkill && (Sessions.Get(attacker) is { Progress: not null });
-		IReadOnlyList<BountyChange> bounty = services.Bounties.Kill(attacker.Slot, !attacker.IsBot && !teamkill, victim.Slot, collects);
+		IReadOnlyList<BountyChange> bounty = services.Bounties.Kill(
+			attacker.Slot, victim.Slot, attacker.IsBot, ProgressionServices.IsTeammate(attacker, victim), Sessions.Get(attacker)?.Progress is not null);
 		CreditKill(@event, attacker, victim, teammatesAreEnemies);
 		services.ApplyBounty(bounty);
 		return HookResult.Continue;

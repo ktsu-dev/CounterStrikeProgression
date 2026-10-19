@@ -71,11 +71,12 @@ internal sealed class BountyBoard(ProgressionSettings settings)
 	/// Records a kill, which ends the victim's streak and adds to the killer's.
 	/// </summary>
 	/// <param name="killerSlot">The killer's slot.</param>
-	/// <param name="killerScores">Whether the kill adds to the killer's streak, which a bot's or a teamkill doesn't.</param>
 	/// <param name="victimSlot">The victim's slot.</param>
-	/// <param name="killerCollects">Whether the killer is paid for ending the victim's bounty, which a bot, a teammate, or a player whose progress hasn't loaded isn't.</param>
+	/// <param name="killerIsBot">Whether the killer is a bot, which neither carries nor collects a bounty.</param>
+	/// <param name="teamkill">Whether the victim was the killer's teammate, which neither adds to a streak nor pays.</param>
+	/// <param name="killerLoaded">Whether the killer's progress has loaded, without which a bounty can't be paid.</param>
 	/// <returns>What happened to the bounty, in order.</returns>
-	public IReadOnlyList<BountyChange> Kill(int killerSlot, bool killerScores, int victimSlot, bool killerCollects)
+	public IReadOnlyList<BountyChange> Kill(int killerSlot, int victimSlot, bool killerIsBot, bool teamkill, bool killerLoaded)
 	{
 		List<BountyChange> changes = [];
 		if (!Enabled)
@@ -83,8 +84,9 @@ internal sealed class BountyBoard(ProgressionSettings settings)
 			return changes;
 		}
 
-		EndStreak(victimSlot, killerCollects ? killerSlot : null, changes);
-		if (killerScores && (killerSlot != victimSlot))
+		bool scores = !killerIsBot && !teamkill && (killerSlot != victimSlot);
+		EndStreak(victimSlot, scores && killerLoaded ? killerSlot : null, changes);
+		if (scores)
 		{
 			streaks[killerSlot] = StreakOf(killerSlot) + 1;
 		}

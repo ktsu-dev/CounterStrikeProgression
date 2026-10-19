@@ -23,7 +23,7 @@ public sealed class BountyTests
 		List<BountyChange> changes = [];
 		for (int i = 0; i < kills; i++)
 		{
-			changes.AddRange(board.Kill(slot, killerScores: true, Victim, killerCollects: true));
+			changes.AddRange(board.Kill(slot, Victim, killerIsBot: false, teamkill: false, killerLoaded: true));
 		}
 
 		return changes;
@@ -63,7 +63,7 @@ public sealed class BountyTests
 		BountyBoard board = Board();
 		Streak(board, Leader, 7);
 
-		IReadOnlyList<BountyChange> changes = board.Kill(Hunter, killerScores: true, Leader, killerCollects: true);
+		IReadOnlyList<BountyChange> changes = board.Kill(Hunter, Leader, killerIsBot: false, teamkill: false, killerLoaded: true);
 
 		Assert.HasCount(1, changes);
 		Assert.AreEqual(new BountyChange(BountyChangeKind.Collected, Leader, 7, 350, Hunter), changes[0]);
@@ -78,7 +78,7 @@ public sealed class BountyTests
 		BountyBoard board = Board();
 		Streak(board, Leader, 5);
 
-		IReadOnlyList<BountyChange> changes = board.Kill(Hunter, killerScores: false, Leader, killerCollects: false);
+		IReadOnlyList<BountyChange> changes = board.Kill(Hunter, Leader, killerIsBot: true, teamkill: false, killerLoaded: false);
 
 		Assert.HasCount(1, changes);
 		Assert.AreEqual(BountyChangeKind.Lost, changes[0].Kind);
@@ -121,7 +121,7 @@ public sealed class BountyTests
 		Streak(board, Leader, 8);
 		Streak(board, Hunter, 6);
 
-		IReadOnlyList<BountyChange> changes = board.Kill(third, killerScores: true, Leader, killerCollects: true);
+		IReadOnlyList<BountyChange> changes = board.Kill(third, Leader, killerIsBot: false, teamkill: false, killerLoaded: true);
 
 		Assert.HasCount(2, changes);
 		Assert.AreEqual(BountyChangeKind.Collected, changes[0].Kind);
@@ -136,7 +136,7 @@ public sealed class BountyTests
 
 		for (int i = 0; i < 10; i++)
 		{
-			Assert.IsEmpty(board.Kill(Leader, killerScores: false, Victim, killerCollects: false));
+			Assert.IsEmpty(board.Kill(Leader, Victim, killerIsBot: true, teamkill: false, killerLoaded: false));
 		}
 
 		Assert.IsNull(board.HolderSlot);
@@ -234,5 +234,51 @@ public sealed class BountyTests
 
 		Assert.HasCount(1, announced);
 		Assert.Contains("went unclaimed", announced[0]);
+	}
+
+	[TestMethod]
+	public void ATeamkillEndsTheStreakWithoutPaying()
+	{
+		BountyBoard board = Board();
+		Streak(board, Leader, 5);
+
+		IReadOnlyList<BountyChange> changes = board.Kill(Hunter, Leader, killerIsBot: false, teamkill: true, killerLoaded: true);
+
+		Assert.AreEqual(BountyChangeKind.Lost, changes.Single().Kind);
+		Assert.AreEqual(0, board.StreakOf(Hunter));
+	}
+
+	[TestMethod]
+	public void AKillerWhoseProgressHasntLoadedStillScoresButCantCollect()
+	{
+		BountyBoard board = Board();
+		Streak(board, Leader, 5);
+
+		IReadOnlyList<BountyChange> changes = board.Kill(Hunter, Leader, killerIsBot: false, teamkill: false, killerLoaded: false);
+
+		Assert.AreEqual(BountyChangeKind.Lost, changes.Single().Kind);
+		Assert.AreEqual(1, board.StreakOf(Hunter));
+	}
+
+	[TestMethod]
+	public void AWorthlessBountyPaysNothing()
+	{
+		ProgressionResult result = TestHelpers.Engine().ApplyBounty(TestHelpers.Player(), "Leader", 5, 0);
+
+		Assert.IsEmpty(result.Notices);
+		Assert.AreEqual(0, result.XpGained);
+	}
+
+	[TestMethod]
+	public void ACollectedBountyIsTheMapsBestMomentOverACommonSkillShot()
+	{
+		ProgressionEngine engine = TestHelpers.Engine();
+		PlayerProgress player = TestHelpers.Player();
+		RecapTracker recap = new(DateTime.UtcNow);
+
+		recap.Add(engine.ApplyCombat(player, TestHelpers.Kill("ak47") with { IsHeadshot = true }));
+		recap.Add(engine.ApplyBounty(player, "Leader", 5, 250));
+
+		Assert.AreEqual("Leader's bounty", recap.Finish(TestHelpers.SteamId, "Tester", "de_dust2", 1, 0, DateTime.UtcNow).Best);
 	}
 }
