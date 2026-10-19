@@ -7,6 +7,7 @@ using System.Text.Json.Serialization;
 using CounterStrikeSharp.API.Core;
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Discord;
+using ktsu.CounterStrikeProgression.Core.Heatmaps;
 using ktsu.CounterStrikeProgression.Core.Storage;
 
 /// <summary>
@@ -226,6 +227,9 @@ public sealed class PluginConfig : BasePluginConfig
 
 	/// <summary>Gets or sets the Discord webhook big moments are posted to. With an empty URL, nothing is posted.</summary>
 	public DiscordSettings Discord { get; set; } = new();
+
+	/// <summary>Gets or sets where kills are recorded for the site's heatmaps.</summary>
+	public HeatmapSettings Heatmaps { get; set; } = new();
 
 	/// <summary>Gets or sets where each player's rank is shown to everyone else.</summary>
 	public RankTagSettings RankTags { get; set; } = new();

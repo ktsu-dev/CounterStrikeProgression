@@ -181,13 +181,35 @@ Sending runs on the thread pool with a 3 second timeout, and a failure is logged
 
 Posting runs on the thread pool, at most one post a second. Lines that arrive meanwhile are joined into the next post, a post Discord rate limits is retried after the wait it asks for, and a failure is logged at most once a minute. Player names are escaped, and posts never ping anyone.
 
+### Kill heatmaps
+
+`Heatmaps` records where kills happen, so the site can draw them over each map's radar at `/heatmaps`, for the whole server or one player (where they got their kills, or where they died). Only kills with a human on either end are kept, each map keeps only its latest `MaxPointsPerMap`, and the oldest are deleted as new ones arrive, so the `csp_kills` table stays a fixed size.
+
+```json
+{
+  "Heatmaps": {
+    "Enabled": true,
+    "SampleEvery": 1,
+    "MaxPointsPerMap": 30000,
+    "QueueLimit": 5000
+  }
+}
+```
+
+- **`Enabled`:** whether kill positions are recorded.
+- **`SampleEvery`:** keep one kill in this many on each map. 1 keeps every kill.
+- **`MaxPointsPerMap`:** how many kills each map keeps. Values under 100 count as 100.
+- **`QueueLimit`:** how many kills wait to be written while the database is down. Past this, the oldest are dropped.
+
+Kills are written in one batch per save interval, on the thread pool. The site sends cell counts on a 128 by 128 grid, never exact positions. The official maps line up with the game's radar from each map's overview file; any other map gets a square fitted around its kills. Radar images aren't shipped, because they're Valve's art: put a 1024 by 1024 PNG at `<DataPath>/radar/<map>.png` (for example `/data/radar/de_dust2.png`, exported from the game's `panorama/images/overheadmaps/<map>_radar_psd` texture with Source 2 Viewer) and the site draws the heat over it. Without one, the page draws an outline from where people fight.
+
 #### The site
 
-The site is a small ASP.NET Core app, published as the image `ghcr.io/ktsu-dev/counterstrikeprogression-site:<version>` with each release (and as `latest`). It shows the live scoreboard and feed on `/`, the rank ladder on `/ranks`, leaderboards for every weapon (by level) and every skill shot (by count), plus the most feats and the rarest skill shots, on `/leaderboards`, a guide to every skill shot with its rarity, weapons, XP, tiers, and how many players have earned it on `/skillshots`, and each player's profile on `/players/{steamId}` (a SteamID64), with their XP feed and suggested next challenges. Ranks show as badges: the color and emblem mark the rank's family, and the pips along the bottom fill with the stage. Pages update live over server-sent events, and a server counts as offline after a few seconds without a batch.
+The site is a small ASP.NET Core app, published as the image `ghcr.io/ktsu-dev/counterstrikeprogression-site:<version>` with each release (and as `latest`). It shows the live scoreboard and feed on `/`, the rank ladder on `/ranks`, leaderboards for every weapon (by level) and every skill shot (by count), plus the most feats and the rarest skill shots, on `/leaderboards`, a guide to every skill shot with its rarity, weapons, XP, tiers, and how many players have earned it on `/skillshots`, kill heatmaps on `/heatmaps`, and each player's profile on `/players/{steamId}` (a SteamID64), with their XP feed and suggested next challenges. Ranks show as badges: the color and emblem mark the rank's family, and the pips along the bottom fill with the stage. Pages update live over server-sent events, and a server counts as offline after a few seconds without a batch.
 
 The image listens on two ports:
 
-- **8080 (public):** `/`, `/ranks`, `/leaderboards`, `/skillshots`, `/players/{steamId}`, `/api/live`, `/api/ranks`, `/api/leaderboards`, `/api/skillshots`, `/api/players/{id}`, `/api/stream`, and `/healthz`. Route this port to visitors.
+- **8080 (public):** `/`, `/ranks`, `/leaderboards`, `/skillshots`, `/heatmaps`, `/players/{steamId}`, `/radar/{map}.png`, `/api/heatmaps`, `/api/live`, `/api/ranks`, `/api/leaderboards`, `/api/skillshots`, `/api/players/{id}`, `/api/stream`, and `/healthz`. Route this port to visitors.
 - **8081 (ingest):** `POST /api/ingest` with the header `Authorization: Bearer <token>`, and `GET /metrics` for Prometheus. Keep this port inside your network, because only the plugin and your scraper need it.
 
 Point the health probe at `/healthz` on port 8080. Port 8081 answers nothing but the ingest and metrics routes, so a probe there always fails.
@@ -200,7 +222,7 @@ Point the health probe at `/healthz` on port 8080. Port 8081 answers nothing but
 - `csp_site_ingest_batches_total` and `csp_site_ingest_failures_total{reason="unauthorized"|"too_large"|"bad_request"}`: batches applied and turned away.
 - `csp_plugin_send_failures_total`, `csp_plugin_batches_dropped_total`, and `csp_plugin_save_failures_total`: the plugin's own counts since it loaded, as of its last batch. They reset when the plugin reloads, and are absent until a batch carries them.
 
-The site reads progress from the plugin's database and never writes to it. Give it a user with `SELECT` on `csp_players`, `csp_weapons`, `csp_challenges`, `csp_seasons`, and `csp_rivals` and nothing else. Until it has `csp_rivals`, player pages still load but show no rivals. The live state and the feed history live in the site's memory and in a file under `/data`, so mount a volume there if the feed should survive a restart. The image runs as the non-root user with UID 1654, so that user must be able to write to the volume (in Kubernetes, set the pod's `fsGroup` to 1654).
+The site reads progress from the plugin's database and never writes to it. Give it a user with `SELECT` on `csp_players`, `csp_weapons`, `csp_challenges`, `csp_seasons`, `csp_rivals`, and `csp_kills` and nothing else. Until it has `csp_rivals`, player pages still load but show no rivals. The live state and the feed history live in the site's memory and in a file under `/data`, so mount a volume there if the feed should survive a restart. The image runs as the non-root user with UID 1654, so that user must be able to write to the volume (in Kubernetes, set the pod's `fsGroup` to 1654).
 
 Configure the site with environment variables:
 
@@ -213,7 +235,7 @@ Configure the site with environment variables:
 | `Site__Database__Password` | empty | The database password. |
 | `Site__Database__RequireTls` | `false` | Whether the database connection must be encrypted. When it's `false`, the site still uses TLS if the server offers it. |
 | `Site__Token` | empty | The bearer token the plugin sends. Empty rejects every batch. |
-| `Site__DataPath` | `/data` | The folder for the feed history file. It must be writable by UID 1654, the user the image runs as. |
+| `Site__DataPath` | `/data` | The folder for the feed history file, and for radar images in its `radar` folder. It must be writable by UID 1654, the user the image runs as. |
 | `Site__OfflineAfterSeconds` | `15` | Seconds without a batch before the server counts as offline. |
 | `Site__FeedLength` | `50` | How many feed entries to keep and show. |
 
@@ -241,6 +263,7 @@ Point the plugin's `Site.Url` at port 8081 and set `Site.Token` to the same valu
 | `csp_weapons` | Steam ID, weapon, weapon XP, level, kills, headshots, hits, shots |
 | `csp_challenges` | Steam ID, weapon, challenge, count, tier reached |
 | `csp_seasons` | Steam ID, season start, rank XP earned in the season |
+| `csp_kills` | Map, killer and victim Steam IDs (0 for a bot), weapon, headshot, both positions, time |
 | `csp_rivals` | Killer's Steam ID, victim's Steam ID, kills |
 | `csp_schema` | The schema version |
 

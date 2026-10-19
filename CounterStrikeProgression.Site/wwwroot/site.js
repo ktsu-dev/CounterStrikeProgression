@@ -1469,7 +1469,9 @@
 			card.target = "_blank";
 			card.title = "An image of this page, for chats and forum signatures";
 			const links = el("span", "player-links");
-			links.append(card, steam);
+			const heat = el("a", null, "Heatmap");
+			heat.href = `/heatmaps?player=${id}`;
+			links.append(heat, card, steam);
 			head.append(left, links);
 
 			const summary = el("div", "pad");

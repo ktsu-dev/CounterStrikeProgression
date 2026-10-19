@@ -63,6 +63,9 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	/// <summary>Gets the progression site reporter, which is <see langword="null"/> when no site is configured.</summary>
 	public SiteReporter? Site { get; } = SiteReporter.Create(config, sessions, logger);
 
+	/// <summary>Gets where kills are noted for the heatmaps, which is <see langword="null"/> when they're off.</summary>
+	public KillMapRecorder? KillMaps { get; } = KillMapRecorder.Create(config, logger);
+
 	/// <summary>Gets the Discord poster, which is <see langword="null"/> when no webhook is configured.</summary>
 	public DiscordSender? Discord { get; } = CreateDiscord(config, logger);
 

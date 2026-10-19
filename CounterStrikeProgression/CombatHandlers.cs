@@ -258,14 +258,14 @@ internal sealed class CombatHandlers(ProgressionServices services)
 			Server.TickCount);
 
 		CreditAssist(@event, victim);
-		if (Sessions.Get(attacker) is not { Progress: PlayerProgress progress } session)
-		{
-			return;
-		}
-
 		CCSPlayerPawn? attackerPawn = GameState.PawnOf(attacker);
 		WeaponInfo? weapon = GameState.ResolveWeapon(@event.Weapon, attackerPawn);
-		if (weapon is null)
+		if ((weapon is not null) && !ProgressionServices.IsTeammate(attacker, victim))
+		{
+			services.KillMaps?.Record(Server.MapName ?? string.Empty, attacker, victim, weapon, @event.Headshot);
+		}
+
+		if ((weapon is null) || (Sessions.Get(attacker) is not { Progress: PlayerProgress progress } session))
 		{
 			return;
 		}
