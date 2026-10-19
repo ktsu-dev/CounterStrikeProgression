@@ -76,13 +76,25 @@ public sealed class TrackerTests
 	{
 		RoundTracker round = new(new ProgressionSettings());
 		round.StartRound();
-		round.NoteLastAlive(1, TeamA, 3);
-		round.NoteLastAlive(1, TeamA, 1);
+		round.NoteLastAlive(1, TeamA, 3, 1);
+		round.NoteLastAlive(1, TeamA, 1, 0);
 
-		(int Player, int Enemies)? clutch = round.Clutch(TeamA, _ => true);
-		Assert.AreEqual((1, 3), clutch);
+		(int Player, int Enemies, bool VsBots)? clutch = round.Clutch(TeamA, _ => true);
+		Assert.AreEqual((1, 3, false), clutch);
 		Assert.IsNull(round.Clutch(TeamB, _ => true));
 		Assert.IsNull(round.Clutch(TeamA, _ => false));
+	}
+
+	[TestMethod]
+	public void AClutchIsAgainstBotsOnlyWhenNoHumanEnemyWasAlive()
+	{
+		RoundTracker round = new(new ProgressionSettings());
+		round.StartRound();
+		round.NoteLastAlive(1, TeamA, 2, 0);
+		round.NoteLastAlive(10, TeamB, 2, 1);
+
+		Assert.AreEqual((1, 2, true), round.Clutch(TeamA, _ => true));
+		Assert.AreEqual((10, 2, false), round.Clutch(TeamB, _ => true));
 	}
 
 	[TestMethod]

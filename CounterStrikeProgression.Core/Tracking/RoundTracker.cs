@@ -85,20 +85,24 @@ internal sealed class RoundTracker(ProgressionSettings settings)
 	/// <param name="player">The player's id.</param>
 	/// <param name="team">Their side.</param>
 	/// <param name="enemiesAlive">Enemies still alive at that moment.</param>
-	public void NoteLastAlive(int player, int team, int enemiesAlive) =>
-		lastAliveByTeam.TryAdd(team, new LastAlive(player, enemiesAlive));
+	/// <param name="humanEnemiesAlive">How many of those enemies are human.</param>
+	public void NoteLastAlive(int player, int team, int enemiesAlive, int humanEnemiesAlive) =>
+		lastAliveByTeam.TryAdd(team, new LastAlive(player, enemiesAlive, humanEnemiesAlive));
 
 	/// <summary>
 	/// Gets the clutch, if any, when a round ends.
 	/// </summary>
 	/// <param name="winningTeam">The side that won.</param>
 	/// <param name="isAlive">Whether a player is still alive.</param>
-	/// <returns>The clutcher and how many enemies they faced, or <see langword="null"/> when there was no clutch.</returns>
-	public (int Player, int Enemies)? Clutch(int winningTeam, Func<int, bool> isAlive)
+	/// <returns>
+	/// The clutcher, how many enemies they faced, and whether every one of those was a bot, or <see langword="null"/>
+	/// when there was no clutch.
+	/// </returns>
+	public (int Player, int Enemies, bool VsBots)? Clutch(int winningTeam, Func<int, bool> isAlive)
 	{
 		Ensure.NotNull(isAlive);
 		return lastAliveByTeam.TryGetValue(winningTeam, out LastAlive? last) && (last.Enemies > 0) && isAlive(last.Player)
-			? (last.Player, last.Enemies)
+			? (last.Player, last.Enemies, last.HumanEnemies == 0)
 			: null;
 	}
 
@@ -115,5 +119,5 @@ internal sealed class RoundTracker(ProgressionSettings settings)
 
 	private sealed record KillRecord(int Victim, int VictimTeam, double Time);
 
-	private sealed record LastAlive(int Player, int Enemies);
+	private sealed record LastAlive(int Player, int Enemies, int HumanEnemies);
 }

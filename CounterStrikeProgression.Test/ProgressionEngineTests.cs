@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Test;
 using ktsu.CounterStrikeProgression.Core.Challenges;
 using ktsu.CounterStrikeProgression.Core.Events;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.SkillShots;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
 [TestClass]
@@ -311,14 +312,39 @@ public sealed class ProgressionEngineTests
 		ProgressionEngine engine = TestHelpers.Engine();
 		PlayerProgress player = TestHelpers.Player();
 
-		ProgressionResult withWeapon = engine.ApplyClutch(player, new ClutchEvent(2, TestHelpers.Weapon("ak47")));
+		ProgressionResult withWeapon = engine.ApplyClutch(player, new ClutchEvent(2, TestHelpers.Weapon("ak47"), VsBots: false));
 		Assert.Contains("clutch", TestHelpers.SkillShots(withWeapon));
 		Assert.AreEqual(1, player.Weapons[WeaponKey.Create("ak47")].Challenges["clutch"].Count);
 
-		ProgressionResult withoutWeapon = engine.ApplyClutch(player, new ClutchEvent(1, null));
+		ProgressionResult withoutWeapon = engine.ApplyClutch(player, new ClutchEvent(1, null, VsBots: false));
 		Assert.AreEqual(60, withoutWeapon.XpGained);
 
-		Assert.AreEqual(0, engine.ApplyClutch(player, new ClutchEvent(0, null)).XpGained);
+		Assert.AreEqual(0, engine.ApplyClutch(player, new ClutchEvent(0, null, VsBots: false)).XpGained);
+	}
+
+	[TestMethod]
+	public void AClutchAgainstOnlyBotsPaysTheBotRate()
+	{
+		ProgressionEngine engine = TestHelpers.Engine();
+		PlayerProgress player = TestHelpers.Player();
+		long botRate = (long)Math.Round(engine.SkillShotXp(Rarity.Epic) * engine.Settings.BotXpMultiplier);
+
+		// The weapon XP and its level-up bonuses are the same either way; only the clutch's own XP is scaled.
+		PlayerProgress human = TestHelpers.Player();
+		ProgressionResult vsHumans = engine.ApplyClutch(human, new ClutchEvent(2, TestHelpers.Weapon("ak47"), VsBots: false));
+		ProgressionResult withWeapon = engine.ApplyClutch(player, new ClutchEvent(2, TestHelpers.Weapon("ak47"), VsBots: true));
+		Assert.AreEqual(engine.SkillShotXp(Rarity.Epic) - botRate, vsHumans.XpGained - withWeapon.XpGained);
+		Assert.AreEqual(botRate, withWeapon.Notices.Single(n => n.Kind == NoticeKind.SkillShot).Xp);
+		Assert.AreEqual(1, player.Weapons[WeaponKey.Create("ak47")].Challenges["clutch"].Count);
+		Assert.AreEqual(human.Weapons[WeaponKey.Create("ak47")].Xp, player.Weapons[WeaponKey.Create("ak47")].Xp);
+
+		ProgressionResult withoutWeapon = engine.ApplyClutch(player, new ClutchEvent(2, null, VsBots: true));
+		Assert.AreEqual(botRate, withoutWeapon.XpGained);
+		ProgressionNotice notice = withoutWeapon.Notices.Single(n => n.Kind == NoticeKind.SkillShot);
+		Assert.AreEqual(botRate, notice.Xp);
+		Assert.IsTrue(notice.VsBot);
+
+		Assert.AreEqual(engine.SkillShotXp(Rarity.Epic), engine.ApplyClutch(player, new ClutchEvent(2, null, VsBots: false)).XpGained);
 	}
 
 	[TestMethod]

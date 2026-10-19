@@ -399,7 +399,8 @@ internal sealed class CombatHandlers(ProgressionServices services)
 			int enemies = alive.Count(p => p.TeamNum != team.Key);
 			if ((team.Count() == 1) && (enemies > 0))
 			{
-				services.Round.NoteLastAlive(team.First().Slot, team.Key, enemies);
+				int humanEnemies = alive.Count(p => (p.TeamNum != team.Key) && !p.IsBot);
+				services.Round.NoteLastAlive(team.First().Slot, team.Key, enemies, humanEnemies);
 			}
 		}
 	}
