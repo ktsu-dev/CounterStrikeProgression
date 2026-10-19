@@ -91,7 +91,7 @@ public sealed class CardTests
 		{
 			Weapons =
 			[
-				.. Enumerable.Range(1, 5).Select(i => new WeaponView($"w{i}", $"Weapon {i}", 10 - i, 40, 0, i * 10, 0, 0, [])),
+				.. Enumerable.Range(1, 5).Select(i => new WeaponView($"w{i}", $"Weapon {i}", 10 - i, 40, 0, 0, 0, i * 10, 0, 0, [])),
 			],
 		};
 
