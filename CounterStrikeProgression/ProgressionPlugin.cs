@@ -50,6 +50,7 @@ public sealed class ProgressionPlugin : BasePlugin, IPluginConfig<PluginConfig>
 		PanelPresenter panel = new(Config.Panel, new PanelBuilder(engine), Logger, Config.ChatPrefix);
 		services = new ProgressionServices(Config, engine, sessions, panel, new Announcer(Config), Logger);
 
+		services.CreateDigest();
 		sessions.Initialize();
 		new LifecycleHandlers(services).Register(this);
 		new CombatHandlers(services).Register(this);

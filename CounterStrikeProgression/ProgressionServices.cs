@@ -66,6 +66,9 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	/// <summary>Gets the Discord poster, which is <see langword="null"/> when no webhook is configured.</summary>
 	public DiscordSender? Discord { get; } = CreateDiscord(config, logger);
 
+	/// <summary>Gets the weekly Discord digest, which is <see langword="null"/> when there's no webhook or it's turned off.</summary>
+	public WeeklyDigestPoster? Digest { get; private set; }
+
 	/// <summary>
 	/// Refreshes a player's panel, shows a floatie, announces what they earned, and adds it to this map's XP,
 	/// the site's feed, and Discord.
@@ -133,6 +136,18 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 		if (announce && (valid is not null))
 		{
 			announcer.AnnounceRecap(valid, recap);
+		}
+	}
+
+	/// <summary>
+	/// Creates the weekly digest, which posts through <see cref="Discord"/>.
+	/// </summary>
+	public void CreateDigest()
+	{
+		DiscordSettings settings = Config.Discord ?? new();
+		if ((Discord is { } discord) && settings.WeeklyDigest)
+		{
+			Digest = new(Sessions.Store, Engine.Ranks, Config.Progression, settings, discord.TryEnqueue, exception => Log.DigestFailed(Logger, exception));
 		}
 	}
 

@@ -373,6 +373,10 @@ public sealed class RivalTests
 
 		public Task<IReadOnlyList<SeasonResult>> SeasonResultsAsync(ulong steamId, CancellationToken cancellationToken) => inner.SeasonResultsAsync(steamId, cancellationToken);
 
+		public Task<IReadOnlyList<PeriodGain>> GainsBetweenAsync(DateOnly start, DateOnly end, CancellationToken cancellationToken) => inner.GainsBetweenAsync(start, end, cancellationToken);
+
+		public Task<bool> ClaimDigestAsync(DateOnly week, DateTime at, CancellationToken cancellationToken) => inner.ClaimDigestAsync(week, at, cancellationToken);
+
 		public Task<IReadOnlyList<HeadToHead>> HeadToHeadAsync(ulong steamId, int count, CancellationToken cancellationToken) => throw new DatabaseDown();
 	}
 

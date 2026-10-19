@@ -151,7 +151,7 @@ Sending runs on the thread pool with a 3 second timeout, and a failure is logged
 
 ### Discord announcements
 
-`Discord` posts the server's big moments to a Discord channel through a webhook: earned feats, epic skill shots, weapon mastery stars, and rank-ups from Gold Nova up. It's off by default, because it sends player names and progress outside the server. With an empty `WebhookUrl`, nothing is posted.
+`Discord` posts the server's big moments to a Discord channel through a webhook: earned feats, epic skill shots, weapon mastery stars, and rank-ups from Gold Nova up, plus a weekly digest every Monday. It's off by default, because it sends player names and progress outside the server. With an empty `WebhookUrl`, nothing is posted.
 
 ```json
 {
@@ -163,6 +163,8 @@ Sending runs on the thread pool with a 3 second timeout, and a failure is logged
     "MasteryStars": true,
     "RankUps": true,
     "MinimumRank": "Gold Nova",
+    "WeeklyDigest": true,
+    "WeeklyDigestPlayers": 5,
     "QueueLimit": 50
   }
 }
@@ -172,6 +174,8 @@ Sending runs on the thread pool with a 3 second timeout, and a failure is logged
 - **`Username`:** the name posts appear under. Empty keeps the name set on the webhook.
 - **`Feats`, `EpicSkillShots`, `MasteryStars`, `RankUps`:** which moments to post.
 - **`MinimumRank`:** the lowest rank whose rank-ups are posted, either a whole rank such as `Gold Nova` (all of its stages) or one stage such as `Gold Nova · III`. A name that matches neither counts as `Gold Nova`.
+- **`WeeklyDigest`:** whether to post a digest of the week before at the first map start after Monday 00:00 UTC: the top climbers by rank XP earned, the rank-ups from `MinimumRank` up, and the weekly contract that starts now. A row in `csp_digests` records each week posted, so a restart never posts it twice, and a week nobody played posts nothing.
+- **`WeeklyDigestPlayers`:** how many top climbers the digest lists, from 1 to 10.
 - **`QueueLimit`:** how many lines wait to post. When Discord is slow or down, the oldest is dropped.
 
 Posting runs on the thread pool, at most one post a second. Lines that arrive meanwhile are joined into the next post, a post Discord rate limits is retried after the wait it asks for, and a failure is logged at most once a minute. Player names are escaped, and posts never ping anyone.
