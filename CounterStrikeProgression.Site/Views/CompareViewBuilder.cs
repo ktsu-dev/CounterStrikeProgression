@@ -158,7 +158,7 @@ internal static class CompareViewBuilder
 				{
 					WeaponView? aWeapon = aWeapons.GetValueOrDefault(key);
 					WeaponView? bWeapon = bWeapons.GetValueOrDefault(key);
-					WeaponView either = aWeapon ?? bWeapon!;
+					WeaponView either = aWeapon ?? bWeapons[key];
 					return new CompareWeaponRow(key, either.DisplayName, either.MaxLevel, WeaponSide(aWeapon), WeaponSide(bWeapon));
 				})
 				.OrderByDescending(r => Math.Max(r.A?.Level ?? 0, r.B?.Level ?? 0))
