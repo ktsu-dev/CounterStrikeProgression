@@ -158,6 +158,17 @@ public sealed class SkillShotTests
 	}
 
 	[TestMethod]
+	public void LifeStreaks_FireOnTheKillThatReachesThem()
+	{
+		Assert.Contains("untouchable", Earned(TestHelpers.Kill("ak47") with { LifeKills = 5, KillsUnhurt = 3 }));
+		Assert.DoesNotContain("untouchable", Earned(TestHelpers.Kill("ak47") with { LifeKills = 5, KillsUnhurt = 4 }));
+		Assert.Contains("killstreak_10", Earned(TestHelpers.Kill("knife") with { LifeKills = 10 }));
+		Assert.DoesNotContain("killstreak_10", Earned(TestHelpers.Kill("ak47") with { LifeKills = 11 }));
+		Assert.Contains("killstreak_20", Earned(TestHelpers.Kill("hegrenade") with { LifeKills = 20 }));
+		Assert.DoesNotContain("killstreak_10", Earned(TestHelpers.Kill("hegrenade") with { LifeKills = 20 }));
+	}
+
+	[TestMethod]
 	public void SkillShotsPayByRarity()
 	{
 		ProgressionEngine engine = TestHelpers.Engine(s => s.EpicSkillTiers = [1000, 2000, 3000, 4000, 5000]);

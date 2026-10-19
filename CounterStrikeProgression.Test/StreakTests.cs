@@ -97,12 +97,14 @@ public sealed class StreakTests
 		}
 
 		player.Streak = streak;
+		player.RankXp = FeatCatalog.MillionaireXp;
 		ProgressionResult result = engine.ApplyCombat(player, TestHelpers.Kill("ak47"));
 		engine.CheckFeats(player, result);
 
 		ProgressionNotice day = Assert.ContainsSingle(n => n.Kind == NoticeKind.StreakDay, result.Notices);
 		Assert.AreEqual(FeatCatalog.RegularDays, day.Value);
 		Assert.AreEqual("regular", Assert.ContainsSingle(n => n.Kind == NoticeKind.FeatEarned, result.Notices).Feat!.Id);
+		Assert.Contains("millionaire", player.EarnedFeats!);
 
 		ProgressionResult later = engine.ApplyCombat(player, TestHelpers.Kill("ak47"));
 		Assert.DoesNotContain(n => n.Kind == NoticeKind.StreakDay, later.Notices);
