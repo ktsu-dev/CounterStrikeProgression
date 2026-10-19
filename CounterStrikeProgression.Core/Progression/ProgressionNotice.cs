@@ -18,6 +18,7 @@ internal enum NoticeKind
 	RankUp,
 	FeatEarned,
 	ContractCompleted,
+	MasteryStar,
 	NemesisKilled,
 }
 
@@ -47,7 +48,7 @@ internal sealed record ProgressionNotice
 	/// <summary>Gets the challenge name, for tier notices.</summary>
 	public string? ChallengeName { get; init; }
 
-	/// <summary>Gets the tier reached, the weapon level reached, or the rank reached.</summary>
+	/// <summary>Gets the tier reached, the weapon level reached, the mastery star reached, or the rank reached.</summary>
 	public int Value { get; init; }
 
 	/// <summary>Gets the rank XP the moment paid.</summary>

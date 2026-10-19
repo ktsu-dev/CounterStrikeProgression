@@ -193,6 +193,52 @@ public sealed class RivalTests
 	}
 
 	[TestMethod]
+	public void JoiningTellsOnlinePlayersAboutTheJoinersKills()
+	{
+		PlayerProgress online = Other();
+		PlayerProgress joining = TestHelpers.Player();
+		joining.Victims[OtherId] = new() { Kills = 2 };
+		online.KilledBy[TestHelpers.SteamId] = 1;
+
+		Rivalry.Join(joining, [online, joining]);
+
+		Assert.AreEqual(2, online.KilledBy[TestHelpers.SteamId]);
+		Assert.AreEqual("Tester", online.RivalNames[TestHelpers.SteamId]);
+		Assert.IsFalse(joining.KilledBy.ContainsKey(TestHelpers.SteamId));
+	}
+
+	[TestMethod]
+	public void LoadingSkipsRowsAboutThePlayerThemselves()
+	{
+		PlayerProgress me = TestHelpers.Player();
+
+		Rivalry.Load(me, [new(TestHelpers.SteamId, "Tester", 3, 3), new(OtherId, "Other", 0, 2)]);
+
+		Assert.IsEmpty(me.Victims);
+		Assert.AreEqual(2, me.KilledBy[OtherId]);
+		Assert.HasCount(1, me.RivalNames);
+	}
+
+	[TestMethod]
+	public async Task AStoredResetDeletesOnlyThePlayersOwnKills()
+	{
+		InMemoryProgressionStore store = new();
+		ProgressionEngine engine = TestHelpers.Engine();
+		PlayerProgress me = TestHelpers.Player();
+		PlayerProgress other = Other();
+		Kills(engine, me, other, 2);
+		Kills(engine, other, me, 1);
+		await store.SaveAsync(ProgressSnapshot.Capture(me), TestContext.CancellationToken).ConfigureAwait(false);
+		await store.SaveAsync(ProgressSnapshot.Capture(other), TestContext.CancellationToken).ConfigureAwait(false);
+
+		await store.ResetAsync(new PlayerRow(TestHelpers.SteamId, "Tester", 0, 0, DateTime.UtcNow, DateTime.UtcNow), TestContext.CancellationToken).ConfigureAwait(false);
+
+		HeadToHead row = Assert.ContainsSingle(await store.HeadToHeadAsync(TestHelpers.SteamId, 10, TestContext.CancellationToken).ConfigureAwait(false));
+		Assert.AreEqual(0, row.Kills);
+		Assert.AreEqual(1, row.Deaths);
+	}
+
+	[TestMethod]
 	public void StatsNameTheNemesisAndVictim()
 	{
 		ProgressionEngine engine = TestHelpers.Engine();

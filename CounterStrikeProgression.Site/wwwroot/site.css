@@ -411,6 +411,12 @@ td.name {
 	align-items: baseline;
 }
 
+.player-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0 16px;
+}
+
 .player-head .name {
 	color: var(--orange);
 	font-weight: bold;
@@ -622,6 +628,18 @@ tr.place-3 td.num:first-child {
 .weapon-pick .level {
 	color: var(--muted);
 	font-size: 11px;
+}
+
+.stars {
+	color: var(--gold);
+	font-size: 0.9em;
+	letter-spacing: 1px;
+	white-space: nowrap;
+}
+
+.weapon-pick .stars {
+	margin-left: 4px;
+	font-size: 10px;
 }
 
 .weapon-pick:hover,

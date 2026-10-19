@@ -163,7 +163,7 @@ internal sealed class ChatReports(ProgressionEngine engine)
 		WeaponProgress? top = player.Weapons.Values.Where(w => w.Xp > 0).OrderByDescending(w => w.Xp).FirstOrDefault();
 		if ((top is not null) && (WeaponCatalog.Find(top.Weapon) is { } weapon))
 		{
-			best = $". Best weapon {weapon.DisplayName}, level {Math.Max(top.Level, engine.Levels.LevelFor(top.Xp))}";
+			best = $". Best weapon {weapon.DisplayName}, level {Math.Max(top.Level, engine.Levels.LevelFor(top.Xp))}{StarsSuffix(top.Xp)}";
 		}
 
 		int feats = engine.Feats.Earned(player).Count();
@@ -203,7 +203,13 @@ internal sealed class ChatReports(ProgressionEngine engine)
 	public string WeaponLeader(int place, WeaponLeaderboardEntry entry)
 	{
 		Ensure.NotNull(entry);
-		return $"{place}. {entry.Name} level {Math.Max(entry.Level, engine.Levels.LevelFor(entry.Xp))} ({Number(entry.Xp)} XP)";
+		return $"{place}. {entry.Name} level {Math.Max(entry.Level, engine.Levels.LevelFor(entry.Xp))}{StarsSuffix(entry.Xp)} ({Number(entry.Xp)} XP)";
+	}
+
+	private string StarsSuffix(long xp)
+	{
+		int stars = engine.Levels.StarsFor(xp);
+		return stars > 0 ? $", {WeaponLevelCurve.StarsText(stars)}" : string.Empty;
 	}
 
 	/// <summary>

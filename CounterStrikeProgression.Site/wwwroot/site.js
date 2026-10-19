@@ -51,7 +51,7 @@
 	const REFETCH_EVERY_MS = 2000;
 	const STREAM_GRACE_MS = 15000;
 	const STEAM_ID = /^\d{17}$/;
-	const GOLD_KINDS = new Set(["RankUp", "WeaponLevelUp", "TierCompleted", "FeatEarned", "ContractCompleted"]);
+	const GOLD_KINDS = new Set(["RankUp", "WeaponLevelUp", "TierCompleted", "FeatEarned", "ContractCompleted", "MasteryStar"]);
 	const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 
 	function el(tag, className, text) {
@@ -454,8 +454,8 @@
 			what.append(playerLink(entry.steamId, entry.playerName), " · ");
 		}
 		what.append(entry.title);
-		// A weapon level-up's title already names the weapon.
-		if (entry.weapon && entry.kind !== "WeaponLevelUp") {
+		// A weapon level-up's or mastery star's title already names the weapon.
+		if (entry.weapon && entry.kind !== "WeaponLevelUp" && entry.kind !== "MasteryStar") {
 			what.append(` · ${entry.weapon}`);
 		}
 		if (entry.caption) {
@@ -872,13 +872,31 @@
 		};
 	}
 
+	// Mastery stars: one glyph each up to five, then a count, so a long-maxed weapon stays on one line.
+	function masteryStars(count) {
+		const stars = Number(count) || 0;
+		if (stars <= 0) {
+			return null;
+		}
+		const span = el("span", "stars", stars <= 5 ? "★".repeat(stars) : `★${stars}`);
+		span.title = stars === 1 ? "1 mastery star" : `${stars} mastery stars`;
+		return span;
+	}
+
 	function weaponDetail(weapon) {
 		const box = el("section", "weapon-detail");
 		const head = el("div", "weapon-head");
 		const name = el("h2", "weapon-name", weapon.displayName);
+		const stars = masteryStars(weapon.stars);
+		if (stars) {
+			name.append(" ", stars);
+		}
 		const maxed = weapon.level >= weapon.maxLevel;
 		const level = el("div", "weapon-level");
-		level.append(el("span", null, maxed ? `Level ${weapon.level} · max` : `Level ${weapon.level}/${weapon.maxLevel}`), bar(maxed ? 1 : weapon.levelProgress));
+		// Past the top level, the bar fills toward the next mastery star instead.
+		level.append(
+			el("span", null, maxed ? `Level ${weapon.level} · next star` : `Level ${weapon.level}/${weapon.maxLevel}`),
+			bar(maxed ? weapon.starProgress : weapon.levelProgress));
 		head.append(name, level);
 
 		const stats = el("div", "weapon-stats");
@@ -1149,8 +1167,13 @@
 				pick.type = "button";
 				pick.setAttribute("aria-pressed", weapon.key === weaponKey ? "true" : "false");
 				pick.append(el("span", null, weapon.displayName), el("span", "level", weapon.level));
+				const stars = masteryStars(weapon.stars);
+				if (stars) {
+					pick.append(stars);
+				}
 				const { done, total } = tiersDone(weapon);
-				pick.title = `Level ${weapon.level} · ${formatXp(weapon.kills)} kills · ${done}/${total} tiers`;
+				const starText = Number(weapon.stars) > 0 ? ` · ${stars.title}` : "";
+				pick.title = `Level ${weapon.level}${starText} · ${formatXp(weapon.kills)} kills · ${done}/${total} tiers`;
 				pick.addEventListener("click", () => {
 					weaponKey = weapon.key;
 					render(last);
@@ -1436,7 +1459,14 @@
 			steam.href = `https://steamcommunity.com/profiles/${id}`;
 			steam.rel = "noopener noreferrer";
 			steam.target = "_blank";
-			head.append(left, steam);
+			// The same image is the link preview, so it also works pasted as a forum signature.
+			const card = el("a", null, "Share card");
+			card.href = `/card/${id}.png`;
+			card.target = "_blank";
+			card.title = "An image of this page, for chats and forum signatures";
+			const links = el("span", "player-links");
+			links.append(card, steam);
+			head.append(left, links);
 
 			const summary = el("div", "pad");
 			const atTop = player.nextRankName === null || player.nextRankName === undefined;
@@ -1737,7 +1767,14 @@
 			}));
 			body.append(board
 				? boardTable(board.rows, [["Level", "num"], ["XP", "num"], ["Kills", "num"]], (row) => [
-					cell("num", row.value),
+					cell("num", (() => {
+						const span = el("span", null, String(row.value));
+						const stars = masteryStars(row.stars);
+						if (stars) {
+							span.append(" ", stars);
+						}
+						return span;
+					})()),
 					cell("num", formatXp(row.xp)),
 					cell("num", formatXp(row.kills)),
 				], `Nobody has used the ${board.name} yet.`)

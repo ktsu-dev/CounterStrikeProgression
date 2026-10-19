@@ -445,6 +445,8 @@ public sealed class SiteEndpointTests
 	[DataRow(8080, "/api/ingest", false)]
 	[DataRow(8080, "/api/live", true)]
 	[DataRow(8080, "/", true)]
+	[DataRow(8081, "/metrics", true)]
+	[DataRow(8080, "/metrics", false)]
 	public void PortGate_KeepsIngestOnItsOwnPort(int port, string path, bool allowed) =>
 		Assert.AreEqual(allowed, Endpoints.IsAllowedOnPort(port, new PathString(path)));
 

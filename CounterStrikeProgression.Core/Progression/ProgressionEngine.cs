@@ -463,6 +463,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 	private void Credit(PlayerProgress player, WeaponProgress weapon, Award award, ProgressionResult result)
 	{
 		int levelBefore = weapon.Level;
+		int starsBefore = Levels.StarsFor(weapon.Xp);
 		weapon.Xp += (long)Math.Round(award.EventXp * award.Multiplier);
 		weapon.Level = Math.Max(weapon.Level, Levels.LevelFor(weapon.Xp));
 		for (int level = levelBefore + 1; level <= weapon.Level; level++)
@@ -472,6 +473,12 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 			bool broadcast = (Settings.AnnounceWeaponLevelEvery > 0) && ((level % Settings.AnnounceWeaponLevelEvery) == 0);
 			result.Notices.Add(new() { Kind = NoticeKind.WeaponLevelUp, Weapon = award.Weapon, Value = level, Xp = bonus, Broadcast = broadcast });
 			result.Signals.Add(new(SignalKind.WeaponLevel, award.Weapon));
+		}
+
+		// Stars are cosmetic, so they pay no rank XP.
+		for (int star = starsBefore + 1; star <= Levels.StarsFor(weapon.Xp); star++)
+		{
+			result.Notices.Add(new() { Kind = NoticeKind.MasteryStar, Weapon = award.Weapon, Value = star, Broadcast = true });
 		}
 
 		double rankXp = ScaleForBots(award.EventXp, award.VsBot) + award.BonusXp;
