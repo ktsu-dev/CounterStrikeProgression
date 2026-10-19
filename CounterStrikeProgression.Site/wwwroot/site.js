@@ -43,6 +43,8 @@
 		collector: "Collector",
 		chicken_overlord: "Chicken overlord",
 		chicken_connoisseur: "Chicken connoisseur",
+		arsenal: "Arsenal",
+		polymath: "Polymath",
 	};
 
 	const FEED_LIMIT = 50;
@@ -228,6 +230,11 @@
 			svgNode("path", { d: "M14.5 14.5 L19.5 19.5", stroke: c, "stroke-width": 2.2, "stroke-linecap": "round" }),
 			svgNode("circle", { cx: 20.5, cy: 18.5, r: 1.6, fill: c }),
 			svgNode("circle", { cx: 18.5, cy: 20.5, r: 1.6, fill: c }),
+		],
+		arsenal: (c) => [svgNode("path", { d: "M8 21 L8 9 M14 21 L14 7 M20 21 L20 9 M6 9 L10 9 M12 7 L16 7 M18 9 L22 9", stroke: c, "stroke-width": 1.6, "stroke-linecap": "round", fill: "none" })],
+		polymath: (c) => [
+			svgNode("path", { d: "M14 6 L21 10 L21 18 L14 22 L7 18 L7 10 Z", fill: "none", stroke: c, "stroke-width": 1.5 }),
+			svgNode("circle", { cx: 14, cy: 14, r: 2.4, fill: c }),
 		],
 	};
 

@@ -155,6 +155,8 @@ Each skill shot has an id, a name, a rarity, the weapon classes it applies to, a
 
 **Multi-kill and situation**
 - **Double kill** (Common), **Triple kill** (Rare), and **Rampage** (Epic): 2, 3, or 4 or more kills within 4 s.
+- **Untouchable** (Rare): three kills in one life without taking any damage in between. Fall damage counts as damage, and the run starts over after each hit taken.
+- **10-kill streak** (Rare) and **20-kill streak** (Epic): the tenth and twentieth kill of one life. They suit deathmatch, where a life can run long.
 - **Collateral** (Epic): two kills with one bullet.
 - **Opening kill** (Common): the first kill of the round.
 - **Trade** (Common): kill a teammate's killer within 3 s.
