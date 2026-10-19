@@ -2,6 +2,8 @@
 
 namespace ktsu.CounterStrikeProgression.Core.Tracking;
 
+using System.Globalization;
+
 /// <summary>
 /// What happened to the bounty.
 /// </summary>
@@ -107,6 +109,27 @@ internal sealed class BountyBoard(ProgressionSettings settings)
 		EndStreak(slot, collector: null, changes);
 		Elect(killerSlot: null, changes);
 		return changes;
+	}
+
+	/// <summary>
+	/// Gets the chat line for a bounty that was placed, grew, or went unclaimed. A collected bounty is announced with
+	/// the collector's result instead, so one with no collector to pay reads as unclaimed.
+	/// </summary>
+	/// <param name="change">What happened.</param>
+	/// <param name="holderName">The name of the player who carries, or carried, the bounty.</param>
+	/// <returns>The line.</returns>
+	public static string Describe(BountyChange change, string holderName)
+	{
+		Ensure.NotNull(change);
+		Ensure.NotNull(holderName);
+
+		string xp = change.Xp.ToString("N0", CultureInfo.InvariantCulture);
+		return change.Kind switch
+		{
+			BountyChangeKind.Placed => $"{holderName} leads with a {change.Kills}-kill streak. End it for a {xp} XP bounty!",
+			BountyChangeKind.Raised => $"{holderName} is on {change.Kills} kills. The bounty is up to {xp} XP!",
+			_ => $"{holderName}'s {change.Kills}-kill streak ended and the {xp} XP bounty went unclaimed.",
+		};
 	}
 
 	/// <summary>

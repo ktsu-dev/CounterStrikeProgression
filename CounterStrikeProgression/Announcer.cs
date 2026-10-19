@@ -11,7 +11,6 @@ using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
-using ktsu.CounterStrikeProgression.Core.Tracking;
 
 /// <summary>
 /// Turns what a player earned into chat lines. Rank-ups, finished tiers, milestone weapon levels, bounties, and weekly
@@ -90,29 +89,10 @@ internal sealed class Announcer(PluginConfig config)
 	}
 
 	/// <summary>
-	/// Tells the server a bounty was placed, grew, or went unclaimed. A collected bounty is announced with the
-	/// collector's result instead.
+	/// Tells the whole server a line, such as a bounty being placed.
 	/// </summary>
-	/// <param name="change">What happened.</param>
-	/// <param name="holderName">The name of the player who carries, or carried, the bounty.</param>
-	public void AnnounceBounty(BountyChange change, string holderName)
-	{
-		Ensure.NotNull(change);
-		Ensure.NotNull(holderName);
-
-		string? line = change.Kind switch
-		{
-			BountyChangeKind.Placed => $"{ChatColors.Red}{holderName}{ChatColors.Default} leads with a {change.Kills}-kill streak. End it for a {ChatColors.Gold}{Xp(change.Xp)} XP{ChatColors.Default} bounty!",
-			BountyChangeKind.Raised => $"{ChatColors.Red}{holderName}{ChatColors.Default} is on {change.Kills} kills. The bounty is up to {ChatColors.Gold}{Xp(change.Xp)} XP{ChatColors.Default}!",
-			BountyChangeKind.Lost => $"{ChatColors.Red}{holderName}{ChatColors.Default}'s {change.Kills}-kill streak ended and the bounty went unclaimed.",
-			_ => null,
-		};
-
-		if (line is not null)
-		{
-			Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {line}");
-		}
-	}
+	/// <param name="line">The line.</param>
+	public void AnnounceAll(string line) => Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {line}");
 
 	/// <summary>
 	/// Tells a player what they earned this map, when the config allows it.

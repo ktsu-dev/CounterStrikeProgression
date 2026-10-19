@@ -114,15 +114,14 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 		foreach (BountyChange change in changes)
 		{
 			string holder = NameOf(change.HolderSlot);
-			if ((change.Kind == BountyChangeKind.Collected)
-				&& (Utilities.GetPlayerFromSlot(change.CollectorSlot ?? -1) is { IsValid: true } collector)
+			if ((change.CollectorSlot is int slot) && (Utilities.GetPlayerFromSlot(slot) is { IsValid: true } collector)
 				&& (Sessions.Get(collector) is { Progress: PlayerProgress progress } session))
 			{
 				Apply(collector, session, Engine.ApplyBounty(progress, holder, change.Kills, change.Xp), change.HolderSlot);
 			}
 			else
 			{
-				announcer.AnnounceBounty(change.Kind == BountyChangeKind.Collected ? change with { Kind = BountyChangeKind.Lost } : change, holder);
+				announcer.AnnounceAll(BountyBoard.Describe(change, holder));
 			}
 		}
 	}

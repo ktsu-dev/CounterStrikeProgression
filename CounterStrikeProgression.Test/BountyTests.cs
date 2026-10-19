@@ -192,4 +192,13 @@ public sealed class BountyTests
 		Assert.Contains("Bounty", FloatieMerger.Labels(result));
 		Assert.AreEqual("Leader's bounty", RecapTracker.Describe(result.Notices.Single(n => n.Kind == NoticeKind.BountyCollected)));
 	}
+
+	[TestMethod]
+	public void EachChangeHasAChatLine()
+	{
+		Assert.AreEqual("Ann leads with a 5-kill streak. End it for a 250 XP bounty!", BountyBoard.Describe(new(BountyChangeKind.Placed, Leader, 5, 250), "Ann"));
+		Assert.AreEqual("Ann is on 20 kills. The bounty is up to 1,000 XP!", BountyBoard.Describe(new(BountyChangeKind.Raised, Leader, 20, 1000), "Ann"));
+		Assert.AreEqual("Ann's 6-kill streak ended and the 300 XP bounty went unclaimed.", BountyBoard.Describe(new(BountyChangeKind.Lost, Leader, 6, 300), "Ann"));
+		Assert.AreEqual("Ann's 6-kill streak ended and the 300 XP bounty went unclaimed.", BountyBoard.Describe(new(BountyChangeKind.Collected, Leader, 6, 300, Hunter), "Ann"));
+	}
 }
