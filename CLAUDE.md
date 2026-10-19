@@ -56,6 +56,7 @@ Nothing goes to NuGet. ktsu.Sdk marks every library packable from its targets, a
 - **`Core/Records/`:** `RecordCatalog` lists the server records (longest kill per gun class, longest no-scope, most kills in one life, best life accuracy, most skill shots in one map), and `RecordBook` holds their holders on the game thread. `ProgressionEngine` checks kills as they happen, a life's `LifeTotals` when it ends, and a map's skill shots when its recap finishes. Nothing is checked until `SessionManager` has loaded `csp_records`, and a broken record is written at once on its own save chain. Record ids are stored, so never rename one.
 - **`Core/Panel/`:** `PanelBuilder` builds the pages, and `PanelFormatter` renders plain text, center HTML, or chat.
 - **`Core/Recap/`:** `RecapTracker` adds up what each player earns over a map, and `MapRecap` is the result: a chat line at the win panel (`PanelFormatter.ToRecapChat`), and the "Last session" the site keeps per player in `recaps.json`.
+- **`Site/Cards/`:** the share cards. `CardRenderer` draws a player's card as a 1200 by 630 PNG with SkiaSharp and the embedded DejaVu Sans Mono (the chiseled image has no fonts), `CardCache` keeps each card for five minutes, and `CardEndpoints` serves `/card/<steamid>.png` and adds the player's Open Graph tags to `/players/<steamid>`, so a pasted link unfurls as the card. `Site:PublicUrl` sets the address in those tags; without it the request's host and `X-Forwarded-Proto` are used.
 - **`CounterStrikeProgression/CombatHandlers.cs`:** the combat events that become `CombatEvent` snapshots.
 - **`CounterStrikeProgression/LifecycleHandlers.cs`:** connects, spawns, rounds, the per-tick tracking, and the transmit filter.
 - **`CounterStrikeProgression/Panel/WorldTextPanel.cs`:** the side panel, a `point_worldtext` moved in front of the eyes every tick.
@@ -67,6 +68,7 @@ Nothing goes to NuGet. ktsu.Sdk marks every library packable from its targets, a
 - **MySqlConnector and Dapper:** MariaDB access.
 - **ktsu.Semantics.Strings:** `WeaponKey` and `SkillShotId` are semantic strings.
 - **ktsu.Extensions:** `GetOrCreate` and other helpers.
+- **SkiaSharp:** the site draws the share cards. `SkiaSharp.NativeAssets.Linux.NoDependencies` supplies a native library that needs no fontconfig.
 - **Polyfill:** required by ktsu.Sdk. Core sets `PolyUseEmbeddedAttribute`, because the plugin sees Core's internals and the two copies would otherwise clash.
 
 ## Architecture
