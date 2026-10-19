@@ -539,6 +539,10 @@ public sealed class SiteEndpointTests
 
 		public Task<IReadOnlyList<MapSummary>> MapSummariesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<MapSummary>>([]);
 
+		public Task<IReadOnlyList<PeriodGain>> GainsBetweenAsync(DateOnly start, DateOnly end, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<PeriodGain>>([]);
+
+		public Task<bool> ClaimDigestAsync(DateOnly week, DateTime at, CancellationToken cancellationToken) => Task.FromResult(false);
+
 		public Task<IReadOnlyList<HeadToHead>> HeadToHeadAsync(ulong steamId, int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<HeadToHead>>([]);
 
 		public void Dispose() => Entered.Dispose();

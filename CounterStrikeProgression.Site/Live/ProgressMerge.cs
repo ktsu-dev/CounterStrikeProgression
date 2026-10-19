@@ -132,6 +132,7 @@ internal static class ProgressMerge
 		result.LastSeen = stored.LastSeen;
 		result.SeasonStart = stored.SeasonStart;
 		result.SeasonXp = stored.SeasonXp;
+		result.Streak = stored.Streak;
 		foreach (WeaponProgress weapon in stored.Weapons.Values)
 		{
 			WeaponProgress copy = result.Weapon(weapon.Weapon);
@@ -171,11 +172,19 @@ internal static class ProgressMerge
 	{
 		if (live.Player is { } player)
 		{
+			long storedXp = result.RankXp;
 			result.Name = player.Name;
 			result.RankXp = Math.Max(result.RankXp, player.RankXp);
 			result.Rank = Math.Max(result.Rank, player.Rank);
 			result.FirstSeen = noStored ? player.FirstSeen : Earlier(result.FirstSeen, player.FirstSeen);
 			result.LastSeen = noStored ? player.LastSeen : Later(result.LastSeen, player.LastSeen);
+
+			// Rank XP not yet saved was earned on the day the live row was last touched, which may be a day the
+			// stored rows don't have yet.
+			if (player.RankXp > storedXp)
+			{
+				result.Streak = result.Streak.Record(DateOnly.FromDateTime(player.LastSeen));
+			}
 		}
 
 		foreach (WeaponRow row in live.Weapons)

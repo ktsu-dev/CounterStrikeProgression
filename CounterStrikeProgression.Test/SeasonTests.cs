@@ -426,6 +426,10 @@ public sealed class SeasonTests
 
 		public Task<IReadOnlyList<SeasonResult>> SeasonResultsAsync(ulong steamId, CancellationToken cancellationToken) => throw new DatabaseDown();
 
+		public Task<IReadOnlyList<PeriodGain>> GainsBetweenAsync(DateOnly start, DateOnly end, CancellationToken cancellationToken) => throw new DatabaseDown();
+
+		public Task<bool> ClaimDigestAsync(DateOnly week, DateTime at, CancellationToken cancellationToken) => throw new DatabaseDown();
+
 		public Task<IReadOnlyList<DailyXp>> HistoryAsync(ulong steamId, DateOnly from, CancellationToken cancellationToken) => throw new DatabaseDown();
 
 		public Task<IReadOnlyList<XpGainEntry>> GainsSinceAsync(DateOnly start, int count, CancellationToken cancellationToken) => throw new DatabaseDown();

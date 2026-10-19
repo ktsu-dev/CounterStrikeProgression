@@ -104,6 +104,11 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			KEY idx_csp_maps_xp (map, xp)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+		CREATE TABLE IF NOT EXISTS csp_digests (
+			week DATE NOT NULL PRIMARY KEY,
+			posted_at DATETIME NOT NULL
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 		CREATE TABLE IF NOT EXISTS csp_rivals (
 			steam_id BIGINT UNSIGNED NOT NULL,
 			victim_id BIGINT UNSIGNED NOT NULL,
@@ -145,6 +150,12 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		ON DUPLICATE KEY UPDATE rank_xp = VALUES(rank_xp);
 		""";
 
+	/// <summary>
+	/// Every daily row of a player, which the play streak is worked out from. A player has one row per day they
+	/// played, so reading them all stays small.
+	/// </summary>
+	private const string SelectDaily = "SELECT day AS Day, rank_xp AS RankXp FROM csp_daily WHERE steam_id = @steamId ORDER BY day";
+
 	private const string SelectHistory = """
 		(SELECT day AS Day, rank_xp AS RankXp FROM csp_daily WHERE steam_id = @steamId AND day < @from ORDER BY day DESC LIMIT 1)
 		UNION
@@ -173,6 +184,27 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		ORDER BY Gained DESC, SteamId ASC
 		LIMIT @count
 		""";
+
+	/// <summary>
+	/// Each player's rank XP before a span, by the same rule as <see cref="SelectGains"/>, and at its end, which is
+	/// their latest row before the day after it.
+	/// </summary>
+	private const string SelectGainsBetween = """
+		SELECT SteamId, Name, StartXp, EndXp FROM (
+			SELECT p.steam_id AS SteamId, p.name AS Name,
+				COALESCE(
+					(SELECT d.rank_xp FROM csp_daily d WHERE d.steam_id = p.steam_id AND d.day < @start ORDER BY d.day DESC LIMIT 1),
+					IF(p.first_seen >= @start, 0, NULL),
+					(SELECT d.rank_xp FROM csp_daily d WHERE d.steam_id = p.steam_id ORDER BY d.day ASC LIMIT 1)) AS StartXp,
+				(SELECT d.rank_xp FROM csp_daily d WHERE d.steam_id = p.steam_id AND d.day < @end ORDER BY d.day DESC LIMIT 1) AS EndXp
+			FROM csp_players p
+			WHERE p.last_seen >= @start AND p.first_seen < @end
+		) g
+		WHERE EndXp > StartXp
+		ORDER BY EndXp - StartXp DESC, SteamId ASC
+		""";
+
+	private const string ClaimDigest = "INSERT IGNORE INTO csp_digests (week, posted_at) VALUES (@week, @at)";
 
 	private const string UpsertWeapon = """
 		INSERT INTO csp_weapons (steam_id, weapon, xp, level, kills, headshots, hits, shots)
@@ -367,7 +399,9 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			parameters,
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-		PlayerProgress progress = ProgressSnapshot.Rebuild(player, weapons, challenges, season, contracts, maps);
+		IEnumerable<DailyRow> daily = await connection.QueryAsync<DailyRow>(new CommandDefinition(SelectDaily, parameters, cancellationToken: cancellationToken)).ConfigureAwait(false);
+
+		PlayerProgress progress = ProgressSnapshot.Rebuild(player, weapons, challenges, season, contracts, maps, daily);
 		try
 		{
 			Rivalry.Load(progress, await QueryHeadToHeadAsync(connection, steamId, MaxRivalsLoaded, cancellationToken).ConfigureAwait(false));
@@ -555,6 +589,30 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			SelectMapSummaries,
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 		return [.. summaries];
+	}
+
+	/// <inheritdoc/>
+	public async Task<IReadOnlyList<PeriodGain>> GainsBetweenAsync(DateOnly start, DateOnly end, CancellationToken cancellationToken)
+	{
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		IEnumerable<PeriodGain> gains = await connection.QueryAsync<PeriodGain>(new CommandDefinition(
+			SelectGainsBetween,
+			new { start = start.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc), end = end.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc) },
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+		return [.. gains];
+	}
+
+	/// <inheritdoc/>
+	public async Task<bool> ClaimDigestAsync(DateOnly week, DateTime at, CancellationToken cancellationToken)
+	{
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		int inserted = await connection.ExecuteAsync(new CommandDefinition(
+			ClaimDigest,
+			new { week = week.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc), at },
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+		return inserted > 0;
 	}
 
 	/// <inheritdoc/>

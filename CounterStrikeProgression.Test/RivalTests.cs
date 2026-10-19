@@ -377,6 +377,10 @@ public sealed class RivalTests
 
 		public Task<IReadOnlyList<Core.Maps.MapSummary>> MapSummariesAsync(CancellationToken cancellationToken) => inner.MapSummariesAsync(cancellationToken);
 
+		public Task<IReadOnlyList<PeriodGain>> GainsBetweenAsync(DateOnly start, DateOnly end, CancellationToken cancellationToken) => inner.GainsBetweenAsync(start, end, cancellationToken);
+
+		public Task<bool> ClaimDigestAsync(DateOnly week, DateTime at, CancellationToken cancellationToken) => inner.ClaimDigestAsync(week, at, cancellationToken);
+
 		public Task<IReadOnlyList<HeadToHead>> HeadToHeadAsync(ulong steamId, int count, CancellationToken cancellationToken) => throw new DatabaseDown();
 	}
 

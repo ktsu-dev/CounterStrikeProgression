@@ -131,6 +131,12 @@ internal sealed class PlayerProgress(ulong steamId)
 	/// </summary>
 	public HashSet<string>? EarnedFeats { get; set; }
 
+	/// <summary>
+	/// Gets or sets the player's run of consecutive days with rank XP. Not saved, because it's worked out from the
+	/// daily rows when the player loads.
+	/// </summary>
+	public PlayStreak Streak { get; set; }
+
 	/// <summary>Gets the player's weapons, keyed by weapon.</summary>
 	public Dictionary<WeaponKey, WeaponProgress> Weapons { get; } = [];
 

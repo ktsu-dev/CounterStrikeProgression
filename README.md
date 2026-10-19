@@ -23,13 +23,15 @@ Players climb an up-only rank ladder from Silver I to Global Elite. Every weapon
 - **Weapon ladders**: Kills, Headshots, and Hits, plus one challenge for every skill shot the weapon can earn, each with five tiers. Skill tiers pay more than volume tiers.
 - **Skill shots**: about 50, covering movement, distance, wallbangs and smokes, scopes, utility and melee, timing and aim, multi-kills, and round situations.
 - **Daily and weekly contracts**: three daily contracts and one weekly, such as "Get 20 kills with SMGs" or "Get 2 kills through walls", pay 500 and 2,500 rank XP. The picks come from the UTC date, so everyone gets the same ones, and they reset at midnight UTC and on Monday. `!contracts` opens them in the panel, and the site's player page shows your progress.
+- **Bounty on the leader**: the human player on the longest current life streak, once it reaches 5 kills, carries a bounty worth 50 rank XP per kill in the streak. Whoever ends the streak collects it, and chat hears when a bounty is placed, every 5 kills after, and when it's collected. Bots never carry one, and `BountyStartKills` and `BountyXpPerKill` tune it (0 turns it off).
 - **Bots count, at a reduced rate**: rank XP against bots is scaled down, while weapon levels and ladders still move, so practice against bots isn't wasted.
 - **Featured weapon of the day**: one gun class (pistols, SMGs, rifles, snipers, shotguns, or machine guns) earns double weapon XP each UTC day. Challenge ladders move at the usual pace. The pick comes from the date, so the panel overview and the site's live page always agree. `FeaturedWeaponMultiplier` sets the multiplier, and 1 turns it off.
 - **Welcome-back bonus**: a player back after 7 or more days away earns double rank XP until they've had 2,000 bonus XP. The join message and the panel overview say how much is left, and what's left is saved, so it carries over between visits. `WelcomeBackDays` sets the gap, and `WelcomeBackXp` the bonus, where 0 turns it off.
 - **Nemesis and rivals**: kills between human players are counted per pair. Your nemesis is whoever has killed you most, at least 3 times, and killing them pays 50 bonus rank XP with a floatie. `!stats` names your nemesis and favourite victim, and the site's player page has a Rivals tab with every head-to-head. `NemesisMinimumKills` and `NemesisKillXp` set the numbers, where 0 XP turns the bonus off. Bots never count.
 - **In-game panel**: `!rank` opens a side panel to the right of the view. It falls back to a center-screen card and then to chat if a way of drawing fails.
 - **XP floaties**: every XP gain floats up as "+XP" text from the center of your screen. Only you see your own. Quick gains add up in one floatie, and skill shots, tiers, and level-ups are named under the number in gold. A `World` mode floats them above the target instead.
-- **Feats**: ten really difficult feats, such as Global Elite, Millionaire, Weapon master, Full ladder, Collector, Chicken overlord, Arsenal (every gun to level 10), and Polymath (a skill shot tier on 20 weapons). They are worked out from the stored progress, announced to the server when earned, and shown as medallions on the progression site.
+- **Daily play streak**: every UTC day in a row with any rank XP adds to the streak. Each new day of a streak is told to the player in chat, and the streak shows on the panel overview and the player page. It's worked out from the daily XP rows already stored, so nothing new is saved.
+- **Feats**: twelve really difficult feats, such as Global Elite, Millionaire, Weapon master, Full ladder, Collector, Chicken overlord, Arsenal (every gun to level 10), Polymath (a skill shot tier on 20 weapons), and Regular and Devoted for 7 and 30 day play streaks. They are worked out from the stored progress, announced to the server when earned, and shown as medallions on the progression site.
 - **Rank tags**: everyone's rank, such as `[GN III]`, shows as their scoreboard clan tag and before their name in chat.
 - **Announcements**: rank-ups, finished tiers, mastery stars, and every fifth weapon level go to the whole server.
 - **Map recap**: when the map ends, each player gets one chat line with the XP, kills and deaths, skill shots, levels, and tiers they earned, and their best moment. The recap also goes to the progression site, which shows it as "Last session" on the player page, and a player who leaves early still gets one there. `AnnounceMapRecap` turns the chat line off.
@@ -150,7 +152,7 @@ Sending runs on the thread pool with a 3 second timeout, and a failure is logged
 
 ### Discord announcements
 
-`Discord` posts the server's big moments to a Discord channel through a webhook: earned feats, epic skill shots, weapon mastery stars, and rank-ups from Gold Nova up. It's off by default, because it sends player names and progress outside the server. With an empty `WebhookUrl`, nothing is posted.
+`Discord` posts the server's big moments to a Discord channel through a webhook: earned feats, epic skill shots, weapon mastery stars, and rank-ups from Gold Nova up, plus a weekly digest every Monday. It's off by default, because it sends player names and progress outside the server. With an empty `WebhookUrl`, nothing is posted.
 
 ```json
 {
@@ -162,6 +164,8 @@ Sending runs on the thread pool with a 3 second timeout, and a failure is logged
     "MasteryStars": true,
     "RankUps": true,
     "MinimumRank": "Gold Nova",
+    "WeeklyDigest": true,
+    "WeeklyDigestPlayers": 5,
     "QueueLimit": 50
   }
 }
@@ -171,17 +175,41 @@ Sending runs on the thread pool with a 3 second timeout, and a failure is logged
 - **`Username`:** the name posts appear under. Empty keeps the name set on the webhook.
 - **`Feats`, `EpicSkillShots`, `MasteryStars`, `RankUps`:** which moments to post.
 - **`MinimumRank`:** the lowest rank whose rank-ups are posted, either a whole rank such as `Gold Nova` (all of its stages) or one stage such as `Gold Nova · III`. A name that matches neither counts as `Gold Nova`.
+- **`WeeklyDigest`:** whether to post a digest of the week before at the first map start after Monday 00:00 UTC: the top climbers by rank XP earned, the rank-ups from `MinimumRank` up, and the weekly contract that starts now. A row in `csp_digests` records each week posted, so a restart never posts it twice, and a week nobody played posts nothing.
+- **`WeeklyDigestPlayers`:** how many top climbers the digest lists, from 1 to 10.
 - **`QueueLimit`:** how many lines wait to post. When Discord is slow or down, the oldest is dropped.
 
 Posting runs on the thread pool, at most one post a second. Lines that arrive meanwhile are joined into the next post, a post Discord rate limits is retried after the wait it asks for, and a failure is logged at most once a minute. Player names are escaped, and posts never ping anyone.
 
+### Kill heatmaps
+
+`Heatmaps` records where kills happen, so the site can draw them over each map's radar at `/heatmaps`, for the whole server or one player (where they got their kills, or where they died). Only kills with a human on either end are kept, each map keeps only its latest `MaxPointsPerMap`, and the oldest are deleted as new ones arrive, so the `csp_kills` table stays a fixed size.
+
+```json
+{
+  "Heatmaps": {
+    "Enabled": true,
+    "SampleEvery": 1,
+    "MaxPointsPerMap": 30000,
+    "QueueLimit": 5000
+  }
+}
+```
+
+- **`Enabled`:** whether kill positions are recorded.
+- **`SampleEvery`:** keep one kill in this many on each map. 1 keeps every kill.
+- **`MaxPointsPerMap`:** how many kills each map keeps. Values under 100 count as 100.
+- **`QueueLimit`:** how many kills wait to be written while the database is down. Past this, the oldest are dropped.
+
+Kills are written in one batch per save interval, on the thread pool. The site sends cell counts on a 128 by 128 grid, never exact positions. The official maps line up with the game's radar from each map's overview file; any other map gets a square fitted around its kills. Radar images aren't shipped, because they're Valve's art: put a 1024 by 1024 PNG at `<DataPath>/radar/<map>.png` (for example `/data/radar/de_dust2.png`, exported from the game's `panorama/images/overheadmaps/<map>_radar_psd` texture with Source 2 Viewer) and the site draws the heat over it. Without one, the page draws an outline from where people fight.
+
 #### The site
 
-The site is a small ASP.NET Core app, published as the image `ghcr.io/ktsu-dev/counterstrikeprogression-site:<version>` with each release (and as `latest`). It shows the live scoreboard and feed on `/`, the rank ladder on `/ranks`, leaderboards for every weapon (by level) and every skill shot (by count), plus the most feats and the rarest skill shots, on `/leaderboards`, a guide to every skill shot with its rarity, weapons, XP, tiers, and how many players have earned it on `/skillshots`, and each player's profile on `/players/{steamId}` (a SteamID64), with their XP feed and suggested next challenges. Ranks show as badges: the color and emblem mark the rank's family, and the pips along the bottom fill with the stage. Pages update live over server-sent events, and a server counts as offline after a few seconds without a batch.
+The site is a small ASP.NET Core app, published as the image `ghcr.io/ktsu-dev/counterstrikeprogression-site:<version>` with each release (and as `latest`). It shows the live scoreboard and feed on `/`, the rank ladder on `/ranks`, leaderboards for every weapon (by level) and every skill shot (by count), plus the most feats and the rarest skill shots, on `/leaderboards`, a guide to every skill shot with its rarity, weapons, XP, tiers, and how many players have earned it on `/skillshots`, kill heatmaps on `/heatmaps`, and each player's profile on `/players/{steamId}` (a SteamID64), with their XP feed and suggested next challenges. Ranks show as badges: the color and emblem mark the rank's family, and the pips along the bottom fill with the stage. Pages update live over server-sent events, and a server counts as offline after a few seconds without a batch.
 
 The image listens on two ports:
 
-- **8080 (public):** `/`, `/ranks`, `/leaderboards`, `/skillshots`, `/players/{steamId}`, `/api/live`, `/api/ranks`, `/api/leaderboards`, `/api/skillshots`, `/api/players/{id}`, `/api/stream`, and `/healthz`. Route this port to visitors.
+- **8080 (public):** `/`, `/ranks`, `/leaderboards`, `/skillshots`, `/heatmaps`, `/players/{steamId}`, `/radar/{map}.png`, `/api/heatmaps`, `/api/live`, `/api/ranks`, `/api/leaderboards`, `/api/skillshots`, `/api/players/{id}`, `/api/stream`, and `/healthz`. Route this port to visitors.
 - **8081 (ingest):** `POST /api/ingest` with the header `Authorization: Bearer <token>`, and `GET /metrics` for Prometheus. Keep this port inside your network, because only the plugin and your scraper need it.
 
 Point the health probe at `/healthz` on port 8080. Port 8081 answers nothing but the ingest and metrics routes, so a probe there always fails.
@@ -194,7 +222,7 @@ Point the health probe at `/healthz` on port 8080. Port 8081 answers nothing but
 - `csp_site_ingest_batches_total` and `csp_site_ingest_failures_total{reason="unauthorized"|"too_large"|"bad_request"}`: batches applied and turned away.
 - `csp_plugin_send_failures_total`, `csp_plugin_batches_dropped_total`, and `csp_plugin_save_failures_total`: the plugin's own counts since it loaded, as of its last batch. They reset when the plugin reloads, and are absent until a batch carries them.
 
-The site reads progress from the plugin's database and never writes to it. Give it a user with `SELECT` on `csp_players`, `csp_weapons`, `csp_challenges`, `csp_seasons`, and `csp_rivals` and nothing else. Until it has `csp_rivals`, player pages still load but show no rivals. The live state and the feed history live in the site's memory and in a file under `/data`, so mount a volume there if the feed should survive a restart. The image runs as the non-root user with UID 1654, so that user must be able to write to the volume (in Kubernetes, set the pod's `fsGroup` to 1654).
+The site reads progress from the plugin's database and never writes to it. Give it a user with `SELECT` on `csp_players`, `csp_weapons`, `csp_challenges`, `csp_seasons`, `csp_rivals`, and `csp_kills` and nothing else. Until it has `csp_rivals`, player pages still load but show no rivals. The live state and the feed history live in the site's memory and in a file under `/data`, so mount a volume there if the feed should survive a restart. The image runs as the non-root user with UID 1654, so that user must be able to write to the volume (in Kubernetes, set the pod's `fsGroup` to 1654).
 
 Configure the site with environment variables:
 
@@ -207,7 +235,7 @@ Configure the site with environment variables:
 | `Site__Database__Password` | empty | The database password. |
 | `Site__Database__RequireTls` | `false` | Whether the database connection must be encrypted. When it's `false`, the site still uses TLS if the server offers it. |
 | `Site__Token` | empty | The bearer token the plugin sends. Empty rejects every batch. |
-| `Site__DataPath` | `/data` | The folder for the feed history file. It must be writable by UID 1654, the user the image runs as. |
+| `Site__DataPath` | `/data` | The folder for the feed history file, and for radar images in its `radar` folder. It must be writable by UID 1654, the user the image runs as. |
 | `Site__OfflineAfterSeconds` | `15` | Seconds without a batch before the server counts as offline. |
 | `Site__FeedLength` | `50` | How many feed entries to keep and show. |
 
@@ -235,6 +263,7 @@ Point the plugin's `Site.Url` at port 8081 and set `Site.Token` to the same valu
 | `csp_weapons` | Steam ID, weapon, weapon XP, level, kills, headshots, hits, shots |
 | `csp_challenges` | Steam ID, weapon, challenge, count, tier reached |
 | `csp_seasons` | Steam ID, season start, rank XP earned in the season |
+| `csp_kills` | Map, killer and victim Steam IDs (0 for a bot), weapon, headshot, both positions, time |
 | `csp_rivals` | Killer's Steam ID, victim's Steam ID, kills |
 | `csp_schema` | The schema version |
 

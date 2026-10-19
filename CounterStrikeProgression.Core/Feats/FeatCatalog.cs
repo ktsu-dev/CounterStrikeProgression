@@ -38,6 +38,12 @@ internal sealed class FeatCatalog(ProgressionSettings settings)
 	/// <summary>The weapons that need a skill shot tier for Polymath.</summary>
 	public const int PolymathWeapons = 20;
 
+	/// <summary>The play streak, in days, that earns Regular.</summary>
+	public const int RegularDays = 7;
+
+	/// <summary>The play streak, in days, that earns Devoted.</summary>
+	public const int DevotedDays = 30;
+
 	/// <summary>Gets every feat, in the order the player page lists them.</summary>
 	public static IReadOnlyList<FeatDefinition> All { get; } =
 	[
@@ -51,6 +57,8 @@ internal sealed class FeatCatalog(ProgressionSettings settings)
 		new("chicken_connoisseur", "Chicken connoisseur", "Earn every chicken skill shot"),
 		new("arsenal", "Arsenal", "Take every gun to level 10"),
 		new("polymath", "Polymath", "Finish a skill shot tier on 20 weapons"),
+		new("regular", "Regular", "Earn XP on 7 days in a row"),
+		new("devoted", "Devoted", "Earn XP on 30 days in a row"),
 	];
 
 	private static readonly WeaponKey[] Guns = [.. WeaponCatalog.All.Where(w => w.IsGun).Select(w => w.Key)];
@@ -154,6 +162,8 @@ internal sealed class FeatCatalog(ProgressionSettings settings)
 			new(chickenShots, ChickenSkillShotIds.Length),
 			new(gunsAtArsenalLevel, Guns.Length),
 			new(weaponsWithSkillTier, PolymathWeapons),
+			new(player.Streak.Best, RegularDays),
+			new(player.Streak.Best, DevotedDays),
 		];
 
 		return [.. All.Zip(measured)];
