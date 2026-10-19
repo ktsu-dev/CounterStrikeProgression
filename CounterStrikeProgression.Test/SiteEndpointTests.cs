@@ -8,6 +8,7 @@ using System.Threading.Channels;
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Rivals;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 using ktsu.CounterStrikeProgression.Site;
@@ -532,6 +533,8 @@ public sealed class SiteEndpointTests
 		public Task<IReadOnlyList<SeasonStanding>> SeasonStandingsAsync(DateOnly start, int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<SeasonStanding>>([]);
 
 		public Task<IReadOnlyList<SeasonResult>> SeasonResultsAsync(ulong steamId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<SeasonResult>>([]);
+
+		public Task<IReadOnlyList<HeadToHead>> HeadToHeadAsync(ulong steamId, int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<HeadToHead>>([]);
 
 		public void Dispose() => Entered.Dispose();
 	}

@@ -75,7 +75,11 @@ internal sealed class Announcer(PluginConfig config)
 					break;
 
 				case NoticeKind.BountyCollected:
-					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} ended {ChatColors.Red}{notice.Target}{ChatColors.Default}'s {notice.Value}-kill streak and collected the {ChatColors.Gold}{Xp(notice.Xp)} XP{ChatColors.Default} bounty!");
+					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} ended {ChatColors.Red}{notice.PlayerName}{ChatColors.Default}'s {notice.Value}-kill streak and collected the {ChatColors.Gold}{Xp(notice.Xp)} XP{ChatColors.Default} bounty!");
+					break;
+
+				case NoticeKind.NemesisKilled:
+					player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} You took down your nemesis {ChatColors.LightRed}{notice.PlayerName}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
 					break;
 
 				case NoticeKind.RankUp:

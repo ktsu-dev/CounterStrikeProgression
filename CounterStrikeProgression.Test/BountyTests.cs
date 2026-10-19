@@ -177,7 +177,7 @@ public sealed class BountyTests
 		Assert.AreEqual(350, result.XpGained);
 		Assert.AreEqual(350, player.RankXp);
 		ProgressionNotice notice = result.Notices.Single(n => n.Kind == NoticeKind.BountyCollected);
-		Assert.AreEqual("Leader", notice.Target);
+		Assert.AreEqual("Leader", notice.PlayerName);
 		Assert.AreEqual(7, notice.Value);
 		Assert.AreEqual(350, notice.Xp);
 		Assert.IsTrue(notice.Broadcast);

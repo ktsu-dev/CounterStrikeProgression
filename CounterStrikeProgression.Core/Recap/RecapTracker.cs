@@ -152,7 +152,7 @@ internal sealed class RecapTracker(DateTime startedAt)
 			NoticeKind.TierCompleted => $"{weapon} {notice.ChallengeName} {PanelBuilder.Numeral(notice.Value)}".TrimStart(),
 			NoticeKind.WeaponLevelUp => $"{weapon} level {notice.Value}".TrimStart(),
 			NoticeKind.MasteryStar => WeaponLevelCurve.StarTitle(notice.Weapon, notice.Value),
-			NoticeKind.BountyCollected => $"{notice.Target}'s bounty",
+			NoticeKind.BountyCollected => $"{notice.PlayerName}'s bounty",
 			_ => weapon is null ? $"{notice.SkillShot?.Name}" : $"{notice.SkillShot?.Name} with the {weapon}",
 		};
 	}
