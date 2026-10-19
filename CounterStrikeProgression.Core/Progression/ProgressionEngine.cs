@@ -393,6 +393,30 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 	}
 
 	/// <summary>
+	/// Pays a bounty to the player who ended its holder's streak. It's paid in full, because the holder is always human.
+	/// </summary>
+	/// <param name="player">The collector's progress.</param>
+	/// <param name="holderName">The name of the player whose streak ended.</param>
+	/// <param name="kills">The streak that ended.</param>
+	/// <param name="xp">What the bounty was worth.</param>
+	/// <returns>What it earned.</returns>
+	public ProgressionResult ApplyBounty(PlayerProgress player, string holderName, int kills, long xp)
+	{
+		Ensure.NotNull(player);
+		Ensure.NotNull(holderName);
+
+		ProgressionResult result = new();
+		if (xp <= 0)
+		{
+			return result;
+		}
+
+		result.Notices.Add(new() { Kind = NoticeKind.BountyCollected, PlayerName = holderName, Value = kills, Xp = xp, Broadcast = true });
+		CreditRankXp(player, xp, result);
+		return Settle(player, result);
+	}
+
+	/// <summary>
 	/// Gets the rank XP a skill shot of a rarity pays.
 	/// </summary>
 	/// <param name="rarity">The rarity.</param>

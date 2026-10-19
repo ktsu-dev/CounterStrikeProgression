@@ -51,6 +51,19 @@ internal sealed record SeasonStanding(ulong SteamId, string Name, int Rank, long
 internal sealed record SeasonResult(DateTime Start, long Xp, long Place, long Players);
 
 /// <summary>
+/// One player's rank XP at the start and end of a span of days, such as last week for the weekly digest.
+/// </summary>
+/// <param name="SteamId">The 64-bit Steam ID.</param>
+/// <param name="Name">The player's last known name.</param>
+/// <param name="StartXp">Their rank XP just before the first day, measured as <see cref="XpHistory.Baseline"/> does.</param>
+/// <param name="EndXp">Their rank XP at the end of the last day.</param>
+internal sealed record PeriodGain(ulong SteamId, string Name, long StartXp, long EndXp)
+{
+	/// <summary>Gets the rank XP earned over the span.</summary>
+	public long Gained => EndXp - StartXp;
+}
+
+/// <summary>
 /// Loads and saves player progress. Calls run off the game thread.
 /// </summary>
 internal interface IProgressionStore
@@ -156,4 +169,22 @@ internal interface IProgressionStore
 	/// <param name="cancellationToken">Cancels the operation.</param>
 	/// <returns>The results, latest season first.</returns>
 	public Task<IReadOnlyList<SeasonResult>> SeasonResultsAsync(ulong steamId, CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Gets every player who earned rank XP from one day up to, but not including, another.
+	/// </summary>
+	/// <param name="start">The first day to count.</param>
+	/// <param name="end">The day after the last day to count.</param>
+	/// <param name="cancellationToken">Cancels the operation.</param>
+	/// <returns>The players who earned any, most first and then by Steam ID.</returns>
+	public Task<IReadOnlyList<PeriodGain>> GainsBetweenAsync(DateOnly start, DateOnly end, CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Records that the weekly digest for a week was posted, unless it already was.
+	/// </summary>
+	/// <param name="week">The Monday the digest is posted for.</param>
+	/// <param name="at">When it's posted, in UTC.</param>
+	/// <param name="cancellationToken">Cancels the operation.</param>
+	/// <returns>True if this call claimed the week, false if an earlier one already had.</returns>
+	public Task<bool> ClaimDigestAsync(DateOnly week, DateTime at, CancellationToken cancellationToken);
 }
