@@ -36,6 +36,8 @@ internal sealed record ChallengeView(
 /// <param name="Level">The weapon level.</param>
 /// <param name="MaxLevel">The highest level a weapon can reach.</param>
 /// <param name="LevelProgress">How far the weapon is to the next level, from 0 to 1.</param>
+/// <param name="Stars">The mastery stars earned past the maximum level.</param>
+/// <param name="StarProgress">How far the weapon is to its next mastery star, from 0 to 1, or 0 below the maximum level.</param>
 /// <param name="Kills">Kills with the weapon.</param>
 /// <param name="HeadshotPercent">Headshot kills as a percentage of kills, from 0 to 100.</param>
 /// <param name="Accuracy">Hits as a percentage of shots, from 0 to 100.</param>
@@ -46,6 +48,8 @@ internal sealed record WeaponView(
 	int Level,
 	int MaxLevel,
 	double LevelProgress,
+	int Stars,
+	double StarProgress,
 	long Kills,
 	double HeadshotPercent,
 	double Accuracy,

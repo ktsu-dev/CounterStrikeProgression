@@ -125,6 +125,8 @@ internal static class PlayerViewBuilder
 			level,
 			curve.MaxLevel,
 			levelProgress,
+			curve.StarsFor(weapon.Xp),
+			Fraction(curve.ProgressToNextStar(weapon.Xp)),
 			weapon.Kills,
 			Percent(weapon.Headshots, weapon.Kills),
 			Percent(weapon.Hits, weapon.Shots),
