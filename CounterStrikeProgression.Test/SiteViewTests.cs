@@ -292,7 +292,7 @@ public sealed class SiteViewTests
 	}
 
 	[TestMethod]
-	public void Suggest_ClosestToNextTierFirst_AtMostTwoPerWeapon_ThenOneNew()
+	public void Suggest_ClosestToNextTierFirst_TwoPerWeaponBeforeTheRest_ThenOneNew()
 	{
 		ProgressionSettings settings = Settings();
 		PlayerProgress player = TestHelpers.Player();
@@ -304,20 +304,50 @@ public sealed class SiteViewTests
 
 		IReadOnlyList<SuggestionView> suggestions = PlayerViewBuilder.Build(player, settings, online: false).Suggestions;
 
-		Assert.HasCount(3, suggestions);
+		Assert.HasCount(4, suggestions);
 		Assert.AreEqual(ChallengeDefinition.KillsId, suggestions[0].ChallengeId);
 		Assert.AreEqual(1, suggestions[0].NextTier);
 		Assert.AreEqual(settings.KillTiers[0], suggestions[0].Target);
 		Assert.AreEqual(settings.VolumeTierXp, suggestions[0].Xp);
 		Assert.IsFalse(suggestions[0].IsNew);
 		Assert.AreEqual(ChallengeDefinition.HeadshotsId, suggestions[1].ChallengeId);
-		SuggestionView fresh = suggestions[2];
+		Assert.AreEqual(ChallengeDefinition.HitsId, suggestions[2].ChallengeId);
+		SuggestionView fresh = suggestions[3];
 		Assert.IsTrue(fresh.IsNew);
 		Assert.AreEqual("ak47", fresh.WeaponKey);
 		Assert.AreEqual(0, fresh.Count);
 		Assert.AreEqual(settings.SkillTierXp, fresh.Xp);
 		Assert.IsNotNull(fresh.Description);
 		Assert.AreEqual(Rarity.Common, SkillShotCatalog.All.Single(s => s.Id.WeakString == fresh.ChallengeId).Rarity);
+	}
+
+	[TestMethod]
+	public void Suggest_SpreadsAcrossWeaponsFirst_AndFillsTen()
+	{
+		ProgressionSettings settings = Settings();
+		PlayerProgress player = TestHelpers.Player();
+		string[] keys = ["ak47", "awp", "deagle"];
+		string[] challenges = [ChallengeDefinition.KillsId, ChallengeDefinition.HeadshotsId, ChallengeDefinition.HitsId];
+		foreach (string key in keys)
+		{
+			WeaponProgress weapon = player.Weapon(TestHelpers.Weapon(key).Key);
+			weapon.Xp = 100;
+			foreach (string challenge in challenges)
+			{
+				weapon.Challenge(challenge).Count = 1;
+			}
+		}
+
+		IReadOnlyList<SuggestionView> suggestions = PlayerViewBuilder.Build(player, settings, online: false).Suggestions;
+
+		Assert.HasCount(ChallengeSuggester.StartedLimit + 1, suggestions);
+		Assert.HasCount(10, suggestions);
+		foreach (string key in keys)
+		{
+			Assert.AreEqual(ChallengeSuggester.PerWeaponLimit, suggestions.Take(6).Count(s => s.WeaponKey == key));
+		}
+
+		Assert.IsTrue(suggestions[^1].IsNew);
 	}
 
 	[TestMethod]
