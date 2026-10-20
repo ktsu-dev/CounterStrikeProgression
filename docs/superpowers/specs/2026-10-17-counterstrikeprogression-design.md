@@ -213,8 +213,8 @@ The overview shows rank, an XP bar, totals, and the weapons closest to their nex
 
 - `!rank` (also `!xp`, `!progress`): opens or closes the panel.
 - `!top`: prints the top 10 by rank XP to chat. `!top <weapon>` prints the top 10 by XP with that weapon.
-- `!next`, `!feats`, `!stats [name]`, and `!site`: the closest tiers, the feats, a one-line summary of a connected player, and the link to the player's page on the site.
-- A welcome line on the first spawn, with the player's rank and a link to their page when `Site.PublicUrl` is set.
+- `!next`, `!feats`, `!stats [name]`, and `!site`: the closest tiers, the feats, a one-line summary of a connected player, and the site's address.
+- A welcome line on the first spawn, with the player's rank and the site's address when `Site.PublicUrl` is set. The address, shown as the bare domain, is also announced to everyone at the start of each match (the first round after warmup) and at the win panel.
 - `css_csp_status` (root admin only): storage and session diagnostics.
 - `css_csp_grant <player> <xp>` and `css_csp_reset <player>` (root admin only, logged): repair a bad save or remove exploited XP. These are the one exception to up-only ranks, since a negative grant puts the rank back to what the remaining XP earns. A correction tells the site to drop its live rows for that player, because the site otherwise keeps the larger of stored and live values.
 

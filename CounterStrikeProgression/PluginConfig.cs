@@ -170,8 +170,8 @@ public sealed class SiteSettings
 	public string Url { get; set; } = "";
 
 	/// <summary>
-	/// Gets or sets the site's public address, such as <c>https://cs2.example.com</c>, which the join message and
-	/// <c>!site</c> link to. It is separate from <see cref="Url"/>, which is usually an address inside the
+	/// Gets or sets the site's public address, such as <c>https://cs2.example.com</c>, which the join message,
+	/// <c>!site</c>, and the match start and end announcements name, shown as just the domain. It is separate from <see cref="Url"/>, which is usually an address inside the
 	/// cluster. With an empty address, the default, no link is shown.
 	/// </summary>
 	[SuppressMessage("Design", "CA1056:URI-like properties should not be strings", Justification = "The config file holds the URL as text, and an empty value means no link. ChatReports parses and validates it.")]

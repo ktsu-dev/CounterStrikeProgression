@@ -14,20 +14,29 @@ public sealed class ChatReportTests
 	public TestContext TestContext { get; set; } = null!;
 
 	[TestMethod]
-	public void ThePlayerPageLinkJoinsTheSiteAndSteamId()
+	public void TheSiteAddressIsJustTheDomain()
 	{
-		Assert.AreEqual("https://cs2.example.com/players/76561198000000001", ChatReports.PlayerPage("https://cs2.example.com", 76561198000000001));
-		Assert.AreEqual("https://cs2.example.com/players/76561198000000001", ChatReports.PlayerPage(" https://cs2.example.com/ ", 76561198000000001));
-		Assert.AreEqual("http://host:8080/csp/players/1", ChatReports.PlayerPage("http://host:8080/csp/?x=1", 1));
+		Assert.AreEqual("cs2.example.com", ChatReports.SiteAddress("https://cs2.example.com"));
+		Assert.AreEqual("cs2.example.com", ChatReports.SiteAddress(" https://cs2.example.com/ "));
+		Assert.AreEqual("cs2.example.com", ChatReports.SiteAddress("http://cs2.example.com:80"));
+		Assert.AreEqual("host:8080/csp", ChatReports.SiteAddress("http://host:8080/csp/?x=1"));
+	}
+
+	[TestMethod]
+	public void TheSiteLineCarriesTheAddress()
+	{
+		Assert.AreEqual("Ranks, stats, and your progress: cs2.example.com", ChatReports.SiteLine("https://cs2.example.com/"));
+		Assert.AreEqual("Ranks, stats, and your progress: [cs2.example.com]", ChatReports.SiteLine("https://cs2.example.com", s => $"[{s}]"));
+		Assert.IsNull(ChatReports.SiteLine(""));
 	}
 
 	[TestMethod]
 	public void NoLinkWithoutAWebAddress()
 	{
-		Assert.IsNull(ChatReports.PlayerPage("", 1));
-		Assert.IsNull(ChatReports.PlayerPage(null, 1));
-		Assert.IsNull(ChatReports.PlayerPage("cs2.example.com", 1));
-		Assert.IsNull(ChatReports.PlayerPage("ftp://cs2.example.com", 1));
+		Assert.IsNull(ChatReports.SiteAddress(""));
+		Assert.IsNull(ChatReports.SiteAddress(null));
+		Assert.IsNull(ChatReports.SiteAddress("cs2.example.com"));
+		Assert.IsNull(ChatReports.SiteAddress("ftp://cs2.example.com"));
 	}
 
 	[TestMethod]
@@ -142,14 +151,14 @@ public sealed class ChatReportTests
 	}
 
 	[TestMethod]
-	public void WelcomeLinesLinkThePageOnlyWithASite()
+	public void WelcomeLinesNameTheSiteOnlyWithOne()
 	{
 		ChatReports reports = new(TestHelpers.Engine());
 		PlayerProgress player = TestHelpers.Player();
 
 		IReadOnlyList<string> withSite = reports.WelcomeLines("Tester", player, "https://cs2.example.com");
 		Assert.HasCount(3, withSite);
-		Assert.AreEqual($"Your progress page: https://cs2.example.com/players/{TestHelpers.SteamId}", withSite[1]);
+		Assert.AreEqual("Ranks, stats, and your progress: cs2.example.com", withSite[1]);
 		Assert.StartsWith("Type !rank", withSite[2]);
 
 		Assert.HasCount(2, reports.WelcomeLines("Tester", player, ""));
@@ -169,7 +178,7 @@ public sealed class ChatReportTests
 		IReadOnlyList<string> exact = reports.StatsFor(online, "alice", "https://cs2.example.com");
 		Assert.HasCount(2, exact);
 		Assert.StartsWith("Alice: ", exact[0]);
-		Assert.AreEqual("https://cs2.example.com/players/1", exact[1]);
+		Assert.AreEqual("More on cs2.example.com", exact[1]);
 
 		IReadOnlyList<string> partial = reports.StatsFor(online, "ob", "");
 		Assert.HasCount(1, partial);
