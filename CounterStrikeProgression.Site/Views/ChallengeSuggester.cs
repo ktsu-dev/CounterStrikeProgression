@@ -13,9 +13,12 @@ using ktsu.CounterStrikeProgression.Core.Weapons;
 internal static class ChallengeSuggester
 {
 	/// <summary>The most started challenges to suggest.</summary>
-	public const int StartedLimit = 4;
+	public const int StartedLimit = 9;
 
-	/// <summary>The most started challenges to suggest for one weapon, so one weapon can't fill the list.</summary>
+	/// <summary>
+	/// The most started challenges to take from one weapon before other weapons have had their turn, so one weapon
+	/// can't crowd out the rest. Slots left over after that are filled from any weapon.
+	/// </summary>
 	public const int PerWeaponLimit = 2;
 
 	/// <summary>
@@ -67,6 +70,7 @@ internal static class ChallengeSuggester
 		}
 
 		List<SuggestionView> suggestions = [];
+		List<SuggestionView> skipped = [];
 		Dictionary<string, int> perWeapon = new(StringComparer.Ordinal);
 		IEnumerable<SuggestionView> closest = started
 			.OrderByDescending(s => s.Score)
@@ -86,7 +90,13 @@ internal static class ChallengeSuggester
 					break;
 				}
 			}
+			else
+			{
+				skipped.Add(view);
+			}
 		}
+
+		suggestions.AddRange(skipped.Take(StartedLimit - suggestions.Count));
 
 		if (NotStarted(weapons, settings, catalog, reroll) is { } fresh)
 		{
