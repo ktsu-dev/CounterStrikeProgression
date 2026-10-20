@@ -482,6 +482,28 @@ td.name {
 	white-space: nowrap;
 }
 
+.suggestion .reroll {
+	background: none;
+	border: 1px solid var(--line);
+	color: var(--muted);
+	font: inherit;
+	font-size: 11px;
+	padding: 0 6px;
+	margin-left: 4px;
+	cursor: pointer;
+}
+
+.suggestion .reroll:hover,
+.suggestion .reroll:focus-visible {
+	border-color: var(--muted);
+	color: var(--text);
+}
+
+.suggestion .reroll:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
 .season-badges {
 	display: flex;
 	flex-wrap: wrap;

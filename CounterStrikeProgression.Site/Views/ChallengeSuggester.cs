@@ -24,6 +24,7 @@ internal static class ChallengeSuggester
 	/// <param name="player">The player's merged progress.</param>
 	/// <param name="settings">The plugin's settings, for the XP a tier pays.</param>
 	/// <param name="catalog">The challenge ladders built from <paramref name="settings"/>.</param>
+	/// <param name="reroll">How many times the player has rerolled the unstarted pick. Each reroll moves to the next one.</param>
 	/// <returns>
 	/// Up to <see cref="StartedLimit"/> started challenges, closest to their next tier first, then one the
 	/// player hasn't started when there is one.
@@ -32,7 +33,7 @@ internal static class ChallengeSuggester
 	/// Closeness is the share of the gap between the last tier and the next one already done, scaled by how
 	/// much the player uses the weapon, so a weapon they barely touch counts half as much as their main one.
 	/// </remarks>
-	public static IReadOnlyList<SuggestionView> Suggest(PlayerProgress player, ProgressionSettings settings, ChallengeCatalog catalog)
+	public static IReadOnlyList<SuggestionView> Suggest(PlayerProgress player, ProgressionSettings settings, ChallengeCatalog catalog, int reroll = 0)
 	{
 		Ensure.NotNull(player);
 		Ensure.NotNull(settings);
@@ -87,7 +88,7 @@ internal static class ChallengeSuggester
 			}
 		}
 
-		if (NotStarted(weapons, settings, catalog) is { } fresh)
+		if (NotStarted(weapons, settings, catalog, reroll) is { } fresh)
 		{
 			suggestions.Add(fresh);
 		}
@@ -96,30 +97,60 @@ internal static class ChallengeSuggester
 	}
 
 	/// <summary>
-	/// Finds a challenge the player hasn't started: the most common unstarted skill challenge on the weapon they
-	/// use most that has one, or else the first Kills tier with the first weapon they haven't used.
+	/// Finds a challenge the player hasn't started. With no rerolls it's the most common unstarted skill challenge
+	/// on the weapon they use most that has one, or else the first Kills tier with the first weapon they haven't used.
 	/// </summary>
-	private static SuggestionView? NotStarted(List<(WeaponInfo Info, WeaponProgress Progress)> weapons, ProgressionSettings settings, ChallengeCatalog catalog)
+	/// <remarks>
+	/// Rerolls walk the unstarted challenges a weapon at a time: the commonest unstarted one on each weapon they
+	/// use, most used first, then the Kills tier on each weapon they haven't used, then the next commonest on each,
+	/// and so on, wrapping round at the end. So a reroll changes the weapon as well as the challenge.
+	/// </remarks>
+	private static SuggestionView? NotStarted(List<(WeaponInfo Info, WeaponProgress Progress)> weapons, ProgressionSettings settings, ChallengeCatalog catalog, int reroll)
 	{
+		List<List<SuggestionView>> perWeapon = [];
 		foreach ((WeaponInfo info, WeaponProgress progress) in weapons)
 		{
-			SuggestionView? skill = catalog.For(info)
-				.Where(d => d.Kind == ChallengeKind.Skill)
-				.OrderBy(d => d.Rarity)
-				.Select(d => Build(info, d, progress, settings, isNew: true))
-				.FirstOrDefault(v => v is { Count: 0 });
-			if (skill is not null)
+			List<SuggestionView> skills =
+			[
+				.. catalog.For(info)
+					.Where(d => d.Kind == ChallengeKind.Skill)
+					.OrderBy(d => d.Rarity)
+					.Select(d => Build(info, d, progress, settings, isNew: true))
+					.OfType<SuggestionView>()
+					.Where(v => v.Count == 0),
+			];
+			if (skills.Count > 0)
 			{
-				return skill;
+				perWeapon.Add(skills);
 			}
 		}
 
 		HashSet<string> used = new(weapons.Select(w => w.Info.Key.WeakString), StringComparer.Ordinal);
-		WeaponInfo? unused = WeaponCatalog.All.FirstOrDefault(w => !used.Contains(w.Key.WeakString));
-		ChallengeDefinition? kills = unused is null ? null : catalog.Find(unused, ChallengeDefinition.KillsId);
-		return unused is null || kills is null
-			? null
-			: Build(unused, kills, new WeaponProgress(unused.Key), settings, isNew: true);
+		foreach (WeaponInfo unused in WeaponCatalog.All.Where(w => !used.Contains(w.Key.WeakString)))
+		{
+			WeaponProgress fresh = new(unused.Key);
+			List<ChallengeDefinition> ladders = [.. catalog.For(unused)];
+			List<SuggestionView> picks =
+			[
+				.. ladders.Where(d => d.Id == ChallengeDefinition.KillsId)
+					.Concat(ladders.Where(d => d.Kind == ChallengeKind.Skill).OrderBy(d => d.Rarity))
+					.Select(d => Build(unused, d, fresh, settings, isNew: true))
+					.OfType<SuggestionView>(),
+			];
+			if (picks.Count > 0)
+			{
+				perWeapon.Add(picks);
+			}
+		}
+
+		List<SuggestionView> order = [];
+		int longest = perWeapon.Count > 0 ? perWeapon.Max(p => p.Count) : 0;
+		for (int round = 0; round < longest; round++)
+		{
+			order.AddRange(perWeapon.Where(p => round < p.Count).Select(p => p[round]));
+		}
+
+		return order.Count == 0 ? null : order[Math.Max(0, reroll) % order.Count];
 	}
 
 	private static SuggestionView? Build(WeaponInfo info, ChallengeDefinition definition, WeaponProgress progress, ProgressionSettings settings, bool isNew)
