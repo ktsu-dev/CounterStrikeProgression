@@ -129,6 +129,17 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	}
 
 	/// <summary>
+	/// Tells everyone the progression site's address, when one is set.
+	/// </summary>
+	public void AnnounceSite()
+	{
+		if (ChatReports.SiteLine(Config.Site.PublicUrl, site => $"{ChatColors.LightBlue}{site}{ChatColors.Default}") is string line)
+		{
+			announcer.AnnounceAll(line);
+		}
+	}
+
+	/// <summary>
 	/// Announces what happened to the bounty and pays a collected one. Call it while the players involved are still
 	/// connected, so their names can be read.
 	/// </summary>

@@ -72,9 +72,9 @@ internal sealed class ChatReports(ProgressionEngine engine)
 			lines.Add($"Welcome-back bonus: your next {Number((long)Math.Ceiling(player.WelcomeBackXp))} rank XP counts double.");
 		}
 
-		if (PlayerPage(siteUrl, player.SteamId) is string page)
+		if (SiteLine(siteUrl) is string site)
 		{
-			lines.Add($"Your progress page: {page}");
+			lines.Add(site);
 		}
 
 		lines.Add("Type !rank for your panel. More: !next !top !feats !stats !site");
@@ -106,9 +106,9 @@ internal sealed class ChatReports(ProgressionEngine engine)
 
 			case 1:
 				List<string> lines = [Stats(matches[0].Name, matches[0].Progress)];
-				if (PlayerPage(siteUrl, matches[0].Progress.SteamId) is string page)
+				if (SiteAddress(siteUrl) is string site)
 				{
-					lines.Add(page);
+					lines.Add($"More on {site}");
 				}
 
 				return lines;
@@ -213,12 +213,24 @@ internal sealed class ChatReports(ProgressionEngine engine)
 	}
 
 	/// <summary>
-	/// Builds the link to a player's page on the progression site.
+	/// Builds the line pointing players at the progression site, sent on joining, at the start and end of each
+	/// match, and by <c>!site</c>.
 	/// </summary>
 	/// <param name="siteUrl">The site's public address, such as <c>https://cs2.example.com</c>.</param>
-	/// <param name="steamId">The player's 64-bit Steam ID.</param>
-	/// <returns>The link, or <see langword="null"/> when no site address is set or it isn't an http or https URL.</returns>
-	public static string? PlayerPage(string? siteUrl, ulong steamId)
+	/// <param name="highlight">Wraps the address, such as in a chat color.</param>
+	/// <returns>The line, or <see langword="null"/> when there is no usable site address.</returns>
+	public static string? SiteLine(string? siteUrl, Func<string, string>? highlight = null) =>
+		SiteAddress(siteUrl) is string site
+			? $"Ranks, stats, and your progress: {(highlight is null ? site : highlight(site))}"
+			: null;
+
+	/// <summary>
+	/// Shortens the progression site's address to what a player types: the host, plus any port and path, with no
+	/// scheme. Chat links aren't clickable, so the short form is easier to read and type.
+	/// </summary>
+	/// <param name="siteUrl">The site's public address, such as <c>https://cs2.example.com</c>.</param>
+	/// <returns>The address, or <see langword="null"/> when no site address is set or it isn't an http or https URL.</returns>
+	public static string? SiteAddress(string? siteUrl)
 	{
 		if (string.IsNullOrWhiteSpace(siteUrl)
 			|| !Uri.TryCreate(siteUrl.Trim(), UriKind.Absolute, out Uri? site)
@@ -227,7 +239,8 @@ internal sealed class ChatReports(ProgressionEngine engine)
 			return null;
 		}
 
-		return $"{site.GetLeftPart(UriPartial.Path).TrimEnd('/')}/players/{steamId.ToString(CultureInfo.InvariantCulture)}";
+		string host = site.IsDefaultPort ? site.Host : $"{site.Host}:{site.Port.ToString(CultureInfo.InvariantCulture)}";
+		return $"{host}{site.AbsolutePath.TrimEnd('/')}";
 	}
 
 	private static string Number(long value) => value.ToString("N0", CultureInfo.InvariantCulture);

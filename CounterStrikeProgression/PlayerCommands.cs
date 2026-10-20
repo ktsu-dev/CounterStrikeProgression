@@ -43,7 +43,7 @@ internal sealed class PlayerCommands(ProgressionServices services, string module
 		plugin.AddCommand("css_next", "Show your three challenges closest to their next tier", OnNext);
 		plugin.AddCommand("css_feats", "Show the feats and how close you are to each", OnFeats);
 		plugin.AddCommand("css_stats", "Show your stats, or a connected player's: !stats <name>", OnStats);
-		plugin.AddCommand("css_site", "Show the link to your page on the progression site", OnSite);
+		plugin.AddCommand("css_site", "Show the progression site's address", OnSite);
 		plugin.AddCommand("css_csp_status", "Show progression storage and session diagnostics", OnStatus);
 	}
 
@@ -189,14 +189,13 @@ internal sealed class PlayerCommands(ProgressionServices services, string module
 
 	private void OnSite(CCSPlayerController? player, CommandInfo command)
 	{
-		if ((player is null) || (services.Sessions.Get(player) is not PlayerSession session))
+		if (player is null)
 		{
 			return;
 		}
 
-		Reply(player, ChatReports.PlayerPage(services.Config.Site.PublicUrl, session.SteamId) is string page
-			? $"Your progress page: {ChatColors.LightBlue}{page}"
-			: "This server has no progression site set up.");
+		Reply(player, ChatReports.SiteLine(services.Config.Site.PublicUrl, site => $"{ChatColors.LightBlue}{site}{ChatColors.Default}")
+			?? "This server has no progression site set up.");
 	}
 
 	private PlayerProgress? LoadedProgress(CCSPlayerController? player)

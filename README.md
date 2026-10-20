@@ -62,9 +62,9 @@ With no database host set, progress is kept in memory and lost when the server r
 | `!next` | Print your three challenges closest to their next tier |
 | `!feats` | Print every feat, with the ones you've earned and how close you are to the rest |
 | `!stats [name]` | Print your rank, XP, kills, headshot share, best weapon, feats, nemesis, and favourite victim, or a connected player's |
-| `!site` | Print the link to your page on the progression site |
+| `!site` | Print the progression site's address |
 
-When a player first spawns, they get a welcome line with their rank, a link to their page on the site (when `Site.PublicUrl` is set), and the commands. `"WelcomeMessage": false` turns it off.
+When a player first spawns, they get a welcome line with their rank, the site's address (when `Site.PublicUrl` is set), and the commands. `"WelcomeMessage": false` turns it off.
 
 While the panel is open, W and S scroll, A and D move between the overview, the contracts, and each weapon, and R closes it. It also closes when you take damage or die.
 
@@ -144,7 +144,7 @@ Settings left out keep their defaults.
 ```
 
 - **`Url`:** the site's ingest endpoint. A URL that isn't absolute http or https is logged and ignored.
-- **`PublicUrl`:** the address players reach the site at, which the welcome line, `!site`, and `!stats` link to. Empty, the default, shows no link.
+- **`PublicUrl`:** the address players reach the site at, which the welcome line, `!site`, and `!stats` name, and which is announced to everyone at the start and end of each match. Chat shows only the domain (plus any port or path), never the scheme or a per-player link. Empty, the default, shows no address.
 - **`Token`:** the shared token the site checks on every batch.
 - **`IntervalSeconds`:** the seconds between batches. Values under 1 count as 1.
 - **`QueueLimit`:** how many batches wait to send. When the site is slow or down, the oldest is dropped, so the game never waits on it.

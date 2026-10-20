@@ -17,6 +17,9 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 	// Set once the match-end recap has gone out, so the map ending doesn't send a second, near-empty one.
 	private bool recapSent;
 
+	// Set at the first round after warmup, so the site's address goes out once at the start of each match.
+	private bool matchStarted;
+
 	private SessionManager Sessions => services.Sessions;
 
 	// Kept from the map start, so a recap names the map that was played even while the next one loads.
@@ -126,6 +129,12 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 	private HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
 	{
 		services.Round.StartRound();
+		if (!matchStarted && !GameState.IsWarmup)
+		{
+			matchStarted = true;
+			services.AnnounceSite();
+		}
+
 		foreach (PlayerSession session in Sessions.All)
 		{
 			session.LastKillWeapon = null;
@@ -157,6 +166,7 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 		}
 
 		recapSent = true;
+		services.AnnounceSite();
 		return HookResult.Continue;
 	}
 
@@ -164,6 +174,7 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 	{
 		MapName = map;
 		recapSent = false;
+		matchStarted = false;
 		services.Bounties.Clear();
 		foreach (PlayerSession session in Sessions.All)
 		{
