@@ -44,7 +44,8 @@ internal sealed record FlashEvent(WeaponInfo Weapon, double BlindSeconds, bool V
 /// </summary>
 /// <param name="EnemiesWhenAlone">How many enemies were alive when the player became the last one standing.</param>
 /// <param name="LastWeapon">The weapon of the player's last kill that round, which takes the ladder progress, if any.</param>
-internal sealed record ClutchEvent(int EnemiesWhenAlone, WeaponInfo? LastWeapon);
+/// <param name="VsBots">Whether every enemy alive at that moment was a bot.</param>
+internal sealed record ClutchEvent(int EnemiesWhenAlone, WeaponInfo? LastWeapon, bool VsBots);
 
 /// <summary>
 /// What a player did over one whole life, across every weapon, for the server records.

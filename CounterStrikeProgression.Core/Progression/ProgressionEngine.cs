@@ -454,14 +454,15 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		if (clutch.LastWeapon is null)
 		{
 			// No weapon to put the ladder progress on, so the clutch pays XP alone.
-			ProgressionNotice notice = new() { Kind = NoticeKind.SkillShot, SkillShot = skillShot, Xp = SkillShotXp(skillShot.Rarity) };
+			double xp = ScaleForBots(SkillShotXp(skillShot.Rarity), clutch.VsBots);
+			ProgressionNotice notice = new() { Kind = NoticeKind.SkillShot, SkillShot = skillShot, Xp = (long)Math.Round(xp), VsBot = clutch.VsBots };
 			result.Notices.Add(notice);
 			result.Signals.Add(new(SignalKind.SkillShot, SkillShot: skillShot));
-			CreditRankXp(player, SkillShotXp(skillShot.Rarity), result);
+			CreditRankXp(player, xp, result);
 			return Settle(player, result);
 		}
 
-		AwardSkillShot(player, clutch.LastWeapon, SkillShotCatalog.Clutch, vsBot: false, result);
+		AwardSkillShot(player, clutch.LastWeapon, SkillShotCatalog.Clutch, clutch.VsBots, result);
 		return Settle(player, result);
 	}
 

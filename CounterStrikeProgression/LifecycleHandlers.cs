@@ -137,11 +137,11 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 	private HookResult OnRoundEnd(EventRoundEnd @event, GameEventInfo info)
 	{
 		if (!GameState.IsWarmup && !GameState.TeammatesAreEnemies
-			&& (services.Round.Clutch(@event.Winner, IsSlotAlive) is (int slot, int enemies))
+			&& (services.Round.Clutch(@event.Winner, IsSlotAlive) is (int slot, int enemies, bool vsBots))
 			&& (Utilities.GetPlayerFromSlot(slot) is CCSPlayerController player)
 			&& (Sessions.Get(player) is { Progress: PlayerProgress progress } session))
 		{
-			services.Apply(player, session, services.Engine.ApplyClutch(progress, new ClutchEvent(enemies, session.LastKillWeapon)));
+			services.Apply(player, session, services.Engine.ApplyClutch(progress, new ClutchEvent(enemies, session.LastKillWeapon, vsBots)));
 		}
 
 		Sessions.SaveAll();
