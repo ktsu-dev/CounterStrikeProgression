@@ -2,6 +2,7 @@
 
 namespace ktsu.CounterStrikeProgression.Core.Storage;
 
+using ktsu.CounterStrikeProgression.Core.Maps;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
@@ -73,11 +74,14 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 	/// </summary>
 	public IReadOnlyList<SeasonRow> Seasons { get; init; } = [];
 
+	/// <summary>Gets the map rows that changed.</summary>
+	public IReadOnlyList<MapRow> Maps { get; init; } = [];
+
 	/// <summary>Gets the rival rows that changed.</summary>
 	public IReadOnlyList<RivalRow> Rivals { get; init; } = [];
 
 	/// <summary>Gets a value indicating whether there's nothing to save.</summary>
-	public bool IsEmpty => (Player is null) && (Weapons.Count == 0) && (Challenges.Count == 0) && (Contracts.Count == 0) && (Seasons.Count == 0) && (Rivals.Count == 0);
+	public bool IsEmpty => (Player is null) && (Weapons.Count == 0) && (Challenges.Count == 0) && (Contracts.Count == 0) && (Seasons.Count == 0) && (Maps.Count == 0) && (Rivals.Count == 0);
 
 	/// <summary>
 	/// Copies a player's changed rows and clears their dirty flags.
@@ -138,6 +142,16 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 			progress.IsSeasonDirty = false;
 		}
 
+		List<MapRow> maps = [];
+		foreach ((string map, MapProgress totals) in progress.Maps)
+		{
+			if (totals.IsDirty)
+			{
+				maps.Add(ToMapRow(progress.SteamId, map, totals));
+				totals.IsDirty = false;
+			}
+		}
+
 		List<RivalRow> rivals = [];
 		foreach ((ulong victim, RivalProgress rival) in progress.Victims)
 		{
@@ -148,7 +162,7 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 			}
 		}
 
-		return new(player, weapons, challenges) { Contracts = contracts, Seasons = seasons, Rivals = rivals };
+		return new(player, weapons, challenges) { Contracts = contracts, Seasons = seasons, Maps = maps, Rivals = rivals };
 	}
 
 	/// <summary>
@@ -172,8 +186,9 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 		}
 
 		List<ContractRow> contracts = [.. progress.Contracts.Select(c => new ContractRow(progress.SteamId, c.Key.Period, c.Key.Contract, c.Value.Count, c.Value.Completed))];
+		List<MapRow> maps = [.. progress.Maps.Select(m => ToMapRow(progress.SteamId, m.Key, m.Value))];
 		List<RivalRow> rivals = [.. progress.Victims.Select(v => new RivalRow(progress.SteamId, v.Key, v.Value.Kills))];
-		return new(ToRow(progress), weapons, challenges) { Contracts = contracts, Seasons = ToSeasonRow(progress) is { } season ? [season] : [], Rivals = rivals };
+		return new(ToRow(progress), weapons, challenges) { Contracts = contracts, Seasons = ToSeasonRow(progress) is { } season ? [season] : [], Maps = maps, Rivals = rivals };
 	}
 
 	/// <summary>
@@ -198,6 +213,19 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 	{
 		Ensure.NotNull(progress);
 		return new(progress.SteamId, progress.Name, progress.RankXp, progress.Rank, progress.FirstSeen, progress.LastSeen, (long)Math.Ceiling(progress.WelcomeBackXp));
+	}
+
+	/// <summary>
+	/// Makes the row for a player's totals on one map.
+	/// </summary>
+	/// <param name="steamId">The player's 64-bit Steam ID.</param>
+	/// <param name="map">The map's stored name.</param>
+	/// <param name="totals">The player's totals on it.</param>
+	/// <returns>The row.</returns>
+	public static MapRow ToMapRow(ulong steamId, string map, MapProgress totals)
+	{
+		Ensure.NotNull(totals);
+		return new(steamId, map, totals.Xp, totals.Kills, totals.Deaths, totals.Seconds, totals.Sessions);
 	}
 
 	/// <summary>
@@ -228,6 +256,11 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 			progress.Contract(row.Period, row.Contract).IsDirty = true;
 		}
 
+		foreach (MapRow row in Maps)
+		{
+			progress.Map(row.Map).IsDirty = true;
+		}
+
 		foreach (RivalRow row in Rivals)
 		{
 			progress.Victim(row.VictimId).IsDirty = true;
@@ -255,9 +288,10 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 	/// <param name="challenges">The player's challenge rows.</param>
 	/// <param name="season">The player's latest season row, if they have one.</param>
 	/// <param name="contracts">The player's contract rows, if any.</param>
+	/// <param name="maps">The player's map rows, if any.</param>
 	/// <param name="daily">The player's daily rows, earliest first, which the play streak is worked out from.</param>
 	/// <returns>The progress, with nothing flagged dirty.</returns>
-	public static PlayerProgress Rebuild(PlayerRow player, IEnumerable<WeaponRow> weapons, IEnumerable<ChallengeRow> challenges, SeasonRow? season = null, IEnumerable<ContractRow>? contracts = null, IEnumerable<DailyRow>? daily = null)
+	public static PlayerProgress Rebuild(PlayerRow player, IEnumerable<WeaponRow> weapons, IEnumerable<ChallengeRow> challenges, SeasonRow? season = null, IEnumerable<ContractRow>? contracts = null, IEnumerable<MapRow>? maps = null, IEnumerable<DailyRow>? daily = null)
 	{
 		Ensure.NotNull(player);
 		Ensure.NotNull(weapons);
@@ -309,6 +343,16 @@ internal sealed record ProgressSnapshot(PlayerRow? Player, IReadOnlyList<WeaponR
 			ContractProgress contract = progress.Contract(row.Period, row.Contract);
 			contract.Count = row.Count;
 			contract.Completed = row.Completed;
+		}
+
+		foreach (MapRow row in maps ?? [])
+		{
+			MapProgress totals = progress.Map(row.Map);
+			totals.Xp = row.Xp;
+			totals.Kills = row.Kills;
+			totals.Deaths = row.Deaths;
+			totals.Seconds = row.Seconds;
+			totals.Sessions = row.Sessions;
 		}
 
 		return progress;

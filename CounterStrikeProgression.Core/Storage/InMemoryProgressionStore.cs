@@ -3,6 +3,7 @@
 namespace ktsu.CounterStrikeProgression.Core.Storage;
 
 using System.Collections.Concurrent;
+using ktsu.CounterStrikeProgression.Core.Maps;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.Rivals;
@@ -20,6 +21,7 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 	private readonly ConcurrentDictionary<(ulong, string, string), ContractRow> contracts = new();
 	private readonly ConcurrentDictionary<(ulong SteamId, DateOnly Day), long> daily = new();
 	private readonly ConcurrentDictionary<(ulong, DateTime), SeasonRow> seasons = new();
+	private readonly ConcurrentDictionary<(ulong SteamId, string Map), MapRow> maps = new();
 	private readonly ConcurrentDictionary<string, RecordRow> records = new(StringComparer.Ordinal);
 	private readonly ConcurrentDictionary<DateOnly, DateTime> digests = new();
 	private readonly ConcurrentDictionary<(ulong SteamId, ulong VictimId), long> rivals = new();
@@ -44,6 +46,7 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 			challenges.Values.Where(c => c.SteamId == steamId),
 			seasons.Values.Where(s => s.SteamId == steamId).MaxBy(s => s.Start),
 			contracts.Values.Where(c => c.SteamId == steamId),
+			maps.Values.Where(m => m.SteamId == steamId),
 			RowsOf(steamId).Select(r => new DailyRow(r.Day.ToDateTime(TimeOnly.MinValue), r.RankXp)));
 		Rivalry.Load(progress, HeadToHeadOf(steamId));
 		return Task.FromResult<PlayerProgress?>(progress);
@@ -78,6 +81,11 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 		foreach (SeasonRow row in snapshot.Seasons)
 		{
 			seasons[(row.SteamId, row.Start)] = row;
+		}
+
+		foreach (MapRow row in snapshot.Maps)
+		{
+			maps[(row.SteamId, row.Map)] = row;
 		}
 
 		foreach (RivalRow row in snapshot.Rivals)
@@ -117,6 +125,11 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 		foreach ((ulong, DateTime) key in seasons.Keys.Where(k => k.Item1 == player.SteamId).ToList())
 		{
 			seasons.TryRemove(key, out _);
+		}
+
+		foreach ((ulong SteamId, string Map) key in maps.Keys.Where(k => k.SteamId == player.SteamId).ToList())
+		{
+			maps.TryRemove(key, out _);
 		}
 
 		foreach ((ulong SteamId, DateOnly Day) key in daily.Keys.Where(k => k.SteamId == player.SteamId).ToList())
@@ -253,6 +266,30 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 				return new SeasonResult(s.Start, s.Xp, season.LongCount(o => o.Xp > s.Xp) + 1, season.LongLength);
 			})];
 		return Task.FromResult(results);
+	}
+
+	/// <inheritdoc/>
+	public Task<IReadOnlyList<MapStanding>> MapStandingsAsync(string map, int count, CancellationToken cancellationToken)
+	{
+		IReadOnlyList<MapStanding> standings = [.. maps.Values
+			.Where(m => string.Equals(m.Map, map, StringComparison.Ordinal) && m.Xp > 0 && players.ContainsKey(m.SteamId))
+			.OrderByDescending(m => m.Xp)
+			.ThenBy(m => m.SteamId)
+			.Take(count)
+			.Select(m => new MapStanding(m.SteamId, players[m.SteamId].Name, players[m.SteamId].Rank, m.Xp, m.Kills, m.Deaths, m.Seconds))];
+		return Task.FromResult(standings);
+	}
+
+	/// <inheritdoc/>
+	public Task<IReadOnlyList<MapSummary>> MapSummariesAsync(CancellationToken cancellationToken)
+	{
+		IReadOnlyList<MapSummary> summaries = [.. maps.Values
+			.Where(m => m.Xp > 0)
+			.GroupBy(m => m.Map, StringComparer.Ordinal)
+			.Select(g => new MapSummary(g.Key, g.LongCount(), g.Sum(m => m.Xp), g.Sum(m => m.Seconds)))
+			.OrderByDescending(s => s.Seconds)
+			.ThenBy(s => s.Map, StringComparer.Ordinal)];
+		return Task.FromResult(summaries);
 	}
 
 	/// <inheritdoc/>

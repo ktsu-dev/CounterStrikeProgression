@@ -4,6 +4,7 @@ namespace ktsu.CounterStrikeProgression.Core.Storage;
 
 using System.Runtime.CompilerServices;
 using Dapper;
+using ktsu.CounterStrikeProgression.Core.Maps;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.Rivals;
@@ -90,6 +91,18 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			xp BIGINT NOT NULL DEFAULT 0,
 			PRIMARY KEY (steam_id, season_start),
 			KEY idx_csp_seasons_xp (season_start, xp)
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+		CREATE TABLE IF NOT EXISTS csp_maps (
+			steam_id BIGINT UNSIGNED NOT NULL,
+			map VARCHAR(64) NOT NULL,
+			xp BIGINT NOT NULL DEFAULT 0,
+			kills BIGINT NOT NULL DEFAULT 0,
+			deaths BIGINT NOT NULL DEFAULT 0,
+			seconds BIGINT NOT NULL DEFAULT 0,
+			sessions BIGINT NOT NULL DEFAULT 0,
+			PRIMARY KEY (steam_id, map),
+			KEY idx_csp_maps_xp (map, xp)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 		CREATE TABLE IF NOT EXISTS csp_records (
@@ -229,6 +242,29 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		ON DUPLICATE KEY UPDATE xp = VALUES(xp);
 		""";
 
+	private const string UpsertMap = """
+		INSERT INTO csp_maps (steam_id, map, xp, kills, deaths, seconds, sessions)
+		VALUES (@SteamId, @Map, @Xp, @Kills, @Deaths, @Seconds, @Sessions)
+		ON DUPLICATE KEY UPDATE xp = VALUES(xp), kills = VALUES(kills), deaths = VALUES(deaths), seconds = VALUES(seconds), sessions = VALUES(sessions);
+		""";
+
+	private const string SelectMaps =
+		"SELECT steam_id AS SteamId, map AS Map, xp AS Xp, kills AS Kills, deaths AS Deaths, seconds AS Seconds, sessions AS Sessions FROM csp_maps WHERE steam_id = @steamId";
+
+	private const string SelectMapStandings = """
+		SELECT m.steam_id AS SteamId, p.name AS Name, p.rank_index AS `Rank`, m.xp AS Xp, m.kills AS Kills, m.deaths AS Deaths, m.seconds AS Seconds
+		FROM csp_maps m JOIN csp_players p ON p.steam_id = m.steam_id
+		WHERE m.map = @map AND m.xp > 0
+		ORDER BY m.xp DESC, m.steam_id ASC LIMIT @count
+		""";
+
+	private const string SelectMapSummaries = """
+		SELECT map AS Map, COUNT(*) AS Players, CAST(SUM(xp) AS SIGNED) AS Xp, CAST(SUM(seconds) AS SIGNED) AS Seconds
+		FROM csp_maps WHERE xp > 0
+		GROUP BY map
+		ORDER BY Seconds DESC, Map ASC
+		""";
+
 	private const string UpsertRival = """
 		INSERT INTO csp_rivals (steam_id, victim_id, kills)
 		VALUES (@SteamId, @VictimId, @Kills)
@@ -306,6 +342,7 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		DELETE FROM csp_contracts WHERE steam_id = @SteamId;
 		DELETE FROM csp_rivals WHERE steam_id = @SteamId;
 		DELETE FROM csp_seasons WHERE steam_id = @SteamId;
+		DELETE FROM csp_maps WHERE steam_id = @SteamId;
 		DELETE FROM csp_daily WHERE steam_id = @SteamId;
 		INSERT INTO csp_daily (steam_id, day, rank_xp) VALUES (@SteamId, DATE(@LastSeen) - INTERVAL 1 DAY, @RankXp);
 		""";
@@ -392,9 +429,14 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			new { steamId, day = DailyRotation.DayKey(today), week = DailyRotation.WeekKey(today) },
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 
+		IEnumerable<MapRow> maps = await connection.QueryAsync<MapRow>(new CommandDefinition(
+			SelectMaps,
+			parameters,
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+
 		IEnumerable<DailyRow> daily = await connection.QueryAsync<DailyRow>(new CommandDefinition(SelectDaily, parameters, cancellationToken: cancellationToken)).ConfigureAwait(false);
 
-		PlayerProgress progress = ProgressSnapshot.Rebuild(player, weapons, challenges, season, contracts, daily);
+		PlayerProgress progress = ProgressSnapshot.Rebuild(player, weapons, challenges, season, contracts, maps, daily);
 		try
 		{
 			Rivalry.Load(progress, await QueryHeadToHeadAsync(connection, steamId, MaxRivalsLoaded, cancellationToken).ConfigureAwait(false));
@@ -446,6 +488,11 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		if (snapshot.Seasons.Count > 0)
 		{
 			await connection.ExecuteAsync(new CommandDefinition(UpsertSeason, snapshot.Seasons, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+		}
+
+		if (snapshot.Maps.Count > 0)
+		{
+			await connection.ExecuteAsync(new CommandDefinition(UpsertMap, snapshot.Maps, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
 		}
 
 		if (snapshot.Rivals.Count > 0)
@@ -554,6 +601,29 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 			new { steamId },
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 		return [.. results];
+	}
+
+	/// <inheritdoc/>
+	public async Task<IReadOnlyList<MapStanding>> MapStandingsAsync(string map, int count, CancellationToken cancellationToken)
+	{
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		IEnumerable<MapStanding> standings = await connection.QueryAsync<MapStanding>(new CommandDefinition(
+			SelectMapStandings,
+			new { map, count },
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+		return [.. standings];
+	}
+
+	/// <inheritdoc/>
+	public async Task<IReadOnlyList<MapSummary>> MapSummariesAsync(CancellationToken cancellationToken)
+	{
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		IEnumerable<MapSummary> summaries = await connection.QueryAsync<MapSummary>(new CommandDefinition(
+			SelectMapSummaries,
+			cancellationToken: cancellationToken)).ConfigureAwait(false);
+		return [.. summaries];
 	}
 
 	/// <inheritdoc/>

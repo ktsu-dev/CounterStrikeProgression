@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading.Channels;
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Live;
+using ktsu.CounterStrikeProgression.Core.Maps;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.Rivals;
@@ -534,6 +535,10 @@ public sealed class SiteEndpointTests
 		public Task<IReadOnlyList<SeasonStanding>> SeasonStandingsAsync(DateOnly start, int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<SeasonStanding>>([]);
 
 		public Task<IReadOnlyList<SeasonResult>> SeasonResultsAsync(ulong steamId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<SeasonResult>>([]);
+
+		public Task<IReadOnlyList<MapStanding>> MapStandingsAsync(string map, int count, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<MapStanding>>([]);
+
+		public Task<IReadOnlyList<MapSummary>> MapSummariesAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<MapSummary>>([]);
 
 		public Task<IReadOnlyList<RecordRow>> RecordsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<RecordRow>>([]);
 
