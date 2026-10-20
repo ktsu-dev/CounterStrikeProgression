@@ -15,5 +15,7 @@
 
   <ItemGroup>
     <PackageReference Include="ktsu.Semantics.Strings" />
+    <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="ValvePak" />
   </ItemGroup>
 </Project>

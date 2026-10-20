@@ -169,28 +169,28 @@ public sealed class HeatmapTests
 			await store.AddAsync([Kill(), Kill("de_mirage", x: -1000, y: 0), Kill("de_mirage", x: -1000, y: 0)], 100, TestContext.CancellationToken).ConfigureAwait(false);
 			using HeatmapReader heatmaps = new(store);
 			using ProgressReader reader = new(new InMemoryProgressionStore());
-			SiteOptions options = new() { DataPath = directory };
+			RadarImages radars = new(new SiteOptions { DataPath = directory });
 			CancellationToken token = TestContext.CancellationToken;
 
-			IResult result = await HeatmapEndpoints.HeatmapsAsync(null, null, null, heatmaps, reader, options, token).ConfigureAwait(false);
+			IResult result = await HeatmapEndpoints.HeatmapsAsync(null, null, null, heatmaps, reader, radars, token).ConfigureAwait(false);
 			HeatmapView view = ((Ok<HeatmapView>)result).Value!;
 			Assert.AreEqual("de_mirage", view.Map);
 			Assert.AreEqual("/radar/de_mirage.png", view.Radar);
 			Assert.AreEqual(2, view.Points);
 			Assert.AreEqual(2, view.Max);
 
-			IResult player = await HeatmapEndpoints.HeatmapsAsync("de_dust2", "deaths", Other.ToString(System.Globalization.CultureInfo.InvariantCulture), heatmaps, reader, options, token).ConfigureAwait(false);
+			IResult player = await HeatmapEndpoints.HeatmapsAsync("de_dust2", "deaths", Other.ToString(System.Globalization.CultureInfo.InvariantCulture), heatmaps, reader, radars, token).ConfigureAwait(false);
 			HeatmapView deaths = ((Ok<HeatmapView>)player).Value!;
 			Assert.AreEqual(HeatmapKind.Deaths, deaths.Kind);
 			Assert.AreEqual(Other, deaths.Player!.SteamId);
 			Assert.AreEqual(1, deaths.Points);
 			Assert.IsNull(deaths.Radar);
 
-			Assert.IsInstanceOfType<NotFound>(await HeatmapEndpoints.HeatmapsAsync("../etc", null, null, heatmaps, reader, options, token).ConfigureAwait(false));
-			Assert.IsInstanceOfType<NotFound>(await HeatmapEndpoints.HeatmapsAsync(null, null, "123", heatmaps, reader, options, token).ConfigureAwait(false));
-			Assert.IsInstanceOfType<PhysicalFileHttpResult>(HeatmapEndpoints.Radar("de_mirage", options));
-			Assert.IsInstanceOfType<NotFound>(HeatmapEndpoints.Radar("de_dust2", options));
-			Assert.IsInstanceOfType<NotFound>(HeatmapEndpoints.Radar("..", options));
+			Assert.IsInstanceOfType<NotFound>(await HeatmapEndpoints.HeatmapsAsync("../etc", null, null, heatmaps, reader, radars, token).ConfigureAwait(false));
+			Assert.IsInstanceOfType<NotFound>(await HeatmapEndpoints.HeatmapsAsync(null, null, "123", heatmaps, reader, radars, token).ConfigureAwait(false));
+			Assert.IsInstanceOfType<PhysicalFileHttpResult>(HeatmapEndpoints.Radar("de_mirage", radars));
+			Assert.IsInstanceOfType<NotFound>(HeatmapEndpoints.Radar("de_dust2", radars));
+			Assert.IsInstanceOfType<NotFound>(HeatmapEndpoints.Radar("..", radars));
 		}
 		finally
 		{

@@ -50,6 +50,7 @@ internal static class Program
 		services.AddSingleton<IProgressionStore>(hasDatabase ? new MySqlProgressionStore(options.Database) : new InMemoryProgressionStore());
 		services.AddSingleton(provider => new ProgressReader(provider.GetRequiredService<IProgressionStore>(), provider.GetRequiredService<TimeProvider>()));
 		services.AddSingleton<IKillMapStore>(hasDatabase ? new MySqlKillMapStore(options.Database) : new InMemoryKillMapStore());
+		services.AddSingleton(new RadarImages(options));
 		services.AddSingleton(provider => new HeatmapReader(provider.GetRequiredService<IKillMapStore>(), provider.GetRequiredService<TimeProvider>()));
 		services.AddHostedService<OnlineWatcher>();
 		services.AddSingleton<FeatIndex>();

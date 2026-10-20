@@ -37,14 +37,14 @@ internal static partial class HeatmapEndpoints
 	/// <param name="player">A SteamID64, or empty for the whole server.</param>
 	/// <param name="heatmaps">Reads the kills.</param>
 	/// <param name="reader">Reads the player's name.</param>
-	/// <param name="options">The site settings, for where radar images are kept.</param>
+	/// <param name="radars">Finds the radar image under the heat.</param>
 	/// <param name="cancellationToken">Stops waiting when the request is aborted.</param>
 	/// <returns>The heatmap, 404 for a bad map name or player id, or 503 when the database can't be read.</returns>
-	public static async Task<IResult> HeatmapsAsync(string? map, string? kind, string? player, HeatmapReader heatmaps, ProgressReader reader, SiteOptions options, CancellationToken cancellationToken)
+	public static async Task<IResult> HeatmapsAsync(string? map, string? kind, string? player, HeatmapReader heatmaps, ProgressReader reader, RadarImages radars, CancellationToken cancellationToken)
 	{
 		Ensure.NotNull(heatmaps);
 		Ensure.NotNull(reader);
-		Ensure.NotNull(options);
+		Ensure.NotNull(radars);
 
 		if (!string.IsNullOrEmpty(map) && !IsMapName(map))
 		{
@@ -83,7 +83,8 @@ internal static partial class HeatmapEndpoints
 				owner = new HeatmapPlayerView(id, stored?.Name ?? string.Empty);
 			}
 
-			string? radar = (shown is not null) && File.Exists(RadarPath(options, shown)) ? $"/radar/{shown}.png" : null;
+			// Only a calibrated map's radar lines up with its kills, so no other is looked for.
+			string? radar = (shown is not null) && (MapOverview.For(shown)?.IsCalibrated == true) && (radars.Find(shown) is not null) ? $"/radar/{shown}.png" : null;
 			return TypedResults.Ok(HeatmapViewBuilder.Build(maps, shown, heat, owner, points, outline, radar));
 		}
 		catch (DbException)
@@ -93,21 +94,15 @@ internal static partial class HeatmapEndpoints
 	}
 
 	/// <summary>
-	/// Serves a map's radar image from the <c>radar</c> folder under the site's data path.
+	/// Serves a map's radar image, put under the site's data path by hand or read out of the game files.
 	/// </summary>
 	/// <param name="map">The map.</param>
-	/// <param name="options">The site settings.</param>
+	/// <param name="radars">Finds the image.</param>
 	/// <returns>The image, or 404 when the site has none for the map.</returns>
-	public static IResult Radar(string map, SiteOptions options)
+	public static IResult Radar(string map, RadarImages radars)
 	{
-		Ensure.NotNull(options);
-		if (!IsMapName(map))
-		{
-			return TypedResults.NotFound();
-		}
-
-		string path = RadarPath(options, map);
-		return File.Exists(path) ? TypedResults.PhysicalFile(path, "image/png") : TypedResults.NotFound();
+		Ensure.NotNull(radars);
+		return IsMapName(map) && (radars.Find(map) is string path) ? TypedResults.PhysicalFile(path, "image/png") : TypedResults.NotFound();
 	}
 
 	/// <summary>
@@ -116,8 +111,6 @@ internal static partial class HeatmapEndpoints
 	/// <param name="map">The text.</param>
 	/// <returns>Whether it's lowercase letters, digits, and underscores, up to 64 long.</returns>
 	public static bool IsMapName(string? map) => (map is not null) && MapName().IsMatch(map);
-
-	private static string RadarPath(SiteOptions options, string map) => Path.Combine(Path.GetFullPath(options.DataPath), "radar", map + ".png");
 
 	[GeneratedRegex("^[a-z0-9_]{1,64}$", RegexOptions.CultureInvariant)]
 	private static partial Regex MapName();

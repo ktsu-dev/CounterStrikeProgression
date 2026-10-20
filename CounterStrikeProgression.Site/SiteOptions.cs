@@ -21,6 +21,9 @@ internal sealed class SiteOptions
 	/// <summary>Gets or sets the folder where the feed history is kept.</summary>
 	public string DataPath { get; set; } = "/data";
 
+	/// <summary>Gets or sets the game's <c>csgo</c> folder, mounted read-only, to read the heatmaps' radar images out of its <c>pak01_dir.vpk</c>. Empty uses only the images put in <c>&lt;DataPath&gt;/radar</c> by hand.</summary>
+	public string GamePath { get; set; } = string.Empty;
+
 	/// <summary>Gets or sets how many seconds without a batch before the server counts as offline.</summary>
 	public double OfflineAfterSeconds { get; set; } = 15;
 
