@@ -74,20 +74,30 @@ internal static class Program
 	{
 		UsePortFilter(app);
 		app.UseStaticFiles();
+		MapPages(app);
+		MapApi(app);
+	}
 
+	private static void MapPages(WebApplication app)
+	{
 		app.MapGet("/", (IWebHostEnvironment environment) => Endpoints.Page(environment, "index.html"));
 		app.MapGet("/ranks", (IWebHostEnvironment environment) => Endpoints.Page(environment, "ranks.html"));
 		app.MapGet("/ladder", (IWebHostEnvironment environment) => Endpoints.Page(environment, "ladder.html"));
 		app.MapGet("/leaderboards", (IWebHostEnvironment environment) => Endpoints.Page(environment, "leaderboards.html"));
 		app.MapGet("/skillshots", (IWebHostEnvironment environment) => Endpoints.Page(environment, "skillshots.html"));
 		app.MapGet("/seasons", (IWebHostEnvironment environment) => Endpoints.Page(environment, "seasons.html"));
-		app.MapGet("/healthz", Endpoints.Health);
-		MapPlayerApi(app);
-		MapApi(app);
+		app.MapGet("/compare", (IWebHostEnvironment environment) => Endpoints.Page(environment, "compare.html"));
 	}
 
-	// Kept apart from the pages, because each handler's parameter types count toward one method's coupling.
 	private static void MapApi(WebApplication app)
+	{
+		app.MapGet("/healthz", Endpoints.Health);
+		MapPlayerApi(app);
+		MapServerApi(app);
+	}
+
+	// Kept apart from MapApi, because each handler's parameter types count toward one method's coupling.
+	private static void MapServerApi(WebApplication app)
 	{
 		app.MapGet("/api/live", Endpoints.Live);
 		app.MapGet("/api/ranks", Endpoints.RanksAsync);
@@ -96,6 +106,7 @@ internal static class Program
 		app.MapGet("/api/skillshots", Endpoints.SkillShotsAsync);
 		app.MapGet("/api/weekly", HistoryEndpoints.WeeklyAsync);
 		app.MapGet("/api/seasons", SeasonEndpoints.SeasonsAsync);
+		app.MapGet("/api/compare", CompareEndpoints.CompareAsync);
 		app.MapGet("/api/maps", MapEndpoints.MapsAsync);
 		app.MapGet("/api/players/{id}/maps", MapEndpoints.PlayerMapsAsync);
 		app.MapGet("/api/records", RecordEndpoints.RecordsAsync);

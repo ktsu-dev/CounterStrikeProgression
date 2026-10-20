@@ -1547,6 +1547,8 @@
 			steam.href = `https://steamcommunity.com/profiles/${id}`;
 			steam.rel = "noopener noreferrer";
 			steam.target = "_blank";
+			const compare = el("a", null, "Compare");
+			compare.href = `/compare?a=${id}`;
 			// The same image is the link preview, so it also works pasted as a forum signature.
 			const card = el("a", null, "Share card");
 			card.href = `/card/${id}.png`;
@@ -1555,7 +1557,7 @@
 			const links = el("span", "player-links");
 			const heat = el("a", null, "Heatmap");
 			heat.href = `/heatmaps?player=${id}`;
-			links.append(heat, card, steam);
+			links.append(compare, heat, card, steam);
 			head.append(left, links);
 
 			const summary = el("div", "pad");
@@ -2267,6 +2269,173 @@
 		load();
 	}
 
+	// The rows of the compare page's head-to-head table: a label, the value to show, and the number that wins (higher is better).
+	const COMPARE_TOTALS = [
+		["Rank XP", (side) => formatXp(side.rankXp), (side) => side.rankXp],
+		["Season XP", (side) => (side.seasonPlace ? `${formatXp(side.seasonXp)} · ${ordinal(side.seasonPlace)}` : formatXp(side.seasonXp)), (side) => side.seasonXp],
+		["Kills", (side) => formatXp(side.kills), (side) => side.kills],
+		["Headshots", (side) => formatPercent(side.headshotPercent), (side) => side.headshotPercent],
+		["Accuracy", (side) => formatPercent(side.accuracy), (side) => side.accuracy],
+		["Weapon levels", (side) => formatXp(side.weaponLevels), (side) => side.weaponLevels],
+		["Tiers", (side) => formatXp(side.tiers), (side) => side.tiers],
+		["Skill shots", (side) => formatXp(side.skillShots), (side) => side.skillShots],
+		["Feats", (side) => `${side.feats}/${Object.keys(FEATS).length}`, (side) => side.feats],
+	];
+
+	// Two cells for one row of the compare page, with the higher value marked.
+	function compareCells(a, b, aValue, bValue) {
+		const aCell = cell("num", a);
+		const bCell = cell("num", b);
+		const x = Number(aValue) || 0;
+		const y = Number(bValue) || 0;
+		if (x > y) {
+			aCell.classList.add("win");
+		} else if (y > x) {
+			bCell.classList.add("win");
+		}
+		return [aCell, bCell];
+	}
+
+	function initCompare(root) {
+		const params = new URLSearchParams(window.location.search);
+		let a = STEAM_ID.test(params.get("a") ?? "") ? params.get("a") : null;
+		let b = STEAM_ID.test(params.get("b") ?? "") ? params.get("b") : null;
+		const top = el("div", "top");
+		const controls = el("div", "pad board-controls");
+		const body = el("div");
+		const panel = el("div", "panel");
+		panel.append(top, controls, body);
+		root.replaceChildren(panel);
+		let players = [];
+
+		function saveQuery() {
+			const query = new URLSearchParams();
+			if (a) {
+				query.set("a", a);
+			}
+			if (b) {
+				query.set("b", b);
+			}
+			const search = query.toString();
+			history.replaceState(null, "", search ? `/compare?${search}` : "/compare");
+		}
+
+		function renderControls() {
+			const options = players.map((row) => [String(row.steamId), row.name]);
+			const choose = (label, selected, onChange) => {
+				const list = selected && !options.some(([value]) => value === selected) ? [[selected, selected], ...options] : options;
+				return picker(label, [["Players", [["", "Pick a player"], ...list]]], selected ?? "", (value) => {
+					onChange(STEAM_ID.test(value) ? value : null);
+					saveQuery();
+					load();
+				});
+			};
+			controls.replaceChildren(choose("Player", a, (value) => { a = value; }), choose("vs", b, (value) => { b = value; }));
+		}
+
+		function sideHead(side) {
+			const head = el("div", "compare-side");
+			const name = el("b", "name");
+			name.append(playerLink(side.steamId, side.name));
+			head.append(name, rankBadge(side.rank, side.rankName), el("span", side.online ? "online" : "muted", side.online ? "online now" : `last seen ${ago(side.lastSeen)}`));
+			return head;
+		}
+
+		function render(view) {
+			const { a: left, b: right } = view;
+			document.title = `${left.name} vs ${right.name} · ${SERVER_NAME}`;
+			const title = el("span");
+			title.append(el("b", null, "Compare"));
+			top.replaceChildren(title, el("span", null, view.season));
+
+			const heads = el("div", "pad compare-heads");
+			heads.append(sideHead(left), el("span", "muted", "vs"), sideHead(right));
+
+			const totals = COMPARE_TOTALS.map(([label, show, value]) => {
+				const tr = el("tr");
+				tr.append(cell(null, label), ...compareCells(show(left), show(right), value(left), value(right)));
+				return tr;
+			});
+
+			const weapons = (Array.isArray(view.weapons) ? view.weapons : []).map((weapon) => {
+				const tr = el("tr");
+				const level = (side) => (side ? `${side.level}` : "—");
+				const kills = (side) => (side ? formatXp(side.kills) : "—");
+				tr.append(
+					cell("name", weapon.displayName),
+					...compareCells(level(weapon.a), level(weapon.b), weapon.a?.level, weapon.b?.level),
+					...compareCells(kills(weapon.a), kills(weapon.b), weapon.a?.kills, weapon.b?.kills),
+				);
+				return tr;
+			});
+
+			const shots = (Array.isArray(view.skillShots) ? view.skillShots : []).map((shot) => {
+				const tr = el("tr");
+				tr.append(cell("name", skillShotTitle(shot, "span")), ...compareCells(formatXp(shot.a), formatXp(shot.b), shot.a, shot.b));
+				return tr;
+			});
+
+			const sections = [
+				heads,
+				table([[""], [left.name, "num"], [right.name, "num"]], totals),
+				el("h2", "section-title pad", "Weapons"),
+				weapons.length > 0
+					? table([["Weapon"], [`${left.name} level`, "num"], [`${right.name} level`, "num"], [`${left.name} kills`, "num"], [`${right.name} kills`, "num"]], weapons)
+					: message("Neither player has weapon progress yet."),
+				el("h2", "section-title pad", "Skill shots"),
+				shots.length > 0
+					? table([["Skill shot"], [left.name, "num"], [right.name, "num"]], shots)
+					: message("Neither player has landed a skill shot yet."),
+			];
+			body.replaceChildren(...sections);
+		}
+
+		function renderEmpty() {
+			document.title = `Compare · ${SERVER_NAME}`;
+			const title = el("span");
+			title.append(el("b", null, "Compare"));
+			top.replaceChildren(title);
+			body.replaceChildren(message(a && a === b ? "Pick two different players." : "Pick two players to compare."));
+		}
+
+		async function load() {
+			if (!a || !b || a === b) {
+				renderEmpty();
+				return;
+			}
+			try {
+				render(await getJson(`/api/compare?a=${a}&b=${b}`));
+			} catch (error) {
+				body.replaceChildren(message(error.status === 404 ? "One of these players hasn't played here yet." : "These players can't be compared right now."));
+			}
+		}
+
+		async function loadPlayers() {
+			try {
+				const rows = await getJson("/api/ranks");
+				players = Array.isArray(rows) ? [...rows].sort((x, y) => String(x.name).localeCompare(String(y.name))) : [];
+			} catch {
+				players = [];
+			}
+			renderControls();
+		}
+
+		const refetch = throttle(load, REFETCH_EVERY_MS);
+		on("progress", (changed) => {
+			if (Array.isArray(changed) && changed.some((changedId) => String(changedId) === a || String(changedId) === b)) {
+				refetch();
+			}
+		});
+		onStatus(({ reconnected }) => {
+			if (reconnected) {
+				refetch();
+			}
+		});
+		renderControls();
+		loadPlayers();
+		load();
+	}
+
 	const pages = {
 		live: initLive,
 		ranks: initRanks,
@@ -2275,6 +2444,7 @@
 		leaderboards: initLeaderboards,
 		skillshots: initSkillShots,
 		seasons: initSeasons,
+		compare: initCompare,
 	};
 
 	document.addEventListener("DOMContentLoaded", () => {
