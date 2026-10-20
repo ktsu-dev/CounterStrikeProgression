@@ -36,6 +36,8 @@
     <PackageReference Include="SkiaSharp" />
     <!-- The chiseled image has no fontconfig, and the cards draw only the embedded fonts, so the build without native dependencies is enough. -->
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />
+    <PackageReference Include="ValvePak" />
+    <PackageReference Include="ValveResourceFormat" />
   </ItemGroup>
 
   <!-- The share cards draw with these, because the container has no fonts. -->

@@ -204,7 +204,7 @@ Posting runs on the thread pool, at most one post a second. Lines that arrive me
 - **`MaxPointsPerMap`:** how many kills each map keeps. Values under 100 count as 100.
 - **`QueueLimit`:** how many kills wait to be written while the database is down. Past this, the oldest are dropped.
 
-Kills are written in one batch per save interval, on the thread pool. The site sends cell counts on a 128 by 128 grid, never exact positions. The official maps line up with the game's radar from each map's overview file; any other map gets a square fitted around its kills. Radar images aren't shipped, because they're Valve's art: put a 1024 by 1024 PNG at `<DataPath>/radar/<map>.png` (for example `/data/radar/de_dust2.png`, exported from the game's `panorama/images/overheadmaps/<map>_radar_psd` texture with Source 2 Viewer) and the site draws the heat over it. Without one, the page draws an outline from where people fight.
+Kills are written in one batch per save interval, on the thread pool. The site sends cell counts on a 128 by 128 grid, never exact positions. The official maps line up with the game's radar from each map's overview file; any other map gets a square fitted around its kills. Radar images aren't shipped, because they're Valve's art. Instead, point `Site__GamePath` at the game server's `csgo` folder (mounted read-only) and the site reads each map's radar out of that install's own `pak01_dir.vpk` the first time the map is shown, keeping a 1024 by 1024 PNG under `<DataPath>/radar/game` until the next game update. A PNG put at `<DataPath>/radar/<map>.png` by hand wins over it. Without either, the page draws an outline from where people fight.
 
 #### The site
 
@@ -239,6 +239,7 @@ Configure the site with environment variables:
 | `Site__Database__RequireTls` | `false` | Whether the database connection must be encrypted. When it's `false`, the site still uses TLS if the server offers it. |
 | `Site__Token` | empty | The bearer token the plugin sends. Empty rejects every batch. |
 | `Site__DataPath` | `/data` | The folder for the feed history file, and for radar images in its `radar` folder. It must be writable by UID 1654, the user the image runs as. |
+| `Site__GamePath` | empty | The game server's `csgo` folder, holding `pak01_dir.vpk`, to read the heatmaps' radar images from. Empty uses only the images in `<DataPath>/radar`. |
 | `Site__OfflineAfterSeconds` | `15` | Seconds without a batch before the server counts as offline. |
 | `Site__FeedLength` | `50` | How many feed entries to keep and show. |
 
