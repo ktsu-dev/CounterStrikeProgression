@@ -1086,8 +1086,23 @@
 		["weapons", "Weapons"],
 		["feats", "Feats"],
 		["history", "History"],
+		["maps", "Maps"],
 		["rivals", "Rivals"],
 	];
+
+	function formatPlaytime(seconds) {
+		const minutes = Math.round((Number(seconds) || 0) / 60);
+		if (minutes < 60) {
+			return `${minutes}m`;
+		}
+		return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+	}
+
+	function formatKd(kills, deaths) {
+		const k = Number(kills) || 0;
+		const d = Number(deaths) || 0;
+		return d > 0 ? (k / d).toFixed(2) : k > 0 ? "∞" : "—";
+	}
 
 	// A head-to-head written as the player's kills first, the way !stats writes it.
 	function headToHead(rival) {
@@ -1117,6 +1132,10 @@
 		let history = null;
 		let historySpan = HISTORY_SPANS[0];
 		let historyLoading = false;
+		// The player's maps, fetched when the maps tab opens and again as progress arrives while it's open.
+		let maps = null;
+		let mapsLoading = false;
+
 		// Nemesis, victim, and head-to-heads, fetched with the page.
 		let rivals = null;
 
@@ -1307,6 +1326,66 @@
 			return box;
 		}
 
+		async function loadMaps() {
+			if (mapsLoading) {
+				return;
+			}
+			mapsLoading = true;
+			try {
+				maps = await getJson(`/api/players/${id}/maps`);
+			} catch {
+				maps = maps ?? { failed: true };
+			} finally {
+				mapsLoading = false;
+			}
+			if (last && tab === "maps") {
+				render(last);
+			}
+		}
+
+		function renderMaps() {
+			if (maps === null) {
+				loadMaps();
+				return message("Loading…");
+			}
+			if (maps.failed) {
+				return message("The maps can't be loaded right now.");
+			}
+			const list = Array.isArray(maps.maps) ? maps.maps : [];
+			if (list.length === 0) {
+				return message("No maps yet. Each map's totals show up here once it ends or you leave it.");
+			}
+			const box = el("div", "pad");
+			const best = list.find((map) => map.map === maps.best);
+			const stats = el("div", "weapon-stats");
+			const totalSeconds = list.reduce((sum, map) => sum + (Number(map.seconds) || 0), 0);
+			for (const [value, label] of [
+				[best ? best.map : "—", best ? `best map · ${formatXp(best.xpPerHour)} XP/h` : `best map · needs ${maps.minimumMinutes} min on one`],
+				[list.length, list.length === 1 ? "map played" : "maps played"],
+				[formatPlaytime(totalSeconds), "played"],
+			]) {
+				const stat = el("div", "stat");
+				stat.append(el("b", null, value), el("span", "muted", label));
+				stats.append(stat);
+			}
+			const rows = list.map((map) => {
+				const tr = el("tr", map.map === maps.best ? "best-map" : null);
+				const name = el("a", null, map.map);
+				name.href = `/leaderboards#map=${encodeURIComponent(map.map)}`;
+				tr.append(
+					cell("name", name),
+					cell("num", formatXp(map.xp)),
+					cell("num", formatXp(map.xpPerHour)),
+					cell("num", `${formatXp(map.kills)}/${formatXp(map.deaths)}`),
+					cell("num", formatKd(map.kills, map.deaths)),
+					cell("num", formatPlaytime(map.seconds)),
+				);
+				return tr;
+			});
+			box.append(stats, table([["Map"], ["XP", "num"], ["XP/h", "num"], ["K/D", "num"], ["Ratio", "num"], ["Played", "num"]], rows));
+			return box;
+		}
+
 		function renderRivals() {
 			if (rivals === null) {
 				return message("Loading…");
@@ -1390,6 +1469,8 @@
 					return renderFeats(player);
 				case "history":
 					return renderHistory();
+				case "maps":
+					return renderMaps();
 				case "rivals":
 					return renderRivals();
 				default:
@@ -1440,6 +1521,9 @@
 			tab = key;
 			if (key === "history" && history !== null) {
 				loadHistory();
+			}
+			if (key === "maps" && maps !== null) {
+				loadMaps();
 			}
 			if (updateHash) {
 				window.history.replaceState(null, "", `#${key}`);
@@ -1529,6 +1613,9 @@
 			}
 			if (tab === "history" && history !== null) {
 				loadHistory();
+			}
+			if (tab === "maps" && maps !== null) {
+				loadMaps();
 			}
 		}
 
@@ -1697,11 +1784,13 @@
 		const recordPanel = el("div", "panel");
 		const weaponPanel = el("div", "panel");
 		const shotPanel = el("div", "panel");
-		root.replaceChildren(head, recordPanel, weaponPanel, shotPanel);
+		const mapPanel = el("div", "panel");
+		root.replaceChildren(head, recordPanel, weaponPanel, shotPanel, mapPanel);
 
 		let last = null;
 		let weaponKey = hashParams().get("weapon");
 		let shotId = hashParams().get("shot");
+		let mapName = hashParams().get("map");
 
 		function saveHash() {
 			const params = new URLSearchParams();
@@ -1711,7 +1800,46 @@
 			if (shotId) {
 				params.set("shot", shotId);
 			}
+			if (mapName) {
+				params.set("map", mapName);
+			}
 			history.replaceState(null, "", `#${params}`);
+		}
+
+		function renderMap(view) {
+			const choices = Array.isArray(view.maps) ? view.maps : [];
+			const shown = choices.find((m) => m.map === view.map);
+			const strip = el("div", "top");
+			const label = el("span");
+			label.append(el("b", null, "Maps"));
+			strip.append(label, el("span", null, shown ? `${plural(shown.players, "player", "players")} · ${formatPlaytime(shown.seconds)} played` : ""));
+			const body = el("div", "pad");
+			if (choices.length === 0) {
+				body.append(message("No maps yet. Each map's totals show up here once it ends."));
+				mapPanel.replaceChildren(strip, body);
+				return;
+			}
+			body.append(picker("Map", [["Most played first", choices.map((m) => [m.map, `${m.map} · ${m.players}`])]], view.map, (value) => {
+				mapName = value;
+				saveHash();
+				loadMap();
+			}));
+			body.append(boardTable(view.rows, [["XP", "num"], ["XP/h", "num"], ["K/D", "num"], ["Played", "num"]], (row) => [
+				cell("num", formatXp(row.xp)),
+				cell("num", formatXp(row.xpPerHour)),
+				cell("num", formatKd(row.kills, row.deaths)),
+				cell("num", formatPlaytime(row.seconds)),
+			], `Nobody has earned XP on ${view.map} yet.`));
+			mapPanel.replaceChildren(strip, body);
+		}
+
+		async function loadMap() {
+			try {
+				const query = mapName ? `?map=${encodeURIComponent(mapName)}` : "";
+				renderMap(await getJson(`/api/maps${query}`));
+			} catch {
+				mapPanel.replaceChildren(message("The map boards can't be loaded right now."));
+			}
 		}
 
 		function renderOverview(view) {
@@ -1886,12 +2014,18 @@
 		}
 
 		async function load() {
+			loadMap();
 			await Promise.all([loadBoards(), loadRecords()]);
 		}
 
 		window.addEventListener("hashchange", () => {
 			weaponKey = hashParams().get("weapon") ?? weaponKey;
 			shotId = hashParams().get("shot") ?? shotId;
+			const map = hashParams().get("map");
+			if (map && map !== mapName) {
+				mapName = map;
+				loadMap();
+			}
 			if (last) {
 				render(last);
 			}

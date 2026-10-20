@@ -55,10 +55,18 @@ internal sealed class LifeTracker
 	/// <param name="weapon">The weapon.</param>
 	/// <param name="headshot">Whether it hit the head.</param>
 	/// <param name="vsBot">Whether the target was a bot.</param>
+	/// <param name="vsTeammate">
+	/// Whether the target was a teammate. Team damage never pays, so the hit isn't counted, but the shot still is.
+	/// </param>
 	/// <param name="tick">The server tick, which merges pellets and wallbang pass-throughs into one hit.</param>
-	public void Hit(WeaponInfo weapon, bool headshot, bool vsBot, int tick)
+	public void Hit(WeaponInfo weapon, bool headshot, bool vsBot, bool vsTeammate, int tick)
 	{
 		Ensure.NotNull(weapon);
+		if (vsTeammate)
+		{
+			return;
+		}
+
 		Counts counts = CountsFor(weapon);
 		if (counts.LastHitTick == tick)
 		{

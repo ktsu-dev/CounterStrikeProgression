@@ -2,6 +2,7 @@
 
 namespace ktsu.CounterStrikeProgression.Core.Storage;
 
+using ktsu.CounterStrikeProgression.Core.Maps;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.Rivals;
@@ -170,6 +171,22 @@ internal interface IProgressionStore
 	/// <param name="cancellationToken">Cancels the operation.</param>
 	/// <returns>The results, latest season first.</returns>
 	public Task<IReadOnlyList<SeasonResult>> SeasonResultsAsync(ulong steamId, CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Gets the players who earned the most rank XP on one map, ordered by that XP and then Steam ID.
+	/// </summary>
+	/// <param name="map">The map's stored name.</param>
+	/// <param name="count">How many to return.</param>
+	/// <param name="cancellationToken">Cancels the operation.</param>
+	/// <returns>The board, highest first.</returns>
+	public Task<IReadOnlyList<MapStanding>> MapStandingsAsync(string map, int count, CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Gets every map anyone has earned XP on, with everyone's totals.
+	/// </summary>
+	/// <param name="cancellationToken">Cancels the operation.</param>
+	/// <returns>The maps, most played first and then by name.</returns>
+	public Task<IReadOnlyList<MapSummary>> MapSummariesAsync(CancellationToken cancellationToken);
 
 	/// <summary>
 	/// Gets every server record's holder.

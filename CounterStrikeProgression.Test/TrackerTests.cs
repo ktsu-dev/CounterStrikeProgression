@@ -4,6 +4,7 @@ namespace ktsu.CounterStrikeProgression.Test;
 
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Events;
+using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Tracking;
 
 [TestClass]
@@ -194,9 +195,9 @@ public sealed class TrackerTests
 		LifeTracker life = new();
 		Core.Weapons.WeaponInfo nova = TestHelpers.Weapon("nova");
 		life.Shot(nova);
-		life.Hit(nova, headshot: false, vsBot: false, tick: 10);
-		life.Hit(nova, headshot: false, vsBot: false, tick: 10);
-		life.Hit(nova, headshot: true, vsBot: false, tick: 10);
+		life.Hit(nova, headshot: false, vsBot: false, vsTeammate: false, tick: 10);
+		life.Hit(nova, headshot: false, vsBot: false, vsTeammate: false, tick: 10);
+		life.Hit(nova, headshot: true, vsBot: false, vsTeammate: false, tick: 10);
 
 		WeaponLifeStats stats = life.EndLife().Single();
 		Assert.AreEqual(1, stats.Shots);
@@ -211,7 +212,7 @@ public sealed class TrackerTests
 		Core.Weapons.WeaponInfo deagle = TestHelpers.Weapon("deagle");
 		life.Shot(ak);
 		life.Shot(ak);
-		life.Hit(ak, headshot: true, vsBot: true, tick: 1);
+		life.Hit(ak, headshot: true, vsBot: true, vsTeammate: false, tick: 1);
 		life.Shot(deagle);
 
 		IReadOnlyList<WeaponLifeStats> stats = life.EndLife();
@@ -221,5 +222,50 @@ public sealed class TrackerTests
 		Assert.AreEqual(1, akStats.HeadshotHits);
 		Assert.IsTrue(akStats.MostlyBots);
 		Assert.IsEmpty(life.EndLife());
+	}
+
+	[TestMethod]
+	public void TeammateHitsCountAsShotsButNotHits()
+	{
+		LifeTracker life = new();
+		Core.Weapons.WeaponInfo ak = TestHelpers.Weapon("ak47");
+		for (int tick = 1; tick <= 10; tick++)
+		{
+			life.Shot(ak);
+		}
+
+		for (int tick = 1; tick <= 4; tick++)
+		{
+			life.Hit(ak, headshot: false, vsBot: false, vsTeammate: false, tick: tick);
+		}
+
+		for (int tick = 5; tick <= 8; tick++)
+		{
+			life.Hit(ak, headshot: true, vsBot: true, vsTeammate: true, tick: tick);
+		}
+
+		Assert.AreEqual(new LifeTotals(0, 0, 10, 4, 0), life.Totals);
+		WeaponLifeStats stats = life.EndLife().Single();
+		Assert.AreEqual(10, stats.Shots);
+		Assert.AreEqual(4, stats.Hits);
+		Assert.AreEqual(0, stats.HeadshotHits);
+		Assert.IsFalse(stats.MostlyBots);
+
+		ProgressionEngine engine = TestHelpers.Engine();
+		Assert.IsEmpty(TestHelpers.SkillShots(engine.ApplyLifeEnd(TestHelpers.Player(), stats)));
+	}
+
+	[TestMethod]
+	public void ATeammateHitDoesNotHideAnEnemyHitOnTheSameTick()
+	{
+		LifeTracker life = new();
+		Core.Weapons.WeaponInfo ak = TestHelpers.Weapon("ak47");
+		life.Shot(ak);
+		life.Hit(ak, headshot: false, vsBot: false, vsTeammate: true, tick: 3);
+		life.Hit(ak, headshot: true, vsBot: false, vsTeammate: false, tick: 3);
+
+		WeaponLifeStats stats = life.EndLife().Single();
+		Assert.AreEqual(1, stats.Hits);
+		Assert.AreEqual(1, stats.HeadshotHits);
 	}
 }

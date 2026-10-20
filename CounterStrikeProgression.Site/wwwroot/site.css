@@ -694,6 +694,15 @@ tr.place-3 td.num:first-child {
 	display: block;
 	font-size: 16px;
 	color: var(--text);
+	overflow-wrap: anywhere;
+}
+
+tr.best-map td {
+	background: var(--gold-bg);
+}
+
+tr.best-map td.name a {
+	color: var(--gold);
 }
 
 .challenge-group {

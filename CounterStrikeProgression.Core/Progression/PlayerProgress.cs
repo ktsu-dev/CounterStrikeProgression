@@ -2,6 +2,7 @@
 
 namespace ktsu.CounterStrikeProgression.Core.Progression;
 
+using ktsu.CounterStrikeProgression.Core.Maps;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 using ktsu.Extensions;
 
@@ -142,6 +143,9 @@ internal sealed class PlayerProgress(ulong steamId)
 	/// <summary>Gets the player's contracts, keyed by the period's key and the contract id. Only current periods are loaded.</summary>
 	public Dictionary<(string Period, string Contract), ContractProgress> Contracts { get; } = [];
 
+	/// <summary>Gets the player's totals on each map they've played, keyed by the map's stored name.</summary>
+	public Dictionary<string, MapProgress> Maps { get; } = new(StringComparer.Ordinal);
+
 	/// <summary>Gets the humans the player has killed, keyed by their Steam ID. Saved to <c>csp_rivals</c>.</summary>
 	public Dictionary<ulong, RivalProgress> Victims { get; } = [];
 
@@ -182,6 +186,13 @@ internal sealed class PlayerProgress(ulong steamId)
 	/// <param name="contract">The contract id.</param>
 	/// <returns>The contract's progress.</returns>
 	public ContractProgress Contract(string period, string contract) => Contracts.GetOrCreate((period, contract));
+
+	/// <summary>
+	/// Gets a map's totals, creating them when the player hasn't played it.
+	/// </summary>
+	/// <param name="map">The map's stored name.</param>
+	/// <returns>The map's totals.</returns>
+	public MapProgress Map(string map) => Maps.GetOrCreate(map);
 
 	/// <summary>
 	/// Gets the player's kills of one other human, creating the row when they haven't killed them.

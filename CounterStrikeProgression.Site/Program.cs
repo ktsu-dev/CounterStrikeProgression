@@ -107,6 +107,8 @@ internal static class Program
 		app.MapGet("/api/weekly", HistoryEndpoints.WeeklyAsync);
 		app.MapGet("/api/seasons", SeasonEndpoints.SeasonsAsync);
 		app.MapGet("/api/compare", CompareEndpoints.CompareAsync);
+		app.MapGet("/api/maps", MapEndpoints.MapsAsync);
+		app.MapGet("/api/players/{id}/maps", MapEndpoints.PlayerMapsAsync);
 		app.MapGet("/api/records", RecordEndpoints.RecordsAsync);
 		app.MapGet("/api/stream", Endpoints.Stream);
 		app.MapPost(Endpoints.IngestRoute, Endpoints.IngestAsync);
