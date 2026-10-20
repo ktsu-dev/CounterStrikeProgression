@@ -132,6 +132,25 @@ public sealed class RecordTests
 	}
 
 	[TestMethod]
+	public void TeammateHitsCannotSetTheAccuracyRecord()
+	{
+		LifeTracker life = new();
+		WeaponInfo ak = TestHelpers.Weapon("ak47");
+		for (int tick = 1; tick <= 40; tick++)
+		{
+			life.Shot(ak);
+			life.Hit(ak, headshot: false, vsBot: false, vsTeammate: tick > 10, tick: tick);
+		}
+
+		ProgressionEngine engine = LoadedEngine();
+		PlayerProgress player = TestHelpers.Player();
+		_ = engine.ApplyLifeRecords(player, new LifeTotals(0, 0, 40, 20, 0));
+
+		IReadOnlyList<ProgressionNotice> notices = Records(engine.ApplyLifeRecords(player, life.Totals));
+		Assert.IsFalse(notices.Any(n => n.Record!.Definition.Id == RecordCatalog.LifeAccuracyId));
+	}
+
+	[TestMethod]
 	public void BeatingYourOwnRecordSaysSo()
 	{
 		ProgressionEngine engine = LoadedEngine();
@@ -175,8 +194,8 @@ public sealed class RecordTests
 		life.Shot(ak);
 		life.Shot(ak);
 		life.Shot(deagle);
-		life.Hit(ak, headshot: false, vsBot: true, tick: 1);
-		life.Hit(deagle, headshot: true, vsBot: false, tick: 1);
+		life.Hit(ak, headshot: false, vsBot: true, vsTeammate: false, tick: 1);
+		life.Hit(deagle, headshot: true, vsBot: false, vsTeammate: false, tick: 1);
 		life.Kill(vsBot: true);
 		life.Kill(vsBot: false);
 
