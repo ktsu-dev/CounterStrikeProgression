@@ -1,6 +1,6 @@
-## v1.19.1 (patch)
+## v1.19.2 (patch)
 
-Changes since v1.19.0:
+Changes since v1.19.1:
 
-- [patch] Scale a clutch against only bots by BotXpMultiplier (Claude)
+- Add a SessionStart hook for Claude Code cloud sessions (Claude)
 
