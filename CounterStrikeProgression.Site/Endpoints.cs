@@ -166,12 +166,13 @@ internal static class Endpoints
 	/// Gets one player's page.
 	/// </summary>
 	/// <param name="id">The SteamID64 from the URL.</param>
+	/// <param name="reroll">How many times the viewer has rerolled the "try something new" suggestion. Omitted or negative, none.</param>
 	/// <param name="reader">Reads the stored progress.</param>
 	/// <param name="live">The live state.</param>
 	/// <param name="cancellationToken">Stops waiting when the request is aborted.</param>
 	/// <param name="feats">The feats each player has earned, kept current here.</param>
 	/// <returns>The player, 404 for a bad or unknown id, or 503 when the database can't be read.</returns>
-	public static async Task<IResult> PlayerAsync(string id, ProgressReader reader, LiveState live, FeatIndex feats, CancellationToken cancellationToken)
+	public static async Task<IResult> PlayerAsync(string id, int? reroll, ProgressReader reader, LiveState live, FeatIndex feats, CancellationToken cancellationToken)
 	{
 		Ensure.NotNull(reader);
 		Ensure.NotNull(live);
@@ -198,7 +199,7 @@ internal static class Endpoints
 		}
 
 		PlayerProgress merged = ProgressMerge.Merge(stored, overlay);
-		PlayerView view = PlayerViewBuilder.Build(merged, live.Settings, live.IsPlaying(steamId), live.PlayerFeed(steamId), live.LastSession(steamId));
+		PlayerView view = PlayerViewBuilder.Build(merged, live.Settings, live.IsPlaying(steamId), live.PlayerFeed(steamId), live.LastSession(steamId), reroll: reroll ?? 0);
 		feats.Set(steamId, view.Feats.Where(f => f.Earned).Select(f => FeatCatalog.All.First(d => d.Id == f.Id)));
 		return TypedResults.Ok(view);
 	}

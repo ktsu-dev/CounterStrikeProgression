@@ -191,7 +191,7 @@ public sealed class SiteEndpointTests
 	{
 		using ProgressReader reader = new(new InMemoryProgressionStore());
 
-		IResult result = await Endpoints.PlayerAsync("76561197993183173", reader, NewState(), new FeatIndex(), CancellationToken.None).ConfigureAwait(false);
+		IResult result = await Endpoints.PlayerAsync("76561197993183173", null, reader, NewState(), new FeatIndex(), CancellationToken.None).ConfigureAwait(false);
 
 		Assert.IsInstanceOfType<NotFound>(result);
 	}
@@ -201,7 +201,7 @@ public sealed class SiteEndpointTests
 	{
 		using ProgressReader reader = new(new InMemoryProgressionStore());
 
-		IResult result = await Endpoints.PlayerAsync("not-a-steam-id", reader, NewState(), new FeatIndex(), CancellationToken.None).ConfigureAwait(false);
+		IResult result = await Endpoints.PlayerAsync("not-a-steam-id", null, reader, NewState(), new FeatIndex(), CancellationToken.None).ConfigureAwait(false);
 
 		Assert.IsInstanceOfType<NotFound>(result);
 	}
@@ -213,7 +213,7 @@ public sealed class SiteEndpointTests
 		await store.SaveAsync(ProgressSnapshot.CaptureAll(TestHelpers.Player()), CancellationToken.None).ConfigureAwait(false);
 		using ProgressReader reader = new(store);
 
-		IResult result = await Endpoints.PlayerAsync(TestHelpers.SteamId.ToString(System.Globalization.CultureInfo.InvariantCulture), reader, NewState(), new FeatIndex(), CancellationToken.None).ConfigureAwait(false);
+		IResult result = await Endpoints.PlayerAsync(TestHelpers.SteamId.ToString(System.Globalization.CultureInfo.InvariantCulture), null, reader, NewState(), new FeatIndex(), CancellationToken.None).ConfigureAwait(false);
 
 		Ok<PlayerView> ok = Assert.IsInstanceOfType<Ok<PlayerView>>(result);
 		Assert.AreEqual("Tester", ok.Value?.Name);

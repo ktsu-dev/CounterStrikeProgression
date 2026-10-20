@@ -29,8 +29,9 @@ internal static class PlayerViewBuilder
 	/// <param name="feed">The player's feed, newest first. Omitted, the page shows none.</param>
 	/// <param name="lastSession">The player's last map recap. Omitted, the page shows none.</param>
 	/// <param name="now">The moment that decides which contracts are running, in UTC, or the current time when omitted.</param>
+	/// <param name="reroll">How many times the viewer has rerolled the "try something new" suggestion.</param>
 	/// <returns>The page model.</returns>
-	public static PlayerView Build(PlayerProgress merged, ProgressionSettings settings, bool online, IReadOnlyList<FeedEntry>? feed = null, MapRecap? lastSession = null, DateTime? now = null)
+	public static PlayerView Build(PlayerProgress merged, ProgressionSettings settings, bool online, IReadOnlyList<FeedEntry>? feed = null, MapRecap? lastSession = null, DateTime? now = null, int reroll = 0)
 	{
 		Ensure.NotNull(merged);
 		Ensure.NotNull(settings);
@@ -67,7 +68,7 @@ internal static class PlayerViewBuilder
 			merged.LastSeen,
 			online,
 			weapons,
-			ChallengeSuggester.Suggest(merged, settings, catalog),
+			ChallengeSuggester.Suggest(merged, settings, catalog, reroll),
 			[.. new FeatCatalog(settings).Measure(merged).Select(m => new FeatView(m.Feat.Id, m.Feat.Name, m.Feat.Description, m.Progress.IsEarned, Math.Min(m.Progress.Current, m.Progress.Target), m.Progress.Target))],
 			FeedCaptions.For(feed ?? [], settings),
 			lastSession is null ? null : BuildSession(lastSession),

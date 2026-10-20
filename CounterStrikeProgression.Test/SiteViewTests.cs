@@ -351,6 +351,52 @@ public sealed class SiteViewTests
 	}
 
 	[TestMethod]
+	public void Suggest_Reroll_MovesTheNewPickToAnotherWeapon_AndKeepsTheStartedOnes()
+	{
+		ProgressionSettings settings = Settings();
+		PlayerProgress player = TestHelpers.Player();
+		WeaponProgress ak = player.Weapon(TestHelpers.Weapon("ak47").Key);
+		ak.Xp = 100;
+		ak.Challenge(ChallengeDefinition.KillsId).Count = 5;
+		WeaponProgress awp = player.Weapon(TestHelpers.Weapon("awp").Key);
+		awp.Xp = 50;
+		awp.Challenge(ChallengeDefinition.KillsId).Count = 5;
+
+		IReadOnlyList<SuggestionView> first = PlayerViewBuilder.Build(player, settings, online: false).Suggestions;
+		IReadOnlyList<SuggestionView> rerolled = PlayerViewBuilder.Build(player, settings, online: false, reroll: 1).Suggestions;
+
+		Assert.AreEqual("ak47", first[^1].WeaponKey);
+		Assert.IsTrue(rerolled[^1].IsNew);
+		Assert.AreEqual("awp", rerolled[^1].WeaponKey);
+		Assert.AreEqual(0, rerolled[^1].Count);
+		CollectionAssert.AreEqual(first.Take(first.Count - 1).ToList(), rerolled.Take(rerolled.Count - 1).ToList());
+	}
+
+	[TestMethod]
+	public void Suggest_Reroll_ThenOffersAnUnusedWeapon_AndWrapsRound()
+	{
+		ProgressionSettings settings = Settings();
+		PlayerProgress player = TestHelpers.Player();
+		player.Weapon(TestHelpers.Weapon("ak47").Key).Xp = 100;
+
+		SuggestionView NewPick(int reroll) => PlayerViewBuilder.Build(player, settings, online: false, reroll: reroll).Suggestions[^1];
+
+		SuggestionView unused = NewPick(1);
+		Assert.AreNotEqual("ak47", unused.WeaponKey);
+		Assert.AreEqual(ChallengeDefinition.KillsId, unused.ChallengeId);
+
+		HashSet<(string, string)> seen = [];
+		int reroll = 0;
+		while (seen.Add((NewPick(reroll).WeaponKey, NewPick(reroll).ChallengeId)))
+		{
+			reroll++;
+		}
+
+		Assert.AreEqual(NewPick(0), NewPick(reroll));
+		Assert.IsGreaterThan(1, seen.Count);
+	}
+
+	[TestMethod]
 	public void Suggest_ProgressIsMeasuredFromTheLastTier()
 	{
 		ProgressionSettings settings = Settings();

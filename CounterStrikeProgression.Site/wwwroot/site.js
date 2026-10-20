@@ -770,7 +770,30 @@
 		load();
 	}
 
-	function suggestionCard(suggestion) {
+	// Rerolls of a player's "try something new" pick are kept in this browser only, since the pick pays nothing
+	// by itself: the XP is the tier's, suggested or not.
+	function rerollKey(id) {
+		return `csp-reroll-${id}`;
+	}
+
+	function readReroll(id) {
+		try {
+			const n = Number.parseInt(window.localStorage.getItem(rerollKey(id)) ?? "0", 10);
+			return Number.isFinite(n) && n > 0 ? n : 0;
+		} catch {
+			return 0;
+		}
+	}
+
+	function saveReroll(id, n) {
+		try {
+			window.localStorage.setItem(rerollKey(id), String(n));
+		} catch {
+			// Without storage the reroll still holds until the page is reloaded.
+		}
+	}
+
+	function suggestionCard(suggestion, onReroll) {
 		const card = el("div", suggestion.isNew ? "suggestion new" : "suggestion");
 		const head = el("div", "head");
 		const tier = ROMAN[suggestion.nextTier] ?? suggestion.nextTier;
@@ -782,6 +805,16 @@
 		title.append(`${suggestion.challengeName} ${tier}`);
 		head.append(title, el("span", "xp", `+${formatXp(suggestion.xp)}`));
 		const weapon = el("div", "muted", suggestion.isNew ? `Try something new · ${suggestion.weaponName}` : suggestion.weaponName);
+		if (suggestion.isNew && onReroll) {
+			const reroll = el("button", "reroll", "↻ Reroll");
+			reroll.type = "button";
+			reroll.title = "Suggest a different challenge";
+			reroll.addEventListener("click", () => {
+				reroll.disabled = true;
+				onReroll();
+			});
+			weapon.append(" ", reroll);
+		}
 		card.append(head, weapon);
 		if (suggestion.description) {
 			card.append(el("div", "muted", suggestion.description));
@@ -1138,6 +1171,24 @@
 
 		// Nemesis, victim, and head-to-heads, fetched with the page.
 		let rivals = null;
+		// How many times this browser has rerolled the "try something new" pick.
+		let reroll = id === null ? 0 : readReroll(id);
+
+		function playerUrl() {
+			return reroll > 0 ? `/api/players/${id}?reroll=${reroll}` : `/api/players/${id}`;
+		}
+
+		async function rerollNew() {
+			reroll += 1;
+			saveReroll(id, reroll);
+			try {
+				render(await getJson(playerUrl()));
+			} catch {
+				if (last) {
+					render(last);
+				}
+			}
+		}
 
 		function tabFromHash() {
 			const name = window.location.hash.replace(/^#/, "");
@@ -1170,7 +1221,7 @@
 				return box;
 			}
 			const cards = el("div", "suggestions");
-			cards.append(...suggestions.map(suggestionCard));
+			cards.append(...suggestions.map((suggestion) => suggestionCard(suggestion, rerollNew)));
 			box.append(el("h2", "section-title", "Closest to a tier"), cards);
 			return box;
 		}
@@ -1596,7 +1647,7 @@
 			try {
 				// The badges are extra, so the page still shows without them.
 				const [player, playerSeasons, playerRivals] = await Promise.all([
-					getJson(`/api/players/${id}`),
+					getJson(playerUrl()),
 					getJson(`/api/players/${id}/seasons`).catch(() => seasons),
 					getJson(`/api/players/${id}/rivals`).catch(() => rivals ?? { failed: true }),
 				]);
