@@ -21,7 +21,7 @@ internal sealed record FightEvent(string Map, string SteamId, int X, int Y, bool
 internal static class LivePublisher
 {
 	/// <summary>
-	/// Publishes a <c>snapshot</c> event when the snapshot changed, a <c>feed</c> event per new entry, oldest
+	/// Publishes <c>snapshot</c> and <c>positions</c> events when the snapshot changed, a <c>feed</c> event per new entry, oldest
 	/// first, a <c>progress</c> event naming the players whose progress changed, and a <c>fights</c> event for
 	/// the new kills.
 	/// </summary>
@@ -39,6 +39,9 @@ internal static class LivePublisher
 		if (changes.SnapshotChanged)
 		{
 			broadcaster.Publish("snapshot", batch.Snapshot);
+
+			// The page already has the radar from /api/positions, so the event carries none.
+			broadcaster.Publish("positions", LivePositions.From(batch.Snapshot, null));
 		}
 
 		foreach (FeedEntry entry in changes.NewFeed.OrderBy(e => e.At))

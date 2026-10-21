@@ -254,15 +254,31 @@ internal sealed class SiteReporter : IDisposable
 
 			if (controller.IsBot)
 			{
-				players.Add(new LivePlayer(controller.Slot, 0, name, IsBot: true, Rank: 0, kills, deaths, MapXp: 0));
+				players.Add(WithPosition(new LivePlayer(controller.Slot, 0, name, IsBot: true, Rank: 0, kills, deaths, MapXp: 0), controller));
 			}
 			else if (GameState.IsHuman(controller))
 			{
 				PlayerSession? session = sessionManager.Get(controller);
-				players.Add(new LivePlayer(controller.Slot, controller.SteamID, name, IsBot: false, session?.Progress?.Rank ?? 0, kills, deaths, session?.MapXp ?? 0));
+				players.Add(WithPosition(new LivePlayer(controller.Slot, controller.SteamID, name, IsBot: false, session?.Progress?.Rank ?? 0, kills, deaths, session?.MapXp ?? 0), controller));
 			}
 		}
 
 		return players;
+	}
+
+	/// <summary>
+	/// Adds where a player's pawn stands, which way it faces, and whether it's alive. A player with no pawn
+	/// keeps no position, and counts as dead.
+	/// </summary>
+	private static LivePlayer WithPosition(LivePlayer player, CCSPlayerController controller)
+	{
+		CCSPlayerPawn? pawn = GameState.PawnOf(controller);
+		if ((pawn is null) || (pawn.AbsOrigin is not { } origin))
+		{
+			return player with { Alive = false };
+		}
+
+		bool alive = pawn.LifeState == (byte)LifeState_t.LIFE_ALIVE;
+		return player with { X = origin.X, Y = origin.Y, Yaw = pawn.EyeAngles.Y, Alive = alive };
 	}
 }

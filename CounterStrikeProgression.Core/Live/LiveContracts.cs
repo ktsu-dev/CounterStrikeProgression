@@ -41,7 +41,11 @@ internal sealed record FeedEntry(DateTime At, ulong SteamId, string PlayerName, 
 /// <param name="Kills">Kills this map.</param>
 /// <param name="Deaths">Deaths this map.</param>
 /// <param name="MapXp">The rank XP earned this map.</param>
-internal sealed record LivePlayer(int Slot, ulong SteamId, string Name, bool IsBot, int Rank, int Kills, int Deaths, double MapXp);
+/// <param name="X">The world X of the player's pawn, or <see langword="null"/> when there is no pawn or the plugin sends none.</param>
+/// <param name="Y">The world Y of the player's pawn, or <see langword="null"/> when there is no pawn or the plugin sends none.</param>
+/// <param name="Yaw">The way the player faces, in degrees counterclockwise from world +X, or <see langword="null"/> when there is no pawn or the plugin sends none.</param>
+/// <param name="Alive">Whether the player is alive, or <see langword="null"/> when the plugin sends none.</param>
+internal sealed record LivePlayer(int Slot, ulong SteamId, string Name, bool IsBot, int Rank, int Kills, int Deaths, double MapXp, double? X = null, double? Y = null, double? Yaw = null, bool? Alive = null);
 
 /// <summary>The state of the server at one moment.</summary>
 /// <param name="SentAt">When the snapshot was taken, in UTC.</param>

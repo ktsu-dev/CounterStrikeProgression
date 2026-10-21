@@ -67,5 +67,13 @@ internal sealed record MapOverview(double PosX, double PosY, double Scale, bool 
 	/// </summary>
 	/// <param name="point">The world position.</param>
 	/// <returns>The pixel, which can be off the image.</returns>
-	public (double X, double Y) ToPixel(HeatPoint point) => ((point.X - PosX) / Scale, (PosY - point.Y) / Scale);
+	public (double X, double Y) ToPixel(HeatPoint point) => ToPixel(point.X, point.Y);
+
+	/// <summary>
+	/// Turns a world position into a pixel on the radar image. World Y grows north and pixel Y grows down.
+	/// </summary>
+	/// <param name="x">The world X.</param>
+	/// <param name="y">The world Y.</param>
+	/// <returns>The pixel, which can be off the image.</returns>
+	public (double X, double Y) ToPixel(double x, double y) => ((x - PosX) / Scale, (PosY - y) / Scale);
 }

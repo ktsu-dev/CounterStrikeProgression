@@ -103,6 +103,7 @@ internal static class Program
 	private static void MapServerApi(WebApplication app)
 	{
 		app.MapGet("/api/live", Endpoints.Live);
+		app.MapGet("/api/positions", PositionEndpoints.Positions);
 		app.MapGet("/api/ranks", Endpoints.RanksAsync);
 		app.MapGet("/api/ladder", Endpoints.LadderAsync);
 		app.MapGet("/api/leaderboards", Endpoints.LeaderboardsAsync);

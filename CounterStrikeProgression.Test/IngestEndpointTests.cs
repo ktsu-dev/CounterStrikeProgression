@@ -164,11 +164,12 @@ public sealed class IngestEndpointTests
 			messages.Add(message);
 		}
 
-		Assert.HasCount(4, messages);
+		Assert.HasCount(5, messages);
 		Assert.StartsWith("event: snapshot\n", messages[0]);
-		Assert.Contains("\"title\":\"First\"", messages[1]);
-		Assert.Contains("\"title\":\"Second\"", messages[2]);
-		Assert.AreEqual("event: progress\ndata: [\"76561198000000001\"]\n\n", messages[3]);
+		Assert.StartsWith("event: positions\n", messages[1]);
+		Assert.Contains("\"title\":\"First\"", messages[2]);
+		Assert.Contains("\"title\":\"Second\"", messages[3]);
+		Assert.AreEqual("event: progress\ndata: [\"76561198000000001\"]\n\n", messages[4]);
 	}
 
 	[TestMethod]
