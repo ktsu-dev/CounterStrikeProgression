@@ -399,7 +399,7 @@
 			}
 			notifyStatus(false);
 		});
-		for (const name of ["snapshot", "feed", "progress", "online"]) {
+		for (const name of ["snapshot", "feed", "progress", "online", "fights"]) {
 			stream.addEventListener(name, (event) => {
 				let data;
 				try {
@@ -1173,6 +1173,8 @@
 		let rivals = null;
 		// How many times this browser has rerolled the "try something new" pick.
 		let reroll = id === null ? 0 : readReroll(id);
+		// Where the player wins and loses fights, built once so a refetch keeps its canvas and live counts.
+		const fightsPanel = id !== null && window.PlayerHeat ? window.PlayerHeat.create(id, on) : null;
 
 		function playerUrl() {
 			return reroll > 0 ? `/api/players/${id}?reroll=${reroll}` : `/api/players/${id}`;
@@ -1633,8 +1635,14 @@
 
 			const tabs = el("div", "player-tabs");
 			tabs.append(tabBar(player), body);
+			const side = el("div", "player-side");
+			if (fightsPanel) {
+				fightsPanel.setOnline(online);
+				side.append(fightsPanel.element);
+			}
+			side.append(renderFeed(player));
 			const grid = el("div", "player-grid");
-			grid.append(tabs, renderFeed(player));
+			grid.append(tabs, side);
 
 			const sections = [head, summary];
 			if (player.lastSession) {

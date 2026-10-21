@@ -188,6 +188,8 @@ Posting runs on the thread pool, at most one post a second. Lines that arrive me
 
 `Heatmaps` records where kills happen, so the site can draw them over each map's radar at `/heatmaps`, for the whole server or one player (where they got their kills, or where they died). Only kills with a human on either end are kept, each map keeps only its latest `MaxPointsPerMap`, and the oldest are deleted as new ones arrive, so the `csp_kills` table stays a fixed size.
 
+Each player's page also shows where that player wins and loses fights, above their XP feed. A won fight is a kill, placed where the player stood, and a lost fight is a death, placed where they died, against humans and bots alike. Each area of the radar is colored by the balance of the two, green where they win most, red where they lose most, and grey where it's about even, and an area with only one or two fights stays faint. Hovering or tapping an area shows its counts. **This match** shows the map being played since it started, and **All time** shows every stored fight on that map. The panel opens on **This match** while the player is online and on **All time**, for the map they last played, while they're offline, and each browser remembers the last choice for each. New fights arrive within a couple of seconds, without a refresh, and a map change switches the panel to the new map. A map with no radar calibration shows no fights.
+
 ```json
 {
   "Heatmaps": {
@@ -208,11 +210,11 @@ Kills are written in one batch per save interval, on the thread pool. The site s
 
 #### The site
 
-The site is a small ASP.NET Core app, published as the image `ghcr.io/ktsu-dev/counterstrikeprogression-site:<version>` with each release (and as `latest`). It shows the live scoreboard and feed on `/`, the rank ladder on `/ranks`, leaderboards for every weapon (by level) and every skill shot (by count), plus the most feats and the rarest skill shots, on `/leaderboards`, a guide to every skill shot with its rarity, weapons, XP, tiers, and how many players have earned it on `/skillshots`, kill heatmaps on `/heatmaps`, and each player's profile on `/players/{steamId}` (a SteamID64), with their XP feed and suggested next challenges. Ranks show as badges: the color and emblem mark the rank's family, and the pips along the bottom fill with the stage. Pages update live over server-sent events, and a server counts as offline after a few seconds without a batch.
+The site is a small ASP.NET Core app, published as the image `ghcr.io/ktsu-dev/counterstrikeprogression-site:<version>` with each release (and as `latest`). It shows the live scoreboard and feed on `/`, the rank ladder on `/ranks`, leaderboards for every weapon (by level) and every skill shot (by count), plus the most feats and the rarest skill shots, on `/leaderboards`, a guide to every skill shot with its rarity, weapons, XP, tiers, and how many players have earned it on `/skillshots`, kill heatmaps on `/heatmaps`, and each player's profile on `/players/{steamId}` (a SteamID64), with their XP feed, suggested next challenges, and a live map of where they win and lose fights. Ranks show as badges: the color and emblem mark the rank's family, and the pips along the bottom fill with the stage. Pages update live over server-sent events, and a server counts as offline after a few seconds without a batch.
 
 The image listens on two ports:
 
-- **8080 (public):** `/`, `/ranks`, `/leaderboards`, `/skillshots`, `/heatmaps`, `/players/{steamId}`, `/radar/{map}.png`, `/api/heatmaps`, `/api/live`, `/api/ranks`, `/api/leaderboards`, `/api/skillshots`, `/api/players/{id}`, `/api/stream`, and `/healthz`. Route this port to visitors.
+- **8080 (public):** `/`, `/ranks`, `/leaderboards`, `/skillshots`, `/heatmaps`, `/players/{steamId}`, `/radar/{map}.png`, `/api/heatmaps`, `/api/live`, `/api/ranks`, `/api/leaderboards`, `/api/skillshots`, `/api/players/{id}`, `/api/players/{id}/fights`, `/api/stream`, and `/healthz`. Route this port to visitors.
 - **8081 (ingest):** `POST /api/ingest` with the header `Authorization: Bearer <token>`, and `GET /metrics` for Prometheus. Keep this port inside your network, because only the plugin and your scraper need it.
 
 Point the health probe at `/healthz` on port 8080. Port 8081 answers nothing but the ingest and metrics routes, so a probe there always fails.
