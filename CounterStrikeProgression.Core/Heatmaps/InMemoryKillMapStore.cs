@@ -11,6 +11,7 @@ internal sealed class InMemoryKillMapStore : IKillMapStore
 {
 	private readonly Lock gate = new();
 	private readonly Dictionary<string, List<KillPoint>> maps = new(StringComparer.Ordinal);
+	private readonly Dictionary<ulong, string> lastMaps = [];
 
 	/// <inheritdoc/>
 	public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -25,6 +26,8 @@ internal sealed class InMemoryKillMapStore : IKillMapStore
 			{
 				List<KillPoint> kept = maps.GetOrCreate(point.Map);
 				kept.Add(point);
+				lastMaps[point.KillerId] = point.Map;
+				lastMaps[point.VictimId] = point.Map;
 			}
 
 			foreach (string map in points.Select(p => p.Map).Distinct())
@@ -69,6 +72,34 @@ internal sealed class InMemoryKillMapStore : IKillMapStore
 				? [.. newest.Where(p => (steamId is null) || (p.KillerId == steamId)).Take(limit).Select(p => new HeatPoint(p.KillerX, p.KillerY))]
 				: [.. newest.Where(p => (steamId is null) || (p.VictimId == steamId)).Take(limit).Select(p => new HeatPoint(p.VictimX, p.VictimY))];
 			return Task.FromResult(points);
+		}
+	}
+
+	/// <inheritdoc/>
+	public Task<IReadOnlyList<KillPoint>> FightsAsync(string map, ulong? steamId, DateTime? since, int limit, CancellationToken cancellationToken)
+	{
+		lock (gate)
+		{
+			if (!maps.TryGetValue(map ?? string.Empty, out List<KillPoint>? kept))
+			{
+				return Task.FromResult<IReadOnlyList<KillPoint>>([]);
+			}
+
+			IReadOnlyList<KillPoint> fights = [.. Enumerable.Reverse(kept)
+				.Where(p => (steamId is null) || (p.KillerId == steamId) || (p.VictimId == steamId))
+				.Where(p => (since is null) || (p.At >= since))
+				.Take(limit)];
+			return Task.FromResult(fights);
+		}
+	}
+
+	/// <inheritdoc/>
+	public Task<string?> LastMapAsync(ulong steamId, CancellationToken cancellationToken)
+	{
+		lock (gate)
+		{
+			string? map = lastMaps.GetValueOrDefault(steamId);
+			return Task.FromResult(map);
 		}
 	}
 }

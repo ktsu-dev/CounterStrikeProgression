@@ -55,6 +55,16 @@ internal sealed class MySqlKillMapStore(DatabaseSettings settings) : IKillMapSto
 
 	private const string SelectPlayerDeaths = "SELECT victim_x AS X, victim_y AS Y FROM csp_kills WHERE victim_id = @steamId AND map = @map ORDER BY id DESC LIMIT @limit";
 
+	private const string SelectFights = """
+		SELECT map AS Map, killer_id AS KillerId, victim_id AS VictimId, weapon AS Weapon, headshot AS Headshot,
+			killer_x AS KillerX, killer_y AS KillerY, killer_z AS KillerZ, victim_x AS VictimX, victim_y AS VictimY, victim_z AS VictimZ, at AS At
+		FROM csp_kills
+		WHERE map = @map AND (@steamId IS NULL OR killer_id = @steamId OR victim_id = @steamId) AND (@since IS NULL OR at >= @since)
+		ORDER BY id DESC LIMIT @limit
+		""";
+
+	private const string SelectLastMap = "SELECT map FROM csp_kills WHERE killer_id = @steamId OR victim_id = @steamId ORDER BY id DESC LIMIT 1";
+
 	private readonly string connectionString = MySqlProgressionStore.ConnectionStringFor(settings);
 
 	/// <inheritdoc/>
@@ -132,6 +142,46 @@ internal sealed class MySqlKillMapStore(DatabaseSettings settings) : IKillMapSto
 		}
 	}
 
+	/// <inheritdoc/>
+	public async Task<IReadOnlyList<KillPoint>> FightsAsync(string map, ulong? steamId, DateTime? since, int limit, CancellationToken cancellationToken)
+	{
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		try
+		{
+			IEnumerable<KillRow> rows = await connection.QueryAsync<KillRow>(new CommandDefinition(
+				SelectFights,
+				new { map, steamId, since, limit },
+				cancellationToken: cancellationToken)).ConfigureAwait(false);
+			return [.. rows.Select(r => new KillPoint(
+				r.Map, r.KillerId, r.VictimId, r.Weapon, r.Headshot,
+				r.KillerX, r.KillerY, r.KillerZ, r.VictimX, r.VictimY, r.VictimZ,
+				DateTime.SpecifyKind(r.At, DateTimeKind.Utc)))];
+		}
+		catch (MySqlException exception) when (exception.ErrorCode == MySqlErrorCode.NoSuchTable)
+		{
+			return [];
+		}
+	}
+
+	/// <inheritdoc/>
+	public async Task<string?> LastMapAsync(ulong steamId, CancellationToken cancellationToken)
+	{
+		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
+		try
+		{
+			return await connection.QueryFirstOrDefaultAsync<string>(new CommandDefinition(
+				SelectLastMap,
+				new { steamId },
+				cancellationToken: cancellationToken)).ConfigureAwait(false);
+		}
+		catch (MySqlException exception) when (exception.ErrorCode == MySqlErrorCode.NoSuchTable)
+		{
+			return null;
+		}
+	}
+
 	private async Task<MySqlConnection> OpenAsync(CancellationToken cancellationToken)
 	{
 		MySqlConnection connection = new(connectionString);
@@ -151,4 +201,19 @@ internal sealed class MySqlKillMapStore(DatabaseSettings settings) : IKillMapSto
 	/// <param name="X">The X position.</param>
 	/// <param name="Y">The Y position.</param>
 	private sealed record PointRow(short X, short Y);
+
+	/// <summary>A kill as read, with the column types the driver returns.</summary>
+	/// <param name="Map">The map.</param>
+	/// <param name="KillerId">The killer's Steam ID, or 0 for a bot.</param>
+	/// <param name="VictimId">The victim's Steam ID, or 0 for a bot.</param>
+	/// <param name="Weapon">The weapon key.</param>
+	/// <param name="Headshot">Whether it was a headshot.</param>
+	/// <param name="KillerX">The killer's X position.</param>
+	/// <param name="KillerY">The killer's Y position.</param>
+	/// <param name="KillerZ">The killer's height.</param>
+	/// <param name="VictimX">The victim's X position.</param>
+	/// <param name="VictimY">The victim's Y position.</param>
+	/// <param name="VictimZ">The victim's height.</param>
+	/// <param name="At">When it happened.</param>
+	private sealed record KillRow(string Map, ulong KillerId, ulong VictimId, string Weapon, bool Headshot, short KillerX, short KillerY, short KillerZ, short VictimX, short VictimY, short VictimZ, DateTime At);
 }

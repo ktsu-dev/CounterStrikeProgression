@@ -239,4 +239,94 @@ public sealed class HeatmapTests
 		Assert.HasCount(70, mine);
 		Assert.IsTrue(mine.All(p => p == new HeatPoint(10, 10)));
 	}
+
+	[TestMethod]
+	public async Task InMemory_FightsIncludeKillsAndDeaths()
+	{
+		InMemoryKillMapStore store = new();
+		CancellationToken token = TestContext.CancellationToken;
+		await store.AddAsync(
+		[
+			Kill(killer: 7, victim: 0, x: 1),
+			Kill(killer: 0, victim: 7, x: 2),
+			Kill(killer: 8, victim: 9, x: 3),
+			Kill("de_nuke", killer: 7, victim: 0, x: 4),
+		], 100, token).ConfigureAwait(false);
+
+		IReadOnlyList<KillPoint> fights = await store.FightsAsync("de_dust2", 7, null, 100, token).ConfigureAwait(false);
+
+		CollectionAssert.AreEqual(new short[] { 2, 1 }, fights.Select(f => f.KillerX).ToArray());
+	}
+
+	[TestMethod]
+	public async Task InMemory_FightsSinceLeavesOutOlderKills()
+	{
+		InMemoryKillMapStore store = new();
+		CancellationToken token = TestContext.CancellationToken;
+		await store.AddAsync([Kill(x: 1), Kill(x: 2) with { At = At.AddMinutes(10) }], 100, token).ConfigureAwait(false);
+
+		IReadOnlyList<KillPoint> fights = await store.FightsAsync("de_dust2", TestHelpers.SteamId, At.AddMinutes(5), 100, token).ConfigureAwait(false);
+
+		Assert.AreEqual((short)2, fights.Single().KillerX);
+	}
+
+	[TestMethod]
+	public async Task InMemory_FightsForTheWholeServerWhenNoPlayer()
+	{
+		InMemoryKillMapStore store = new();
+		CancellationToken token = TestContext.CancellationToken;
+		await store.AddAsync([Kill(killer: 7, victim: 8), Kill(killer: 9, victim: 0), Kill("de_nuke")], 100, token).ConfigureAwait(false);
+
+		IReadOnlyList<KillPoint> fights = await store.FightsAsync("de_dust2", null, null, 100, token).ConfigureAwait(false);
+
+		Assert.HasCount(2, fights);
+	}
+
+	[TestMethod]
+	public async Task InMemory_LastMapIsTheNewestFight()
+	{
+		InMemoryKillMapStore store = new();
+		CancellationToken token = TestContext.CancellationToken;
+		await store.AddAsync([Kill("de_nuke", killer: 7), Kill("de_dust2", victim: 7, killer: 0)], 100, token).ConfigureAwait(false);
+
+		Assert.AreEqual("de_dust2", await store.LastMapAsync(7, token).ConfigureAwait(false));
+		Assert.IsNull(await store.LastMapAsync(99, token).ConfigureAwait(false));
+	}
+
+	[TestMethod]
+	public async Task MySql_FightsMatchInMemory()
+	{
+		string? target = Environment.GetEnvironmentVariable("CSP_TEST_MYSQL");
+		if (string.IsNullOrEmpty(target))
+		{
+			Assert.Inconclusive("Set CSP_TEST_MYSQL to run against MariaDB.");
+			return;
+		}
+
+		string[] parts = target.Replace('/', ':').Split(':', StringSplitOptions.None);
+		DatabaseSettings settings = new() { Host = parts[0], Port = int.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture), Database = parts[2], User = parts[3], Password = parts[4] };
+		MySqlKillMapStore mySql = new(settings);
+		InMemoryKillMapStore memory = new();
+		CancellationToken token = TestContext.CancellationToken;
+		await mySql.InitializeAsync(token).ConfigureAwait(false);
+
+		string map = "de_test_" + Random.Shared.Next(1_000, 1_000_000).ToString(System.Globalization.CultureInfo.InvariantCulture);
+		KillPoint[] kills =
+		[
+			Kill(map, killer: 7, victim: 0, x: 1),
+			Kill(map, killer: 0, victim: 7, x: 2) with { At = At.AddMinutes(10) },
+			Kill(map, killer: 8, victim: 9, x: 3) with { At = At.AddMinutes(20) },
+		];
+		await mySql.AddAsync(kills, 100, token).ConfigureAwait(false);
+		await memory.AddAsync(kills, 100, token).ConfigureAwait(false);
+
+		foreach ((ulong? steamId, DateTime? since, int limit) in new (ulong?, DateTime?, int)[] { (7, null, 100), (7, At.AddMinutes(5), 100), (null, null, 100), (null, null, 2) })
+		{
+			IReadOnlyList<KillPoint> expected = await memory.FightsAsync(map, steamId, since, limit, token).ConfigureAwait(false);
+			IReadOnlyList<KillPoint> actual = await mySql.FightsAsync(map, steamId, since, limit, token).ConfigureAwait(false);
+			CollectionAssert.AreEqual(expected.ToArray(), actual.ToArray());
+		}
+
+		Assert.AreEqual(map, await mySql.LastMapAsync(7, token).ConfigureAwait(false));
+	}
 }

@@ -41,4 +41,23 @@ internal interface IKillMapStore
 	/// <param name="cancellationToken">Cancels the operation.</param>
 	/// <returns>The positions, newest first.</returns>
 	public Task<IReadOnlyList<HeatPoint>> PointsAsync(string map, HeatmapKind kind, ulong? steamId, int limit, CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Gets the newest kills on a map, for the server or the fights one player was in.
+	/// </summary>
+	/// <param name="map">The map.</param>
+	/// <param name="steamId">The player who was the killer or the victim, or <see langword="null"/> for every kill.</param>
+	/// <param name="since">The earliest time to take, or <see langword="null"/> for no limit.</param>
+	/// <param name="limit">The most kills to return.</param>
+	/// <param name="cancellationToken">Cancels the operation.</param>
+	/// <returns>The kills, newest first.</returns>
+	public Task<IReadOnlyList<KillPoint>> FightsAsync(string map, ulong? steamId, DateTime? since, int limit, CancellationToken cancellationToken);
+
+	/// <summary>
+	/// Gets the map of a player's newest kill or death.
+	/// </summary>
+	/// <param name="steamId">The player.</param>
+	/// <param name="cancellationToken">Cancels the operation.</param>
+	/// <returns>The map, or <see langword="null"/> if the player has no kills kept.</returns>
+	public Task<string?> LastMapAsync(ulong steamId, CancellationToken cancellationToken);
 }
