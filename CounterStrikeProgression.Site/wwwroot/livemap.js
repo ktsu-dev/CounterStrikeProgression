@@ -8,9 +8,12 @@
 	const MARKER_RADIUS = 16;
 	// The pin's viewBox reaches the wedge's tip on every side, so the pin can turn without clipping.
 	const PIN_EXTENT = MARKER_RADIUS * 2.6;
-	// Without a positions event for this long, the server has stopped sending and the positions are old. A
-	// batch only brings positions when something changed, so this is far longer than the 2 second batches.
+	// Without a positions event for this long, the server has stopped sending and the positions are old. Every
+	// in-order batch brings one, about every 2 seconds, so this leaves room for a few late batches.
 	const QUIET_MS = 20000;
+	// How often to ask /api/positions again while the current map's radar isn't drawn, such as after a failed
+	// fetch or image load, or while the site has no radar image for the map yet.
+	const RADAR_RETRY_MS = 5000;
 	// A label on a marker past this share of the width goes on the marker's left, so it stays on the map.
 	const FLIP_AT = 0.7;
 	const STEAM_ID = /^\d+$/;
@@ -91,8 +94,14 @@
 			calibrated: false,
 			size: 1024,
 			players: [],
+			// The map and URL the canvas's radar is for, the loaded image, and whether a load is under way.
 			radarMap: null,
+			radarUrl: null,
 			radar: null,
+			radarLoading: false,
+			// Whether a fetch of /api/positions is under way, and when the last one started.
+			fetching: false,
+			fetchedAt: 0,
 			online: null,
 			lastAt: 0,
 			// Counts positions events, so a fetch that started before one doesn't overwrite it.
@@ -122,22 +131,31 @@
 			}
 		}
 
+		// Clears the canvas to the new map's radar at once, so markers never sit on another map's radar. The same
+		// map and URL again is left alone while its image is loaded or loading, and loaded again after a failure.
 		function showRadar(map, url) {
-			if (map === state.radarMap) {
+			if (map === state.radarMap && url === state.radarUrl && (state.radar || state.radarLoading)) {
 				return;
 			}
 			state.radarMap = map;
+			state.radarUrl = url;
 			state.radar = null;
+			state.radarLoading = Boolean(url);
 			drawRadar();
 			if (!url) {
 				return;
 			}
 			loadImage(url).then((image) => {
-				if (state.radarMap === map) {
+				if (state.radarMap === map && state.radarUrl === url) {
 					state.radar = image;
+					state.radarLoading = false;
 					drawRadar();
 				}
 			});
+		}
+
+		function radarMissing() {
+			return Boolean(state.map && state.calibrated) && (state.radarMap !== state.map || (!state.radar && !state.radarLoading));
 		}
 
 		function markerKey(player) {
@@ -250,17 +268,23 @@
 			canvas.setAttribute("aria-label", map ? `Where everyone is on ${mapLabel(map)}` : "The live map");
 			if (radar !== undefined) {
 				showRadar(map, radar);
-			} else if (changed && map && state.calibrated) {
+			} else if (changed) {
 				// Events carry no radar, so a new map's radar comes from /api/positions.
-				refresh();
+				showRadar(map, null);
+				if (map && state.calibrated) {
+					refresh();
+				}
 			}
 			placeMarkers();
 			showState();
 		}
 
 		function refresh() {
+			state.fetching = true;
+			state.fetchedAt = Date.now();
 			const before = state.events;
 			fetchPositions().then((positions) => {
+				state.fetching = false;
 				if (!positions) {
 					return;
 				}
@@ -293,7 +317,12 @@
 			}
 		});
 
-		setInterval(showState, 1000);
+		setInterval(() => {
+			showState();
+			if (radarMissing() && !state.fetching && Date.now() - state.fetchedAt >= RADAR_RETRY_MS) {
+				refresh();
+			}
+		}, 1000);
 
 		state.lastAt = Date.now();
 		refresh();
