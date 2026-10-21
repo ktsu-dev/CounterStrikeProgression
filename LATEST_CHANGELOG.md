@@ -1,6 +1,6 @@
-## v1.22.0 (minor)
+## v1.22.1 (patch)
 
-Changes since v1.21.0:
+Changes since v1.22.0:
 
-- [minor] Read the heatmaps' radar images out of the game server's own files (Claude)
+- [patch] Make browsers revalidate the site's pages and scripts (matt-edmondson)
 
