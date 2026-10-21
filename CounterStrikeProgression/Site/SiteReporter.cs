@@ -279,6 +279,13 @@ internal sealed class SiteReporter : IDisposable
 		}
 
 		bool alive = pawn.LifeState == (byte)LifeState_t.LIFE_ALIVE;
-		return player with { X = origin.X, Y = origin.Y, Yaw = pawn.EyeAngles.Y, Alive = alive };
+		float yaw = pawn.EyeAngles.Y;
+		// The site's JSON options reject NaN and Infinity, and one such value would fail the whole batch.
+		if (!float.IsFinite(origin.X) || !float.IsFinite(origin.Y) || !float.IsFinite(yaw))
+		{
+			return player with { Alive = alive };
+		}
+
+		return player with { X = origin.X, Y = origin.Y, Yaw = yaw, Alive = alive };
 	}
 }

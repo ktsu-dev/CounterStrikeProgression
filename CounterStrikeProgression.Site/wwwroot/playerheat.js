@@ -313,6 +313,10 @@
 
 		function setOnline(online) {
 			const now = Boolean(online);
+			if (!now && state.position) {
+				state.position.stale = true;
+				placeMarker();
+			}
 			if (now === state.online) {
 				return;
 			}
@@ -414,6 +418,13 @@
 		on("positions", (positions) => {
 			state.positionsSeen = true;
 			takePositions(positions);
+		});
+
+		// The page learns the server went quiet only from this event, since no snapshot arrives to say so.
+		on("online", (online) => {
+			if (online !== true) {
+				setOnline(false);
+			}
 		});
 
 		// The starting position, unless an event has already brought a newer one.

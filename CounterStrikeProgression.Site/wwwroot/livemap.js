@@ -11,9 +11,11 @@
 	// Without a positions event for this long, the server has stopped sending and the positions are old. Every
 	// in-order batch brings one, about every 2 seconds, so this leaves room for a few late batches.
 	const QUIET_MS = 20000;
-	// How often to ask /api/positions again while the current map's radar isn't drawn, such as after a failed
-	// fetch or image load, or while the site has no radar image for the map yet.
+	// How soon to ask /api/positions again while the current map's radar isn't drawn, such as after a failed
+	// fetch or image load, or while the site has no radar image for the map yet. Each try doubles the wait, up to
+	// the ceiling, until the map changes or a radar draws.
 	const RADAR_RETRY_MS = 5000;
+	const RADAR_RETRY_MAX_MS = 60000;
 	// A label on a marker past this share of the width goes on the marker's left, so it stays on the map.
 	const FLIP_AT = 0.7;
 	const STEAM_ID = /^\d+$/;
@@ -99,6 +101,10 @@
 			radarUrl: null,
 			radar: null,
 			radarLoading: false,
+			// Whether /api/positions has answered for radarMap, so a missing radar URL means no image exists.
+			radarAnswered: false,
+			// The wait before the next radar retry.
+			retryMs: RADAR_RETRY_MS,
 			// Whether a fetch of /api/positions is under way, and when the last one started.
 			fetching: false,
 			fetchedAt: 0,
@@ -137,6 +143,10 @@
 			if (map === state.radarMap && url === state.radarUrl && (state.radar || state.radarLoading)) {
 				return;
 			}
+			if (map !== state.radarMap) {
+				state.radarAnswered = false;
+				state.retryMs = RADAR_RETRY_MS;
+			}
 			state.radarMap = map;
 			state.radarUrl = url;
 			state.radar = null;
@@ -149,6 +159,9 @@
 				if (state.radarMap === map && state.radarUrl === url) {
 					state.radar = image;
 					state.radarLoading = false;
+					if (image) {
+						state.retryMs = RADAR_RETRY_MS;
+					}
 					drawRadar();
 				}
 			});
@@ -246,6 +259,8 @@
 				note.textContent = "Waiting for the server.";
 			} else if (!state.calibrated) {
 				note.textContent = "This map has no radar yet, so nobody can be placed on it.";
+			} else if (state.radarAnswered && state.radarMap === state.map && !state.radarUrl) {
+				note.textContent = "No radar image for this map yet.";
 			} else if (stale) {
 				note.textContent = alive > 0 ? "The server is offline. These are the last positions it sent." : "The server is offline.";
 			} else if (alive === 0) {
@@ -293,6 +308,8 @@
 				} else if (positions.map === state.map) {
 					showRadar(positions.map, positions.radar ?? null);
 				}
+				state.radarAnswered = positions.map === state.radarMap;
+				showState();
 			});
 		}
 
@@ -319,7 +336,8 @@
 
 		setInterval(() => {
 			showState();
-			if (radarMissing() && !state.fetching && Date.now() - state.fetchedAt >= RADAR_RETRY_MS) {
+			if (radarMissing() && !state.fetching && Date.now() - state.fetchedAt >= state.retryMs) {
+				state.retryMs = Math.min(state.retryMs * 2, RADAR_RETRY_MAX_MS);
 				refresh();
 			}
 		}, 1000);

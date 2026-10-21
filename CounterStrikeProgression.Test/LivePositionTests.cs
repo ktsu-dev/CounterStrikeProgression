@@ -69,6 +69,22 @@ public sealed class LivePositionTests
 	}
 
 	[TestMethod]
+	public void From_OlderPluginPlayerWithoutPositionMembers_IsLeftOutButMapIsNamed()
+	{
+		const string json = """
+			{"sentAt":"2026-10-21T12:00:00Z","map":"de_dust2","gameMode":"Deathmatch","maxPlayers":16,
+			"players":[{"slot":3,"steamId":76561198000000007,"name":"Tester","isBot":false,"rank":1,"kills":2,"deaths":3,"mapXp":4.5}]}
+			""";
+
+		ServerSnapshot snapshot = JsonSerializer.Deserialize<ServerSnapshot>(json, SiteJson.Options)!;
+		PositionsView view = LivePositions.From(snapshot, null);
+
+		Assert.ContainsSingle(snapshot.Players);
+		Assert.AreEqual(Dust, view.Map);
+		Assert.IsEmpty(view.Players);
+	}
+
+	[TestMethod]
 	public void From_IncludesBotsWithoutSteamId()
 	{
 		PositionsView view = LivePositions.From(Server(Dust, Player(5, 0, 0, isBot: true)), null);
