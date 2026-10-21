@@ -132,5 +132,6 @@ internal static class Program
 		app.MapGet("/api/players/{id}/history", HistoryEndpoints.PlayerHistoryAsync);
 		app.MapGet("/api/players/{id}/seasons", SeasonEndpoints.PlayerSeasonsAsync);
 		app.MapGet("/api/players/{id}/rivals", RivalEndpoints.PlayerRivalsAsync);
+		app.MapGet("/api/players/{id}/fights", FightEndpoints.FightsAsync);
 	}
 }
