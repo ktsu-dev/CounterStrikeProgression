@@ -453,6 +453,26 @@ public sealed class SiteEndpointTests
 		Assert.AreEqual(allowed, Endpoints.IsAllowedOnPort(port, new PathString(path)));
 
 	[TestMethod]
+	public async Task CacheDefault_MakesBrowsersRevalidate()
+	{
+		DefaultHttpContext context = new();
+		await CachePolicy.RevalidateByDefaultAsync(context, _ => Task.CompletedTask).ConfigureAwait(false);
+		Assert.AreEqual("no-cache", context.Response.Headers.CacheControl.ToString());
+	}
+
+	[TestMethod]
+	public async Task CacheDefault_YieldsToAnEndpointsOwnPolicy()
+	{
+		DefaultHttpContext context = new();
+		await CachePolicy.RevalidateByDefaultAsync(context, next =>
+		{
+			next.Response.Headers.CacheControl = "public, max-age=300";
+			return Task.CompletedTask;
+		}).ConfigureAwait(false);
+		Assert.AreEqual("public, max-age=300", context.Response.Headers.CacheControl.ToString());
+	}
+
+	[TestMethod]
 	public void OnlineWatcher_PublishesOnlyWhenOnlineFlips()
 	{
 		ManualTime time = new();

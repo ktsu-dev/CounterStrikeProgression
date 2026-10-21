@@ -74,6 +74,7 @@ internal static class Program
 	private static void MapRoutes(WebApplication app)
 	{
 		UsePortFilter(app);
+		app.Use(CachePolicy.RevalidateByDefaultAsync);
 		app.UseStaticFiles();
 		MapPages(app);
 		MapApi(app);
