@@ -17,6 +17,8 @@ namespace ktsu.CounterStrikeProgression.Core.Heatmaps;
 /// <param name="VictimY">The victim's Y position.</param>
 /// <param name="VictimZ">The victim's height.</param>
 /// <param name="At">When it happened, in UTC.</param>
+/// <param name="KillerName">The killer's name, for the live map. It isn't stored, so a kill read back from the store has none.</param>
+/// <param name="VictimName">The victim's name, for the live map. It isn't stored, so a kill read back from the store has none.</param>
 internal sealed record KillPoint(
 	string Map,
 	ulong KillerId,
@@ -29,7 +31,9 @@ internal sealed record KillPoint(
 	short VictimX,
 	short VictimY,
 	short VictimZ,
-	DateTime At)
+	DateTime At,
+	string? KillerName = null,
+	string? VictimName = null)
 {
 	/// <summary>
 	/// Rounds a world coordinate to a stored one. CS2 maps fit in ±16384 units, so anything past a short's range is clamped.

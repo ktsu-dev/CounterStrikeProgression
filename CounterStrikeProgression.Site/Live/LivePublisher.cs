@@ -22,8 +22,8 @@ internal static class LivePublisher
 {
 	/// <summary>
 	/// Publishes <c>snapshot</c> and <c>positions</c> events when the snapshot changed, a <c>feed</c> event per new entry, oldest
-	/// first, a <c>progress</c> event naming the players whose progress changed, and a <c>fights</c> event for
-	/// the new kills.
+	/// first, a <c>progress</c> event naming the players whose progress changed, a <c>fights</c> event for
+	/// the new kills, and a <c>kills</c> event for the batch's kills on the radar, bots' included.
 	/// </summary>
 	/// <param name="broadcaster">Where the events go.</param>
 	/// <param name="batch">The batch.</param>
@@ -59,6 +59,11 @@ internal static class LivePublisher
 		if (events.Length > 0)
 		{
 			broadcaster.Publish("fights", events);
+		}
+
+		if (batch.Kills is { Count: > 0 } batchKills && LiveKills.From(batchKills) is { Count: > 0 } kills)
+		{
+			broadcaster.Publish("kills", kills);
 		}
 	}
 

@@ -399,7 +399,7 @@
 			}
 			notifyStatus(false);
 		});
-		for (const name of ["snapshot", "feed", "progress", "online", "fights", "positions"]) {
+		for (const name of ["snapshot", "feed", "progress", "online", "fights", "positions", "kills"]) {
 			stream.addEventListener(name, (event) => {
 				let data;
 				try {

@@ -65,7 +65,7 @@ internal sealed class KillMapRecorder(HeatmapSettings settings, IKillMapStore st
 	});
 
 	/// <summary>
-	/// Reads where a kill happened.
+	/// Reads where a kill happened, and who was in it.
 	/// </summary>
 	/// <param name="map">The map.</param>
 	/// <param name="killer">The killer.</param>
@@ -96,7 +96,9 @@ internal sealed class KillMapRecorder(HeatmapSettings settings, IKillMapStore st
 			KillPoint.Round(to.X),
 			KillPoint.Round(to.Y),
 			KillPoint.Round(to.Z),
-			DateTime.UtcNow);
+			DateTime.UtcNow,
+			killer.PlayerName,
+			victim.PlayerName);
 	}
 
 	/// <summary>

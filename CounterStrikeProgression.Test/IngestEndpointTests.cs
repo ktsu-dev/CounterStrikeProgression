@@ -204,7 +204,9 @@ public sealed class IngestEndpointTests
 			messages.Add(message);
 		}
 
-		Assert.StartsWith("event: fights\n", messages[^1]);
-		Assert.Contains("\"steamId\":\"76561198000000001\"", messages[^1]);
+		string fightsEvent = Assert.ContainsSingle(messages.Where(m => m.StartsWith("event: fights\n", StringComparison.Ordinal)));
+		Assert.Contains("\"steamId\":\"76561198000000001\"", fightsEvent);
+		string killsEvent = Assert.ContainsSingle(messages.Where(m => m.StartsWith("event: kills\n", StringComparison.Ordinal)));
+		Assert.Contains("\"weapon\":\"AK-47\"", killsEvent);
 	}
 }

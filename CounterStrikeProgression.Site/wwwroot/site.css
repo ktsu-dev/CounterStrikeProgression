@@ -483,6 +483,106 @@ a.live-map-name:focus-visible {
 	display: none;
 }
 
+/* Kill lines and crosses fade out evenly over the kill's lifetime, which livemap.js sets as the duration. */
+@keyframes live-map-kill-fade {
+	from {
+		opacity: 1;
+	}
+
+	to {
+		opacity: 0;
+	}
+}
+
+.live-map-lines {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+}
+
+.live-map-line {
+	stroke: var(--red);
+	stroke-width: 1.5px;
+	stroke-opacity: 0.7;
+	vector-effect: non-scaling-stroke;
+	animation: live-map-kill-fade 10s linear forwards;
+}
+
+.live-map-line.headshot {
+	stroke-opacity: 0.9;
+}
+
+/* A kill's hit area is a circle around its cross, and its readout only shows while hovered, focused, or tapped
+   open, like a bot's name. */
+.live-map-kill {
+	position: absolute;
+	width: 24px;
+	height: 24px;
+	margin: -12px 0 0 -12px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: transparent;
+	font: inherit;
+	cursor: pointer;
+	pointer-events: auto;
+	touch-action: manipulation;
+	animation: live-map-kill-fade 10s linear forwards;
+}
+
+.live-map-cross {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	width: 14px;
+	height: 14px;
+	transform: translate(-50%, -50%);
+	overflow: visible;
+}
+
+.live-map-cross path {
+	fill: none;
+	stroke: var(--red);
+	stroke-width: 2.5px;
+	stroke-linecap: round;
+	opacity: 0.8;
+}
+
+.live-map-kill.headshot .live-map-cross path {
+	stroke: #ff8f87;
+	stroke-width: 3.5px;
+	opacity: 1;
+	filter: drop-shadow(0 0 2px rgba(255, 143, 135, 0.9));
+}
+
+.live-map-kill .live-map-name {
+	display: none;
+	left: 12px;
+	top: 12px;
+	margin-left: 0;
+	transform: translate(14px, -50%);
+	max-width: 14em;
+	white-space: normal;
+}
+
+.live-map-kill.flip .live-map-name {
+	transform: translate(calc(-100% - 14px), -50%);
+}
+
+.live-map-kill:hover .live-map-name,
+.live-map-kill:focus-visible .live-map-name,
+.live-map-kill.open .live-map-name {
+	display: block;
+}
+
+.live-map-kill:hover,
+.live-map-kill:focus-visible,
+.live-map-kill.open {
+	z-index: 3;
+}
+
 .section-title {
 	margin: 0 0 6px;
 	color: var(--muted);

@@ -127,17 +127,13 @@ internal sealed class SiteReporter : IDisposable
 	}
 
 	/// <summary>
-	/// Adds a kill to the next batch, for the live fight maps. A kill between two bots is left out, because it can't be anyone's fight.
+	/// Adds a kill to the next batch, for the live map and the live fight maps. Kills between two bots are sent
+	/// too, for the live map, and the site keeps them out of the fight maps.
 	/// </summary>
 	/// <param name="point">The kill.</param>
 	public void Record(KillPoint point)
 	{
 		Ensure.NotNull(point);
-
-		if ((point.KillerId == 0) && (point.VictimId == 0))
-		{
-			return;
-		}
 
 		pendingKills.Add(point);
 		if (pendingKills.Count > PendingFeedLimit)

@@ -1,7 +1,7 @@
 "use strict";
 
 // The home page's live map: every player on the server, humans and bots, drawn on the current map's radar and
-// moved with each batch from the site's event stream.
+// moved with each batch from the site's event stream, with each kill drawn from killer to victim as it happens.
 (() => {
 	const SVG = "http://www.w3.org/2000/svg";
 	// A human's dot radius on a 1024 pixel radar, the same as the player page's marker in playerheat.js.
@@ -18,6 +18,13 @@
 	const RADAR_RETRY_MAX_MS = 60000;
 	// A label on a marker past this share of the width goes on the marker's left, so it stays on the map.
 	const FLIP_AT = 0.7;
+	// How long a kill stays on the map, fading out evenly from the moment it arrives, so the map shows the
+	// recent fighting rather than every kill of the match.
+	const KILL_FADE_MS = 10000;
+	// A kill's readout is wider than a name, so it goes on the cross's left from halfway across.
+	const KILL_FLIP_AT = 0.5;
+	// Half the width of a kill's cross, in screen pixels.
+	const CROSS_HALF = 5;
 	const STEAM_ID = /^\d+$/;
 
 	function el(tag, className, text) {
@@ -73,6 +80,29 @@
 		return { pin, turn };
 	}
 
+	// The cross marking where a victim fell, drawn in a small SVG of its own so it keeps its size at any map width.
+	function makeCross() {
+		const cross = svg("svg", "live-map-cross");
+		const extent = CROSS_HALF + 2;
+		cross.setAttribute("viewBox", `${-extent} ${-extent} ${extent * 2} ${extent * 2}`);
+		cross.setAttribute("aria-hidden", "true");
+		const path = svg("path");
+		path.setAttribute("d", `M ${-CROSS_HALF} ${-CROSS_HALF} L ${CROSS_HALF} ${CROSS_HALF} M ${CROSS_HALF} ${-CROSS_HALF} L ${-CROSS_HALF} ${CROSS_HALF}`);
+		cross.append(path);
+		return cross;
+	}
+
+	function killText(kill) {
+		const killer = String(kill.killerName ?? "") || (kill.killerIsBot ? "A bot" : "A player");
+		const victim = String(kill.victimName ?? "") || (kill.victimIsBot ? "a bot" : "a player");
+		const weapon = String(kill.weapon ?? "");
+		return `${killer} → ${victim}${weapon ? `, ${weapon}` : ""}${kill.headshot ? ", headshot" : ""}`;
+	}
+
+	function isNumber(value) {
+		return typeof value === "number" && Number.isFinite(value);
+	}
+
 	function create(on) {
 		const element = el("section", "live-map");
 		const head = el("h2", "section-title live-map-head");
@@ -85,6 +115,11 @@
 		const canvas = el("canvas", "live-map-canvas");
 		canvas.setAttribute("role", "img");
 		const layer = el("div", "live-map-layer");
+		// Kill lines sit first in the layer, under the crosses, labels, and pins, and take no pointer events.
+		const lines = svg("svg", "live-map-lines");
+		lines.setAttribute("preserveAspectRatio", "none");
+		lines.setAttribute("aria-hidden", "true");
+		layer.append(lines);
 		const frame = el("div", "live-map-frame");
 		frame.hidden = true;
 		frame.append(canvas, layer);
@@ -113,6 +148,10 @@
 			// Counts positions events, so a fetch that started before one doesn't overwrite it.
 			events: 0,
 			markers: new Map(),
+			// The kills on the map now, oldest first, each with its line, its cross, and its open key.
+			kills: [],
+			killCount: 0,
+			// The key of the bot label or kill cross a tap holds open.
 			open: null,
 		};
 
@@ -200,6 +239,75 @@
 			for (const [key, marker] of state.markers) {
 				marker.label.classList.toggle("open", key === state.open);
 			}
+			for (const kill of state.kills) {
+				kill.button.classList.toggle("open", kill.key === state.open);
+			}
+		}
+
+		function removeKill(kill) {
+			const index = state.kills.indexOf(kill);
+			if (index < 0) {
+				return;
+			}
+			state.kills.splice(index, 1);
+			clearTimeout(kill.timer);
+			kill.line?.remove();
+			kill.button.remove();
+			if (state.open === kill.key) {
+				state.open = null;
+			}
+		}
+
+		function clearKills() {
+			for (const kill of [...state.kills]) {
+				removeKill(kill);
+			}
+		}
+
+		// Draws a kill: a line from the killer to the victim when the killer stood on the radar, and a cross where
+		// the victim fell that names the kill on hover or tap. Both fade out over KILL_FADE_MS and are then removed.
+		function addKill(kill) {
+			const size = state.size;
+			const victimX = Number(kill.victimX);
+			const victimY = Number(kill.victimY);
+			if (!Number.isFinite(victimX) || !Number.isFinite(victimY)) {
+				return;
+			}
+			const key = `kill|${(state.killCount += 1)}`;
+			const fade = `${KILL_FADE_MS}ms`;
+			lines.setAttribute("viewBox", `0 0 ${size} ${size}`);
+			let line = null;
+			if (isNumber(kill.killerX) && isNumber(kill.killerY)) {
+				line = svg("line", kill.headshot ? "live-map-line headshot" : "live-map-line");
+				line.setAttribute("x1", kill.killerX.toFixed(1));
+				line.setAttribute("y1", kill.killerY.toFixed(1));
+				line.setAttribute("x2", victimX.toFixed(1));
+				line.setAttribute("y2", victimY.toFixed(1));
+				line.style.animationDuration = fade;
+				lines.append(line);
+			}
+
+			const text = killText(kill);
+			const button = el("button", kill.headshot ? "live-map-kill headshot" : "live-map-kill");
+			button.type = "button";
+			button.setAttribute("aria-label", text);
+			button.style.left = `${((victimX / size) * 100).toFixed(2)}%`;
+			button.style.top = `${((victimY / size) * 100).toFixed(2)}%`;
+			button.style.animationDuration = fade;
+			button.classList.toggle("flip", victimX / size > KILL_FLIP_AT);
+			button.append(makeCross(), el("span", "live-map-name", text));
+			button.addEventListener("click", (event) => {
+				event.stopPropagation();
+				state.open = state.open === key ? null : key;
+				showOpen();
+			});
+			// After the lines and older crosses, and before the labels and pins, so live markers stay on top.
+			const before = state.kills.length > 0 ? state.kills[state.kills.length - 1].button.nextSibling : lines.nextSibling;
+			layer.insertBefore(button, before);
+
+			const entry = { key, line, button, timer: 0 };
+			entry.timer = setTimeout(() => removeKill(entry), KILL_FADE_MS);
+			state.kills.push(entry);
 		}
 
 		function placeMarkers() {
@@ -241,7 +349,7 @@
 					state.markers.delete(key);
 				}
 			}
-			if (state.open !== null && !seen.has(state.open)) {
+			if (state.open !== null && !seen.has(state.open) && !state.kills.some((kill) => kill.key === state.open)) {
 				state.open = null;
 			}
 			showOpen();
@@ -266,7 +374,7 @@
 			} else if (alive === 0) {
 				note.textContent = "Nobody is alive on the map right now.";
 			} else {
-				note.textContent = "Names link to player pages. Tap or hover a bot for its name.";
+				note.textContent = "Names link to player pages. Tap or hover a bot for its name, or a ✕ for the kill.";
 			}
 		}
 
@@ -280,6 +388,9 @@
 			state.calibrated = Boolean(positions.calibrated);
 			state.size = Number(positions.size) > 0 ? Number(positions.size) : 1024;
 			state.players = Array.isArray(positions.players) ? positions.players : [];
+			if (changed || !state.calibrated) {
+				clearKills();
+			}
 			canvas.setAttribute("aria-label", map ? `Where everyone is on ${mapLabel(map)}` : "The live map");
 			if (radar !== undefined) {
 				showRadar(map, radar);
@@ -317,6 +428,17 @@
 			state.events += 1;
 			state.lastAt = Date.now();
 			takePositions(positions);
+		});
+
+		on("kills", (kills) => {
+			if (!Array.isArray(kills) || !state.map || !state.calibrated || isStale()) {
+				return;
+			}
+			for (const kill of kills) {
+				if (kill && kill.map === state.map) {
+					addKill(kill);
+				}
+			}
 		});
 
 		on("online", (online) => {

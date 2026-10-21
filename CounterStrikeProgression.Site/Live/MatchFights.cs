@@ -136,15 +136,15 @@ internal sealed partial class MatchFights(IKillMapStore store, ILogger<MatchFigh
 	}
 
 	/// <summary>
-	/// Adds the stored kills that arrived in no live batch. The store keeps whole seconds, so a stored kill
+	/// Adds the stored kills that arrived in no live batch. The store keeps whole seconds and no names, so a stored kill
 	/// matches a live one with the same players, weapon, and positions less than a second apart.
 	/// </summary>
 	private void AddStored(IReadOnlyList<KillPoint> stored)
 	{
-		ILookup<KillPoint, DateTime> live = match.ToLookup(k => k with { At = default }, k => k.At);
+		ILookup<KillPoint, DateTime> live = match.ToLookup(StoredKey, k => k.At);
 		foreach (KillPoint kill in stored)
 		{
-			if (IsInMatch(kill, StoredSince()) && !live[kill with { At = default }].Any(at => Math.Abs((at - kill.At).Ticks) < TimeSpan.TicksPerSecond) && seen.Add(kill))
+			if (IsInMatch(kill, StoredSince()) && !live[StoredKey(kill)].Any(at => Math.Abs((at - kill.At).Ticks) < TimeSpan.TicksPerSecond) && seen.Add(kill))
 			{
 				match.Add(kill);
 			}
@@ -153,6 +153,9 @@ internal sealed partial class MatchFights(IKillMapStore store, ILogger<MatchFigh
 		match.Sort((a, b) => a.At.CompareTo(b.At));
 		Trim();
 	}
+
+	/// <summary>Gets what the store keeps of a kill apart from its time, so live and stored copies compare equal.</summary>
+	private static KillPoint StoredKey(KillPoint kill) => kill with { At = default, KillerName = null, VictimName = null };
 
 	/// <summary>Gets the match start floored to a whole second, which is how far the store's dates reach.</summary>
 	private DateTime? StoredSince() =>

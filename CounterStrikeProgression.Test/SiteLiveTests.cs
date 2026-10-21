@@ -563,6 +563,21 @@ public sealed class SiteLiveTests
 	}
 
 	[TestMethod]
+	public async Task MatchFights_RebuildSkipsAStoredKillThatArrivedLiveWithNames()
+	{
+		InMemoryKillMapStore store = new();
+		KillPoint stored = Kill("de_dust2", 7, 0, Start);
+		await store.AddAsync([stored], 100, CancellationToken.None).ConfigureAwait(false);
+		MatchFights fights = NewFights(store);
+		KillPoint live = stored with { At = Start.AddMilliseconds(300), KillerName = "Tester", VictimName = "Bot Ringo" };
+
+		fights.Apply(Server(Start.AddMinutes(1)) with { MapStartedAt = Start }, [live]);
+		MatchView current = await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false);
+
+		Assert.AreEqual(live, Assert.ContainsSingle(current.Kills));
+	}
+
+	[TestMethod]
 	public async Task MatchFights_IgnoresABatchWithoutKillsOrStart()
 	{
 		MatchFights fights = NewFights();
