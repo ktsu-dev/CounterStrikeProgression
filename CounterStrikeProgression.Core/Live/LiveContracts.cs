@@ -2,6 +2,7 @@
 
 namespace ktsu.CounterStrikeProgression.Core.Live;
 
+using ktsu.CounterStrikeProgression.Core.Heatmaps;
 using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.Storage;
 
@@ -48,7 +49,8 @@ internal sealed record LivePlayer(int Slot, ulong SteamId, string Name, bool IsB
 /// <param name="GameMode">The game mode's display name.</param>
 /// <param name="MaxPlayers">The player limit.</param>
 /// <param name="Players">The players on the server.</param>
-internal sealed record ServerSnapshot(DateTime SentAt, string Map, string GameMode, int MaxPlayers, IReadOnlyList<LivePlayer> Players);
+/// <param name="MapStartedAt">When the current map started, in UTC, or <see langword="null"/> when the plugin loaded mid-map or sends none.</param>
+internal sealed record ServerSnapshot(DateTime SentAt, string Map, string GameMode, int MaxPlayers, IReadOnlyList<LivePlayer> Players, DateTime? MapStartedAt = null);
 
 /// <summary>The plugin's own health counters, each counted since the plugin loaded.</summary>
 /// <param name="SendFailures">Batches the site didn't accept, or that never reached it.</param>
@@ -67,4 +69,7 @@ internal sealed record PluginStats(long SendFailures, long BatchesDropped, long 
 /// the live rows it holds for them before taking this batch's, which carries all of their rows again.
 /// </param>
 /// <param name="Stats">The plugin's health counters, or <see langword="null"/> from a plugin that sends none.</param>
-internal sealed record LiveBatch(ServerSnapshot Snapshot, IReadOnlyList<FeedEntry> Feed, IReadOnlyList<ProgressSnapshot> Progress, ProgressionSettings Settings, IReadOnlyList<MapRecap>? Recaps = null, IReadOnlyList<ulong>? Corrected = null, PluginStats? Stats = null);
+/// <param name="Kills">
+/// The kills between enemies since the last batch, bots included and none sampled out, or <see langword="null"/> from a plugin that sends none.
+/// </param>
+internal sealed record LiveBatch(ServerSnapshot Snapshot, IReadOnlyList<FeedEntry> Feed, IReadOnlyList<ProgressSnapshot> Progress, ProgressionSettings Settings, IReadOnlyList<MapRecap>? Recaps = null, IReadOnlyList<ulong>? Corrected = null, PluginStats? Stats = null, IReadOnlyList<KillPoint>? Kills = null);

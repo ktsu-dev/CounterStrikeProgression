@@ -266,9 +266,11 @@ internal sealed class CombatHandlers(ProgressionServices services)
 
 		CCSPlayerPawn? attackerPawn = GameState.PawnOf(attacker);
 		WeaponInfo? weapon = GameState.ResolveWeapon(@event.Weapon, attackerPawn);
-		if ((weapon is not null) && !ProgressionServices.IsTeammate(attacker, victim))
+		if ((weapon is not null) && !ProgressionServices.IsTeammate(attacker, victim) && ((services.KillMaps is not null) || (services.Site is not null))
+			&& (KillMapRecorder.PointOf(Server.MapName ?? string.Empty, attacker, victim, weapon, @event.Headshot) is { } point))
 		{
-			services.KillMaps?.Record(Server.MapName ?? string.Empty, attacker, victim, weapon, @event.Headshot);
+			services.KillMaps?.Record(point);
+			services.Site?.Record(point);
 		}
 
 		if ((weapon is null) || (Sessions.Get(attacker) is not { Progress: PlayerProgress progress } session))

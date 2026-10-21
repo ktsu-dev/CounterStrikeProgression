@@ -6,6 +6,7 @@ using System.Diagnostics.CodeAnalysis;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Cvars;
+using ktsu.CounterStrikeProgression.Core.Heatmaps;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Recap;
@@ -33,6 +34,8 @@ internal sealed class SiteReporter : IDisposable
 	private readonly List<FeedEntry> pendingFeed = [];
 	private readonly List<MapRecap> pendingRecaps = [];
 	private readonly List<ulong> pendingCorrected = [];
+	private readonly List<KillPoint> pendingKills = [];
+	private DateTime? mapStartedAt;
 	private ConVar? gameType;
 	private ConVar? gameMode;
 	private int batchesSinceReset;
@@ -124,6 +127,26 @@ internal sealed class SiteReporter : IDisposable
 	}
 
 	/// <summary>
+	/// Adds a kill to the next batch, for the live fight maps.
+	/// </summary>
+	/// <param name="point">The kill.</param>
+	public void Record(KillPoint point)
+	{
+		Ensure.NotNull(point);
+
+		pendingKills.Add(point);
+		if (pendingKills.Count > PendingFeedLimit)
+		{
+			pendingKills.RemoveRange(0, pendingKills.Count - PendingFeedLimit);
+		}
+	}
+
+	/// <summary>
+	/// Notes that a map just started, so the site can tell this match's kills from the last one's.
+	/// </summary>
+	public void MapStarted() => mapStartedAt = DateTime.UtcNow;
+
+	/// <summary>
 	/// Reads the server's state and queues a batch for the site. Call it on the game thread. A failure is
 	/// logged and skips this batch, so the site never breaks the game.
 	/// </summary>
@@ -175,7 +198,7 @@ internal sealed class SiteReporter : IDisposable
 		gameType ??= ConVar.Find("game_type");
 		gameMode ??= ConVar.Find("game_mode");
 		string mode = GameModes.Name(gameType?.GetPrimitiveValue<int>() ?? 0, gameMode?.GetPrimitiveValue<int>() ?? 0);
-		ServerSnapshot snapshot = new(DateTime.UtcNow, Server.MapName ?? string.Empty, mode, Server.MaxPlayers, ReadPlayers());
+		ServerSnapshot snapshot = new(DateTime.UtcNow, Server.MapName ?? string.Empty, mode, Server.MaxPlayers, ReadPlayers(), mapStartedAt);
 
 		int fullResendEvery = pluginConfig.Site.FullResendEvery;
 		if ((fullResendEvery > 0) && (batchesSinceReset >= fullResendEvery))
@@ -202,9 +225,11 @@ internal sealed class SiteReporter : IDisposable
 
 		ulong[] corrected = [.. pendingCorrected];
 		pendingCorrected.Clear();
+		KillPoint[] kills = [.. pendingKills];
+		pendingKills.Clear();
 
 		PluginStats stats = new(sender.SendFailures, sender.BatchesDropped, sessionManager.SaveFailures);
-		sender.TryEnqueue(new LiveBatch(snapshot, feed, progress, pluginConfig.Progression, recaps, corrected, stats));
+		sender.TryEnqueue(new LiveBatch(snapshot, feed, progress, pluginConfig.Progression, recaps, corrected, stats, kills));
 	}
 
 	private List<LivePlayer> ReadPlayers()

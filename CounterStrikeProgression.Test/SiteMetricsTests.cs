@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Test;
 using System.Text;
 using System.Text.Json;
 using ktsu.CounterStrikeProgression.Core;
+using ktsu.CounterStrikeProgression.Core.Heatmaps;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Site;
 using ktsu.CounterStrikeProgression.Site.Live;
@@ -76,15 +77,16 @@ public sealed class SiteMetricsTests
 		LiveState live = NewState(time);
 		SiteMetrics metrics = new(time);
 		SiteOptions options = new() { Token = "dev" };
+		MatchFights fights = new(new InMemoryKillMapStore(), NullLogger<MatchFights>.Instance);
 		LiveBatch batch = Batch() with
 		{
 			Snapshot = Batch().Snapshot with { Players = [new LivePlayer(1, TestHelpers.SteamId, "Tester", false, 2, 3, 1, 40), new LivePlayer(2, 0, "Bot", true, 0, 0, 0, 0)] },
 			Stats = new PluginStats(SendFailures: 3, BatchesDropped: 1, SaveFailures: 2),
 		};
 
-		metrics.Record(StatusOf(await Endpoints.IngestAsync(IngestContext("Bearer dev", JsonSerializer.Serialize(batch, LiveJson.Options)), options, live, new Broadcaster(), new FeatIndex()).ConfigureAwait(false)));
-		metrics.Record(StatusOf(await Endpoints.IngestAsync(IngestContext(null, "{}"), options, live, new Broadcaster(), new FeatIndex()).ConfigureAwait(false)));
-		metrics.Record(StatusOf(await Endpoints.IngestAsync(IngestContext("Bearer dev", "not json"), options, live, new Broadcaster(), new FeatIndex()).ConfigureAwait(false)));
+		metrics.Record(StatusOf(await IngestEndpoints.IngestAsync(IngestContext("Bearer dev", JsonSerializer.Serialize(batch, LiveJson.Options)), options, live, new Broadcaster(), new FeatIndex(), fights).ConfigureAwait(false)));
+		metrics.Record(StatusOf(await IngestEndpoints.IngestAsync(IngestContext(null, "{}"), options, live, new Broadcaster(), new FeatIndex(), fights).ConfigureAwait(false)));
+		metrics.Record(StatusOf(await IngestEndpoints.IngestAsync(IngestContext("Bearer dev", "not json"), options, live, new Broadcaster(), new FeatIndex(), fights).ConfigureAwait(false)));
 		metrics.Record(StatusCodes.Status499ClientClosedRequest);
 		time.Advance(TimeSpan.FromSeconds(5));
 

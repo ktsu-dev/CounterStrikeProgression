@@ -52,6 +52,7 @@ internal static class Program
 		services.AddSingleton<IKillMapStore>(hasDatabase ? new MySqlKillMapStore(options.Database) : new InMemoryKillMapStore());
 		services.AddSingleton(new RadarImages(options));
 		services.AddSingleton(provider => new HeatmapReader(provider.GetRequiredService<IKillMapStore>(), provider.GetRequiredService<TimeProvider>()));
+		services.AddSingleton<MatchFights>();
 		services.AddHostedService<OnlineWatcher>();
 		services.AddSingleton<FeatIndex>();
 		services.AddSingleton(provider => new BoardIndex(provider.GetRequiredService<TimeProvider>()));
@@ -113,7 +114,7 @@ internal static class Program
 		app.MapGet("/api/players/{id}/maps", MapEndpoints.PlayerMapsAsync);
 		app.MapGet("/api/records", RecordEndpoints.RecordsAsync);
 		app.MapGet("/api/stream", Endpoints.Stream);
-		app.MapPost(Endpoints.IngestRoute, Endpoints.IngestAsync);
+		app.MapPost(Endpoints.IngestRoute, IngestEndpoints.IngestAsync);
 		HeatmapEndpoints.Map(app);
 		MapCardRoutes(app);
 	}

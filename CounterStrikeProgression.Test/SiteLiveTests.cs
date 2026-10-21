@@ -2,7 +2,10 @@
 
 namespace ktsu.CounterStrikeProgression.Test;
 
+using System.Text.Json;
+using System.Threading.Channels;
 using ktsu.CounterStrikeProgression.Core;
+using ktsu.CounterStrikeProgression.Core.Heatmaps;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Storage;
@@ -472,6 +475,109 @@ public sealed class SiteLiveTests
 		Assert.HasCount(3, logger.Entries);
 		Assert.AreEqual(LogLevel.Information, logger.Entries[1].Level);
 		Assert.AreEqual(LogLevel.Warning, logger.Entries[2].Level);
+	}
+
+	private static KillPoint Kill(string map, ulong killer, ulong victim, DateTime at) =>
+		new(map, killer, victim, "ak47", false, 0, 0, 0, 100, 100, 0, at);
+
+	private static MatchFights NewFights(IKillMapStore? store = null) =>
+		new(store ?? new InMemoryKillMapStore(), NullLogger<MatchFights>.Instance);
+
+	[TestMethod]
+	public async Task MatchFights_KeepsKillsOnTheCurrentMap()
+	{
+		MatchFights fights = NewFights();
+		KillPoint first = Kill("de_dust2", 7, 0, Start);
+		KillPoint second = Kill("de_dust2", 0, 7, Start.AddSeconds(1));
+
+		IReadOnlyList<KillPoint> kept = fights.Apply(Server(Start), [first, second]);
+		IReadOnlyList<KillPoint> current = await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false);
+
+		CollectionAssert.AreEquivalent(new[] { first, second }, kept.ToArray());
+		CollectionAssert.AreEquivalent(new[] { first, second }, current.ToArray());
+		Assert.AreEqual("de_dust2", fights.Map);
+	}
+
+	[TestMethod]
+	public async Task MatchFights_DropsKillsFromAnotherMap()
+	{
+		MatchFights fights = NewFights();
+
+		IReadOnlyList<KillPoint> kept = fights.Apply(Server(Start), [Kill("de_nuke", 7, 0, Start)]);
+
+		Assert.IsEmpty(kept);
+		Assert.IsEmpty(await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false));
+	}
+
+	[TestMethod]
+	public async Task MatchFights_StartsEmptyOnAMapChange()
+	{
+		MatchFights fights = NewFights();
+		fights.Apply(Server(Start) with { MapStartedAt = Start.AddMinutes(-1) }, [Kill("de_dust2", 7, 0, Start)]);
+
+		fights.Apply(Server(Start.AddMinutes(1), "de_mirage") with { MapStartedAt = Start.AddSeconds(30) }, null);
+
+		Assert.IsEmpty(await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false));
+		Assert.AreEqual("de_mirage", fights.Map);
+	}
+
+	[TestMethod]
+	public async Task MatchFights_RebuildsFromTheStoreAfterARestart()
+	{
+		InMemoryKillMapStore store = new();
+		KillPoint[] match = [Kill("de_dust2", 7, 0, Start), Kill("de_dust2", 0, 7, Start.AddSeconds(5)), Kill("de_dust2", 7, 8, Start.AddSeconds(9))];
+		await store.AddAsync([Kill("de_dust2", 7, 0, Start.AddSeconds(-1)), .. match], 100, CancellationToken.None).ConfigureAwait(false);
+		MatchFights fights = NewFights(store);
+
+		IReadOnlyList<KillPoint> kept = fights.Apply(Server(Start.AddMinutes(1)) with { MapStartedAt = Start }, null);
+		IReadOnlyList<KillPoint> current = await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false);
+
+		Assert.IsEmpty(kept);
+		CollectionAssert.AreEquivalent(match, current.ToArray());
+	}
+
+	[TestMethod]
+	public async Task MatchFights_IgnoresABatchWithoutKillsOrStart()
+	{
+		MatchFights fights = NewFights();
+
+		IReadOnlyList<KillPoint> kept = fights.Apply(Server(Start), null);
+
+		Assert.IsEmpty(kept);
+		Assert.IsEmpty(await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false));
+	}
+
+	[TestMethod]
+	public void Ingest_PublishesFightsForEachHuman()
+	{
+		Broadcaster broadcaster = new();
+		using CancellationTokenSource cancel = new();
+		ChannelReader<string> reader = broadcaster.Subscribe(cancel.Token);
+		LiveBatch batch = Batch(Server(Start));
+		LiveChanges changes = new(SnapshotChanged: false, [], []);
+
+		LivePublisher.Publish(broadcaster, batch, changes, [Kill("de_dust2", 7, 0, Start)]);
+		LivePublisher.Publish(broadcaster, batch, changes, [Kill("de_dust2", 7, 8, Start)]);
+
+		FightEvent[] onBot = ReadFights(reader);
+		FightEvent single = Assert.ContainsSingle(onBot);
+		Assert.AreEqual("de_dust2", single.Map);
+		Assert.AreEqual("7", single.SteamId);
+		Assert.IsTrue(single.Won);
+
+		FightEvent[] betweenHumans = ReadFights(reader);
+		Assert.HasCount(2, betweenHumans);
+		Assert.IsTrue(betweenHumans.Single(f => f.SteamId == "7").Won);
+		Assert.IsFalse(betweenHumans.Single(f => f.SteamId == "8").Won);
+		Assert.IsFalse(reader.TryRead(out _));
+	}
+
+	private static FightEvent[] ReadFights(ChannelReader<string> reader)
+	{
+		Assert.IsTrue(reader.TryRead(out string? message));
+		const string Prefix = "event: fights\ndata: ";
+		Assert.StartsWith(Prefix, message);
+		return JsonSerializer.Deserialize<FightEvent[]>(message[Prefix.Length..].Trim(), SiteJson.Options) ?? [];
 	}
 
 	private sealed record LogEntry(LogLevel Level, string Message, Exception? Exception);

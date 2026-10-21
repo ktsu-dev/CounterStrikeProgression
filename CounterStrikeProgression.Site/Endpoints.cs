@@ -4,7 +4,6 @@ namespace ktsu.CounterStrikeProgression.Site;
 
 using System.Data.Common;
 using System.Globalization;
-using System.Text.Json;
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Feats;
 using ktsu.CounterStrikeProgression.Core.Live;
@@ -16,7 +15,6 @@ using ktsu.CounterStrikeProgression.Site.Live;
 using ktsu.CounterStrikeProgression.Site.Views;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 
@@ -38,9 +36,6 @@ internal static class Endpoints
 
 	/// <summary>The in-cluster port that takes batches from the plugin, and nothing else.</summary>
 	public const int IngestPort = 8081;
-
-	/// <summary>The largest batch the ingest endpoint reads, in bytes.</summary>
-	public const long IngestBodyLimit = 4 * 1024 * 1024;
 
 	/// <summary>The ingest route.</summary>
 	public const string IngestRoute = "/api/ingest";
@@ -247,89 +242,4 @@ internal static class Endpoints
 		Ensure.NotNull(lifetime);
 		return new EventStreamResult(live, broadcaster, lifetime.ApplicationStopping);
 	}
-
-	/// <summary>
-	/// Takes a batch from the plugin, applies it, and tells the browsers what changed.
-	/// </summary>
-	/// <param name="context">The request.</param>
-	/// <param name="options">The site settings, for the token.</param>
-	/// <param name="live">The live state.</param>
-	/// <param name="broadcaster">Where the change events go.</param>
-	/// <param name="feats">The feats each player has earned, kept current here.</param>
-	/// <returns>204 on success, 401 without the token, 400 for a body that isn't a batch, or 413 for one over the limit.</returns>
-	public static async Task<IResult> IngestAsync(HttpContext context, SiteOptions options, LiveState live, Broadcaster broadcaster, FeatIndex feats)
-	{
-		Ensure.NotNull(context);
-		Ensure.NotNull(options);
-		Ensure.NotNull(live);
-		Ensure.NotNull(broadcaster);
-
-		if (!IngestAuth.IsAuthorized(context.Request.Headers.Authorization, options.Token))
-		{
-			return TypedResults.Unauthorized();
-		}
-
-		if (context.Request.ContentLength > IngestBodyLimit)
-		{
-			return TypedResults.StatusCode(StatusCodes.Status413PayloadTooLarge);
-		}
-
-		if (context.Features.Get<IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } sizeLimit)
-		{
-			sizeLimit.MaxRequestBodySize = IngestBodyLimit;
-		}
-
-		LiveBatch? batch;
-		try
-		{
-			batch = await JsonSerializer.DeserializeAsync<LiveBatch>(context.Request.Body, LiveJson.Options, context.RequestAborted).ConfigureAwait(false);
-		}
-		catch (JsonException)
-		{
-			return TypedResults.BadRequest();
-		}
-		catch (BadHttpRequestException ex)
-		{
-			return TypedResults.StatusCode(ex.StatusCode);
-		}
-
-		if (!IsComplete(batch))
-		{
-			return TypedResults.BadRequest();
-		}
-
-		LiveChanges changes = live.Apply(batch);
-		feats.Add(changes.NewFeed);
-		Publish(broadcaster, batch, changes);
-		return TypedResults.NoContent();
-	}
-
-	private static void Publish(Broadcaster broadcaster, LiveBatch batch, LiveChanges changes)
-	{
-		if (changes.SnapshotChanged)
-		{
-			broadcaster.Publish("snapshot", batch.Snapshot);
-		}
-
-		foreach (FeedEntry entry in changes.NewFeed.OrderBy(e => e.At))
-		{
-			broadcaster.Publish("feed", FeedCaptions.For(entry, batch.Settings));
-		}
-
-		if (changes.ChangedPlayers.Count > 0)
-		{
-			string[] steamIds = [.. changes.ChangedPlayers.Select(id => id.ToString(CultureInfo.InvariantCulture))];
-			broadcaster.Publish("progress", steamIds);
-		}
-	}
-
-	private static bool IsComplete([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] LiveBatch? batch) =>
-		batch is { Snapshot.Players: { } players, Feed: { } feed, Progress: { } progress, Settings: not null }
-		&& players.All(p => p is not null)
-		&& feed.All(e => e is not null)
-		&& progress.All(p => p is { Weapons: { } weapons, Challenges: { } challenges, Contracts: { } contracts }
-			&& weapons.All(w => w is not null)
-			&& challenges.All(c => c is not null)
-			&& contracts.All(c => c is { Period: not null, Contract: not null }))
-		&& (batch.Recaps?.All(r => r is { PlayerName: not null, Map: not null }) ?? true);
 }

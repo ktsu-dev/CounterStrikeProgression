@@ -50,7 +50,11 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 		if (services.Site is { } site)
 		{
 			// A batch straight after the new map loads, so the site's scoreboard doesn't show the old map until the next interval.
-			plugin.RegisterListener<Listeners.OnMapStart>(_ => plugin.AddTimer(1, site.Collect));
+			plugin.RegisterListener<Listeners.OnMapStart>(_ =>
+			{
+				site.MapStarted();
+				plugin.AddTimer(1, site.Collect);
+			});
 		}
 	}
 

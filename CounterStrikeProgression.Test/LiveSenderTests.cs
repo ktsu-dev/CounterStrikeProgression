@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Text.Json;
 using ktsu.CounterStrikeProgression.Core;
+using ktsu.CounterStrikeProgression.Core.Heatmaps;
 using ktsu.CounterStrikeProgression.Core.Live;
 
 [TestClass]
@@ -52,6 +53,22 @@ public sealed class LiveSenderTests
 		LiveBatch? back = JsonSerializer.Deserialize<LiveBatch>(body, LiveJson.Options);
 		Assert.IsNotNull(back);
 		Assert.AreEqual("de_dust2", back.Snapshot.Map);
+	}
+
+	[TestMethod]
+	public void Batch_RoundTripsKillsAndMapStart()
+	{
+		DateTime started = new(2026, 10, 17, 11, 55, 0, DateTimeKind.Utc);
+		KillPoint kill = new("de_dust2", 76561198000000001, 0, "ak47", true, -120, 350, 12, 400, -80, 0, started.AddMinutes(2));
+		LiveBatch batch = Batch("de_dust2") with { Kills = [kill] };
+		batch = batch with { Snapshot = batch.Snapshot with { MapStartedAt = started } };
+
+		LiveBatch? back = JsonSerializer.Deserialize<LiveBatch>(JsonSerializer.Serialize(batch, LiveJson.Options), LiveJson.Options);
+
+		Assert.IsNotNull(back);
+		Assert.AreEqual(started, back.Snapshot.MapStartedAt);
+		Assert.IsNotNull(back.Kills);
+		Assert.AreEqual(kill, Assert.ContainsSingle(back.Kills));
 	}
 
 	[TestMethod]

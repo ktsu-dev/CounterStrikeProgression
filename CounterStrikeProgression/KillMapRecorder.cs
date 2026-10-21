@@ -65,14 +65,15 @@ internal sealed class KillMapRecorder(HeatmapSettings settings, IKillMapStore st
 	});
 
 	/// <summary>
-	/// Notes a kill, if a human is on either end of it.
+	/// Reads where a kill happened.
 	/// </summary>
 	/// <param name="map">The map.</param>
 	/// <param name="killer">The killer.</param>
 	/// <param name="victim">The victim.</param>
 	/// <param name="weapon">The weapon.</param>
 	/// <param name="headshot">Whether it was a headshot.</param>
-	public void Record(string map, CCSPlayerController killer, CCSPlayerController victim, WeaponInfo weapon, bool headshot)
+	/// <returns>The kill, or <see langword="null"/> when either player has no pawn.</returns>
+	public static KillPoint? PointOf(string map, CCSPlayerController killer, CCSPlayerController victim, WeaponInfo weapon, bool headshot)
 	{
 		Ensure.NotNull(killer);
 		Ensure.NotNull(victim);
@@ -80,10 +81,10 @@ internal sealed class KillMapRecorder(HeatmapSettings settings, IKillMapStore st
 
 		if ((GameState.PawnOf(killer)?.AbsOrigin is not { } from) || (GameState.PawnOf(victim)?.AbsOrigin is not { } to))
 		{
-			return;
+			return null;
 		}
 
-		buffer.Add(new KillPoint(
+		return new KillPoint(
 			map,
 			GameState.IsHuman(killer) ? killer.SteamID : 0,
 			GameState.IsHuman(victim) ? victim.SteamID : 0,
@@ -95,8 +96,14 @@ internal sealed class KillMapRecorder(HeatmapSettings settings, IKillMapStore st
 			KillPoint.Round(to.X),
 			KillPoint.Round(to.Y),
 			KillPoint.Round(to.Z),
-			DateTime.UtcNow));
+			DateTime.UtcNow);
 	}
+
+	/// <summary>
+	/// Notes a kill for the next write, if a human is on either end of it and the sampling keeps it.
+	/// </summary>
+	/// <param name="point">The kill, from <see cref="PointOf"/>.</param>
+	public void Record(KillPoint point) => buffer.Add(point);
 
 	/// <summary>
 	/// Writes the waiting kills in the background, unless a write is still running. A failed write puts them back.
