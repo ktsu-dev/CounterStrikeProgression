@@ -196,7 +196,7 @@ public sealed class IngestEndpointTests
 		IResult result = await IngestEndpoints.IngestAsync(context, new SiteOptions { Token = "dev" }, NewState(), broadcaster, new FeatIndex(), fights).ConfigureAwait(false);
 
 		Assert.AreEqual(StatusCodes.Status204NoContent, StatusOf(result));
-		Assert.AreEqual(kill, Assert.ContainsSingle(await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false)));
+		Assert.AreEqual(kill, Assert.ContainsSingle((await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false)).Kills));
 		List<string> messages = [];
 		while (reader.TryRead(out string? message))
 		{

@@ -8,6 +8,11 @@ using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Site.Data;
 using Microsoft.Extensions.Logging;
 
+/// <summary>The current match: its map and its kills, read together.</summary>
+/// <param name="Map">The map of the match, or <see langword="null"/> before the first batch.</param>
+/// <param name="Kills">The match's kills, newest first.</param>
+internal sealed record MatchView(string? Map, IReadOnlyList<KillPoint> Kills);
+
 /// <summary>
 /// The kills of the match being played now, taken from the plugin's live batches. It starts over when the map
 /// changes, and after a site restart it reads the match so far back from the kill store, because the plugin
@@ -25,18 +30,6 @@ internal sealed partial class MatchFights(IKillMapStore store, ILogger<MatchFigh
 	private DateTime lastSentAt = DateTime.MinValue;
 	private int generation;
 	private bool needsStore;
-
-	/// <summary>Gets the map of the current match, or <see langword="null"/> before the first batch.</summary>
-	public string? Map
-	{
-		get
-		{
-			lock (gate)
-			{
-				return map;
-			}
-		}
-	}
 
 	/// <summary>
 	/// Takes a batch's kills. A snapshot on a new map, or with a later <see cref="ServerSnapshot.MapStartedAt"/>,
@@ -79,12 +72,12 @@ internal sealed partial class MatchFights(IKillMapStore store, ILogger<MatchFigh
 	}
 
 	/// <summary>
-	/// Gets the kills of the current match. The first call after a restart or a map change also reads the
+	/// Gets the current match's map and kills, taken under one lock so they always belong together. The first call after a restart or a map change also reads the
 	/// match so far from the store, when the plugin said when the match started.
 	/// </summary>
 	/// <param name="cancellationToken">Stops waiting for the store.</param>
-	/// <returns>The kills, newest first.</returns>
-	public async Task<IReadOnlyList<KillPoint>> CurrentAsync(CancellationToken cancellationToken)
+	/// <returns>The map and the kills, newest first.</returns>
+	public async Task<MatchView> CurrentAsync(CancellationToken cancellationToken)
 	{
 		string? storedMap;
 		DateTime? since;
@@ -93,10 +86,12 @@ internal sealed partial class MatchFights(IKillMapStore store, ILogger<MatchFigh
 		{
 			if (!needsStore)
 			{
-				return NewestFirst();
+				return Snapshot();
 			}
 
-			(storedMap, since, storedGeneration) = (map, startedAt, generation);
+			// MySQL DATETIME keeps whole seconds, so a kill stored in the match's first second is dated before a fractional start.
+			since = StoredSince();
+			(storedMap, storedGeneration) = (map, generation);
 		}
 
 		IReadOnlyList<KillPoint> stored;
@@ -110,7 +105,7 @@ internal sealed partial class MatchFights(IKillMapStore store, ILogger<MatchFigh
 			LogStoreReadFailed(logger, ex, storedMap!);
 			lock (gate)
 			{
-				return NewestFirst();
+				return Snapshot();
 			}
 		}
 
@@ -123,7 +118,7 @@ internal sealed partial class MatchFights(IKillMapStore store, ILogger<MatchFigh
 				AddStored(stored);
 			}
 
-			return NewestFirst();
+			return Snapshot();
 		}
 	}
 
@@ -149,7 +144,7 @@ internal sealed partial class MatchFights(IKillMapStore store, ILogger<MatchFigh
 		ILookup<KillPoint, DateTime> live = match.ToLookup(k => k with { At = default }, k => k.At);
 		foreach (KillPoint kill in stored)
 		{
-			if (IsInMatch(kill) && !live[kill with { At = default }].Any(at => Math.Abs((at - kill.At).Ticks) < TimeSpan.TicksPerSecond) && seen.Add(kill))
+			if (IsInMatch(kill, StoredSince()) && !live[kill with { At = default }].Any(at => Math.Abs((at - kill.At).Ticks) < TimeSpan.TicksPerSecond) && seen.Add(kill))
 			{
 				match.Add(kill);
 			}
@@ -159,9 +154,16 @@ internal sealed partial class MatchFights(IKillMapStore store, ILogger<MatchFigh
 		Trim();
 	}
 
-	private bool IsInMatch(KillPoint kill) =>
-		string.Equals(kill.Map, map, StringComparison.Ordinal)
-		&& ((startedAt is null) || (kill.At >= startedAt));
+	/// <summary>Gets the match start floored to a whole second, which is how far the store's dates reach.</summary>
+	private DateTime? StoredSince() =>
+		startedAt is { } start ? start.AddTicks(-(start.Ticks % TimeSpan.TicksPerSecond)) : null;
+
+	private bool IsInMatch(KillPoint kill) => IsInMatch(kill, startedAt);
+
+	private bool IsInMatch(KillPoint kill, DateTime? since) =>
+		((kill.KillerId != 0) || (kill.VictimId != 0))
+		&& string.Equals(kill.Map, map, StringComparison.Ordinal)
+		&& ((since is null) || (kill.At >= since));
 
 	private void Trim()
 	{
@@ -179,5 +181,5 @@ internal sealed partial class MatchFights(IKillMapStore store, ILogger<MatchFigh
 		match.RemoveRange(0, over);
 	}
 
-	private List<KillPoint> NewestFirst() => [.. Enumerable.Reverse(match)];
+	private MatchView Snapshot() => new(map, [.. Enumerable.Reverse(match)]);
 }

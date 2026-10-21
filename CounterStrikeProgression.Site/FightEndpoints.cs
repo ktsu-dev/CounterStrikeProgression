@@ -55,13 +55,13 @@ internal static class FightEndpoints
 			IReadOnlyList<KillPoint> kills = [];
 			if (matchScope)
 			{
-				shown = match.Map;
-				kills = await match.CurrentAsync(cancellationToken).ConfigureAwait(false);
+				MatchView current = await match.CurrentAsync(cancellationToken).ConfigureAwait(false);
+				(shown, kills) = (current.Map, current.Kills);
 			}
 			else
 			{
 				ServerSnapshot? snapshot = live.Snapshot;
-				bool online = snapshot?.Players.Any(p => p.SteamId == steamId) == true;
+				bool online = live.IsPlaying(steamId);
 				shown = !string.IsNullOrEmpty(map) ? map
 					: online ? snapshot!.Map
 					: await store.LastMapAsync(steamId, cancellationToken).ConfigureAwait(false);

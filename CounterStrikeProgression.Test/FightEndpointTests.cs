@@ -3,6 +3,7 @@
 namespace ktsu.CounterStrikeProgression.Test;
 
 using System.Globalization;
+using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Heatmaps;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Site;
@@ -42,9 +43,9 @@ public sealed class FightEndpointTests
 
 	private static string Text(ulong id) => id.ToString(CultureInfo.InvariantCulture);
 
-	private async Task<IResult> CallAsync(string id, string? scope, string? map, InMemoryKillMapStore store, MatchFights match)
+	private async Task<IResult> CallAsync(string id, string? scope, string? map, InMemoryKillMapStore store, MatchFights match, LiveState? state = null)
 	{
-		LiveState live = new(new SiteOptions(), new FeedStore(Path.Combine(directory, "feed.json")), TimeProvider.System, NullLogger<LiveState>.Instance);
+		LiveState live = state ?? new(new SiteOptions(), new FeedStore(Path.Combine(directory, "feed.json")), TimeProvider.System, NullLogger<LiveState>.Instance);
 		RadarImages radars = new(new SiteOptions { DataPath = directory });
 		return await FightEndpoints.FightsAsync(id, scope, map, store, match, live, radars, TestContext.CancellationToken).ConfigureAwait(false);
 	}
@@ -128,4 +129,41 @@ public sealed class FightEndpointTests
 
 		Assert.IsInstanceOfType<NotFound>(await CallAsync("123", "all", null, store, match).ConfigureAwait(false));
 	}
+
+	[TestMethod]
+	public async Task Fights_AllScopeUsesTheServerMapForAPlayerPlaying()
+	{
+		InMemoryKillMapStore store = new();
+		await store.AddAsync([Kill(Dust, Player, Rival), Kill("de_mirage", Player, Rival), Kill("de_mirage", Player, Rival, 1)], 100, TestContext.CancellationToken).ConfigureAwait(false);
+		MatchFights match = new(store, NullLogger<MatchFights>.Instance);
+		LiveState live = new(new SiteOptions(), new FeedStore(Path.Combine(directory, "feed.json")), new ManualTime(), NullLogger<LiveState>.Instance);
+		live.Apply(Batch("de_mirage", Human(Player)));
+
+		FightView view = View(await CallAsync(Text(Player), "all", null, store, match, live).ConfigureAwait(false));
+
+		Assert.AreEqual("de_mirage", view.Map);
+		Assert.AreEqual(2, view.Cells.Sum(c => c.Won));
+	}
+
+	[TestMethod]
+	public async Task Fights_AllScopeUsesTheLastMapWhenTheServerIsOffline()
+	{
+		InMemoryKillMapStore store = new();
+		await store.AddAsync([Kill("de_mirage", Player, Rival), Kill(Dust, Player, Rival, 1)], 100, TestContext.CancellationToken).ConfigureAwait(false);
+		MatchFights match = new(store, NullLogger<MatchFights>.Instance);
+		ManualTime time = new();
+		LiveState live = new(new SiteOptions(), new FeedStore(Path.Combine(directory, "feed.json")), time, NullLogger<LiveState>.Instance);
+		live.Apply(Batch("de_mirage", Human(Player)));
+		time.Advance(TimeSpan.FromMinutes(5));
+
+		FightView view = View(await CallAsync(Text(Player), "all", null, store, match, live).ConfigureAwait(false));
+
+		Assert.IsFalse(live.IsPlaying(Player));
+		Assert.AreEqual(Dust, view.Map);
+	}
+
+	private static LiveBatch Batch(string map, params LivePlayer[] players) =>
+		new(new ServerSnapshot(At, map, "Deathmatch", 16, players), [], [], new ProgressionSettings());
+
+	private static LivePlayer Human(ulong steamId) => new(0, steamId, "Tester", false, 1, 0, 0, 0);
 }

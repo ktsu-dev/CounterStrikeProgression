@@ -340,7 +340,6 @@
 			}
 		});
 
-
 		return { element, setOnline };
 	}
 

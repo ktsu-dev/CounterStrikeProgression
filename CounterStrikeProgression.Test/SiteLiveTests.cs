@@ -491,11 +491,11 @@ public sealed class SiteLiveTests
 		KillPoint second = Kill("de_dust2", 0, 7, Start.AddSeconds(1));
 
 		IReadOnlyList<KillPoint> kept = fights.Apply(Server(Start), [first, second]);
-		IReadOnlyList<KillPoint> current = await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false);
+		IReadOnlyList<KillPoint> current = (await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false)).Kills;
 
 		CollectionAssert.AreEquivalent(new[] { first, second }, kept.ToArray());
 		CollectionAssert.AreEquivalent(new[] { first, second }, current.ToArray());
-		Assert.AreEqual("de_dust2", fights.Map);
+		Assert.AreEqual("de_dust2", (await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false)).Map);
 	}
 
 	[TestMethod]
@@ -506,7 +506,7 @@ public sealed class SiteLiveTests
 		IReadOnlyList<KillPoint> kept = fights.Apply(Server(Start), [Kill("de_nuke", 7, 0, Start)]);
 
 		Assert.IsEmpty(kept);
-		Assert.IsEmpty(await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false));
+		Assert.IsEmpty((await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false)).Kills);
 	}
 
 	[TestMethod]
@@ -517,8 +517,8 @@ public sealed class SiteLiveTests
 
 		fights.Apply(Server(Start.AddMinutes(1), "de_mirage") with { MapStartedAt = Start.AddSeconds(30) }, null);
 
-		Assert.IsEmpty(await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false));
-		Assert.AreEqual("de_mirage", fights.Map);
+		Assert.IsEmpty((await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false)).Kills);
+		Assert.AreEqual("de_mirage", (await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false)).Map);
 	}
 
 	[TestMethod]
@@ -530,10 +530,36 @@ public sealed class SiteLiveTests
 		MatchFights fights = NewFights(store);
 
 		IReadOnlyList<KillPoint> kept = fights.Apply(Server(Start.AddMinutes(1)) with { MapStartedAt = Start }, null);
-		IReadOnlyList<KillPoint> current = await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false);
+		IReadOnlyList<KillPoint> current = (await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false)).Kills;
 
 		Assert.IsEmpty(kept);
 		CollectionAssert.AreEquivalent(match, current.ToArray());
+	}
+
+	[TestMethod]
+	public async Task MatchFights_RebuildIncludesAStoredKillFromTheStartSecond()
+	{
+		InMemoryKillMapStore store = new();
+		KillPoint stored = Kill("de_dust2", 7, 0, Start);
+		await store.AddAsync([stored], 100, CancellationToken.None).ConfigureAwait(false);
+		MatchFights fights = NewFights(store);
+
+		fights.Apply(Server(Start.AddMinutes(1)) with { MapStartedAt = Start.AddMilliseconds(500) }, null);
+		MatchView current = await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false);
+
+		Assert.AreEqual(stored, Assert.ContainsSingle(current.Kills));
+	}
+
+	[TestMethod]
+	public async Task MatchFights_IgnoresKillsBetweenBots()
+	{
+		MatchFights fights = NewFights();
+		KillPoint human = Kill("de_dust2", 7, 0, Start);
+
+		IReadOnlyList<KillPoint> kept = fights.Apply(Server(Start), [Kill("de_dust2", 0, 0, Start), human]);
+
+		Assert.AreEqual(human, Assert.ContainsSingle(kept));
+		Assert.AreEqual(human, Assert.ContainsSingle((await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false)).Kills));
 	}
 
 	[TestMethod]
@@ -544,7 +570,7 @@ public sealed class SiteLiveTests
 		IReadOnlyList<KillPoint> kept = fights.Apply(Server(Start), null);
 
 		Assert.IsEmpty(kept);
-		Assert.IsEmpty(await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false));
+		Assert.IsEmpty((await fights.CurrentAsync(CancellationToken.None).ConfigureAwait(false)).Kills);
 	}
 
 	[TestMethod]
