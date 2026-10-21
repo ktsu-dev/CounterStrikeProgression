@@ -681,7 +681,34 @@ tr.place-3 td.num:first-child {
 	touch-action: manipulation;
 }
 
-.player-heat-canvas[hidden],
+.player-heat-map {
+	position: relative;
+}
+
+/* Inset by the canvas border, so the marker's coordinates match the radar's. */
+.player-heat-marker {
+	position: absolute;
+	inset: 1px;
+	width: calc(100% - 2px);
+	height: calc(100% - 2px);
+	pointer-events: none;
+	overflow: visible;
+}
+
+.player-heat-marker.stale {
+	opacity: 0.4;
+}
+
+.player-heat-dot,
+.player-heat-wedge {
+	fill: var(--orange);
+	stroke: var(--bg);
+	stroke-width: 5px;
+	stroke-linejoin: round;
+}
+
+.player-heat-map[hidden],
+.player-heat-marker[hidden],
 .player-heat-readout[hidden] {
 	display: none;
 }
@@ -961,7 +988,7 @@ tr.best-map td.name a {
 		max-height: none;
 	}
 
-	.player-heat-canvas {
+	.player-heat-map {
 		max-width: 520px;
 	}
 }

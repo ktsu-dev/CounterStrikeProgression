@@ -12,11 +12,16 @@
 	const GREY = [0x8a, 0x8f, 0x98];
 	const GREEN = [0x30, 0xa4, 0x6c];
 
-	// Two fights or fewer stay faint, so one death doesn't paint an area solid red.
-	const FAINT_FIGHTS = 2;
-	const SOLID_FIGHTS = 6;
-	const FAINT_ALPHA = 0.25;
-	const SOLID_ALPHA = 0.85;
+	// How strongly a cell shows by its number of fights, per scope. All time keeps two fights or fewer faint, so
+	// one death doesn't paint an area solid red. This match has few fights in all, so even one shows clearly.
+	const ALPHA = {
+		all: { fewFights: 2, manyFights: 6, few: 0.25, many: 0.85 },
+		match: { fewFights: 1, manyFights: 4, few: 0.6, many: 0.95 },
+	};
+
+	const SVG = "http://www.w3.org/2000/svg";
+	// The marker's dot radius on a 1024 pixel radar.
+	const MARKER_RADIUS = 16;
 
 	function el(tag, className, text) {
 		const node = document.createElement(tag);
@@ -62,14 +67,23 @@
 		}
 	}
 
-	function cellColor(won, lost) {
+	function svg(tag, className) {
+		const node = document.createElementNS(SVG, tag);
+		if (className) {
+			node.setAttribute("class", className);
+		}
+		return node;
+	}
+
+	function cellColor(won, lost, scope) {
 		const fights = won + lost;
 		const balance = fights > 0 ? (won - lost) / fights : 0;
 		const end = balance < 0 ? RED : GREEN;
 		const t = Math.abs(balance);
 		const rgb = GREY.map((c, i) => Math.round(c + (end[i] - c) * t));
-		const confidence = Math.min(1, Math.max(0, (fights - FAINT_FIGHTS) / (SOLID_FIGHTS - FAINT_FIGHTS)));
-		const alpha = FAINT_ALPHA + (SOLID_ALPHA - FAINT_ALPHA) * confidence;
+		const curve = ALPHA[scope] ?? ALPHA.all;
+		const confidence = Math.min(1, Math.max(0, (fights - curve.fewFights) / (curve.manyFights - curve.fewFights)));
+		const alpha = curve.few + (curve.many - curve.few) * confidence;
 		return `rgba(${rgb.join(",")},${alpha.toFixed(3)})`;
 	}
 
@@ -107,9 +121,25 @@
 
 		const canvas = el("canvas", "player-heat-canvas");
 		canvas.setAttribute("role", "img");
+
+		// The player's marker sits over the canvas in its own layer, which lets pointer events through to the canvas
+		// so the cell under the marker still reads out. The wedge points the way the player faces.
+		const marker = svg("svg", "player-heat-marker");
+		marker.setAttribute("aria-hidden", "true");
+		marker.toggleAttribute("hidden", true);
+		const pin = svg("g");
+		const wedge = svg("path", "player-heat-wedge");
+		wedge.setAttribute("d", `M ${-MARKER_RADIUS * 0.8} ${-MARKER_RADIUS * 0.6} L 0 ${-MARKER_RADIUS * 2.6} L ${MARKER_RADIUS * 0.8} ${-MARKER_RADIUS * 0.6} Z`);
+		const dot = svg("circle", "player-heat-dot");
+		dot.setAttribute("r", String(MARKER_RADIUS));
+		pin.append(wedge, dot);
+		marker.append(pin);
+
+		const frame = el("div", "player-heat-map");
+		frame.append(canvas, marker);
 		const readout = el("div", "muted player-heat-readout", BLANK);
 		const note = el("div", "muted");
-		element.append(head, filters, canvas, readout, note);
+		element.append(head, filters, frame, readout, note);
 
 		const state = {
 			online: null,
@@ -122,6 +152,10 @@
 			serverMap: null,
 			serverStartedAt: null,
 			request: 0,
+			// The map the latest positions are for, and where the player was last seen.
+			positionsMap: null,
+			position: null,
+			positionsSeen: false,
 		};
 
 		function key(x, y) {
@@ -150,7 +184,7 @@
 			const pixels = view.cellPixels;
 			const inset = 2;
 			for (const cell of state.cells.values()) {
-				context.fillStyle = cellColor(cell.won, cell.lost);
+				context.fillStyle = cellColor(cell.won, cell.lost, state.scope);
 				context.beginPath();
 				if (context.roundRect) {
 					context.roundRect(cell.x * pixels + inset, cell.y * pixels + inset, pixels - inset * 2, pixels - inset * 2, 6);
@@ -164,7 +198,7 @@
 		// The note says why the map is empty, and the readout line only shows once there's a cell to point at.
 		function showNote() {
 			const view = state.view;
-			readout.hidden = canvas.hidden || state.cells.size === 0;
+			readout.hidden = frame.hidden || state.cells.size === 0;
 			if (!view.map) {
 				note.textContent = state.scope === "match" ? "No match is being played right now." : "No fights here yet.";
 			} else if (!view.calibrated) {
@@ -174,6 +208,39 @@
 			} else {
 				note.textContent = "Green where you win most fights, red where you lose most. Faint areas have only a few.";
 			}
+		}
+
+		// Shown only while the panel's map is the map the player was last seen on, and the positions are still for
+		// that map. A dead player, or one missing from the latest positions, stays at the last known spot, faded.
+		function placeMarker() {
+			const view = state.view;
+			const position = state.position;
+			const visible = Boolean(view?.map && !frame.hidden && position && position.map === state.positionsMap && position.map === view.map);
+			marker.toggleAttribute("hidden", !visible);
+			if (!visible) {
+				return;
+			}
+			const size = view.size;
+			const scale = size / position.size;
+			marker.setAttribute("viewBox", `0 0 ${size} ${size}`);
+			pin.setAttribute("transform", `translate(${(position.x * scale).toFixed(1)} ${(position.y * scale).toFixed(1)}) rotate(${position.facing.toFixed(1)}) scale(${(size / 1024).toFixed(3)})`);
+			marker.classList.toggle("stale", position.stale);
+		}
+
+		function takePositions(positions) {
+			if (!positions || typeof positions !== "object") {
+				return;
+			}
+			state.positionsMap = positions.map ?? null;
+			const players = Array.isArray(positions.players) ? positions.players : [];
+			const mine = players.find((player) => player.steamId !== null && player.steamId !== undefined && String(player.steamId) === steamId);
+			if (mine && positions.map) {
+				const size = Number(positions.size) > 0 ? Number(positions.size) : 1024;
+				state.position = { map: positions.map, x: Number(mine.x), y: Number(mine.y), facing: Number(mine.facing) || 0, size, stale: !mine.alive };
+			} else if (state.position) {
+				state.position.stale = true;
+			}
+			placeMarker();
 		}
 
 		// Live when the panel shows the map being played, since only that map's fights arrive on the stream, and
@@ -188,9 +255,10 @@
 			title.textContent = view.map ? `Fights · ${mapLabel(view.map)}` : "Fights";
 			readout.textContent = BLANK;
 			const drawable = Boolean(view.map && view.calibrated);
-			canvas.hidden = !drawable;
+			frame.hidden = !drawable;
 			showNote();
 			showLive();
+			placeMarker();
 			if (!drawable) {
 				return;
 			}
@@ -212,6 +280,7 @@
 				return;
 			}
 			draw();
+			placeMarker();
 		}
 
 		async function load() {
@@ -233,7 +302,8 @@
 			} catch {
 				if (mine === state.request) {
 					state.view = null;
-					canvas.hidden = true;
+					frame.hidden = true;
+					placeMarker();
 					readout.hidden = true;
 					live.hidden = true;
 					note.textContent = "The fights can't be loaded right now.";
@@ -299,7 +369,7 @@
 			}
 			if (changed) {
 				showNote();
-				if (!canvas.hidden) {
+				if (!frame.hidden) {
 					draw();
 				}
 			}
@@ -327,7 +397,7 @@
 					// Cleared at once, so the new match's first fights don't land on the old one's while the refetch runs.
 					state.cells = new Map();
 					showNote();
-					if (!canvas.hidden) {
+					if (!frame.hidden) {
 						draw();
 					}
 					load();
@@ -340,6 +410,23 @@
 				load();
 			}
 		});
+
+		on("positions", (positions) => {
+			state.positionsSeen = true;
+			takePositions(positions);
+		});
+
+		// The starting position, unless an event has already brought a newer one.
+		fetch("/api/positions", { headers: { Accept: "application/json" }, cache: "no-store" })
+			.then((response) => (response.ok ? response.json() : null))
+			.then((positions) => {
+				if (positions && !state.positionsSeen) {
+					takePositions(positions);
+				}
+			})
+			.catch(() => {
+				// Without a starting position the marker appears with the first positions event.
+			});
 
 		return { element, setOnline };
 	}
