@@ -488,7 +488,16 @@
 		feedBox.append(el("h2", "section-title", "Feed"), feedList);
 		const board = el("div");
 		boardBox.append(board);
-		grid.append(boardBox, feedBox);
+		// Where everyone is on the map, beside the scoreboard and above the feed.
+		const liveMap = window.LiveMap ? window.LiveMap.create(on) : null;
+		if (liveMap) {
+			grid.classList.add("with-map");
+			boardBox.classList.add("live-board");
+			feedBox.classList.add("live-feed");
+			grid.append(boardBox, liveMap.element, feedBox);
+		} else {
+			grid.append(boardBox, feedBox);
+		}
 		const panel = el("div", "panel");
 		panel.append(top, featuredBox, grid);
 		root.replaceChildren(panel);

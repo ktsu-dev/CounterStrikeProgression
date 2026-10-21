@@ -325,6 +325,164 @@ td.name {
 	min-width: 0;
 }
 
+/* The scoreboard runs down the left, and the map sits on the right above the feed. */
+.live-grid.with-map {
+	grid-template-areas:
+		"board map"
+		"board feed";
+	grid-template-rows: auto 1fr;
+}
+
+.live-board {
+	grid-area: board;
+}
+
+.live-map {
+	grid-area: map;
+}
+
+.live-feed {
+	grid-area: feed;
+}
+
+.live-map-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.live-map-frame {
+	position: relative;
+	margin-bottom: 6px;
+}
+
+.live-map-canvas {
+	display: block;
+	width: 100%;
+	aspect-ratio: 1;
+	background: #101318;
+	border: 1px solid var(--line);
+}
+
+/* Inset by the canvas border, so the markers' coordinates match the radar's. Only the labels take pointer events. */
+.live-map-layer {
+	position: absolute;
+	inset: 1px;
+	overflow: hidden;
+	pointer-events: none;
+}
+
+.live-map-layer.stale {
+	opacity: 0.4;
+}
+
+/* Sized as a share of the map, like the player page's marker: the pin's viewBox is 2.6 dot radii each way. Pins sit
+   above the labels, so a label beside a marker never hides its wedge. */
+.live-map-pin {
+	position: absolute;
+	width: 8.125%;
+	height: 8.125%;
+	z-index: 2;
+	transform: translate(-50%, -50%);
+	overflow: visible;
+}
+
+.live-map-pin.bot {
+	width: 5.5%;
+	height: 5.5%;
+	opacity: 0.6;
+}
+
+.live-map-dot,
+.live-map-wedge {
+	fill: var(--orange);
+	stroke: var(--bg);
+	stroke-width: 5px;
+	stroke-linejoin: round;
+}
+
+.live-map-pin.bot .live-map-dot,
+.live-map-pin.bot .live-map-wedge {
+	fill: var(--muted);
+}
+
+/* A margin as a share of the map clears the human pin's wedge, which reaches 2.6 dot radii (4.1%) from its center. */
+.live-map-name {
+	position: absolute;
+	margin-left: 3.5%;
+	transform: translate(0, -50%);
+	width: max-content;
+	max-width: 12em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	padding: 0 3px;
+	background: rgba(13, 15, 18, 0.75);
+	color: var(--text);
+	font-size: 11px;
+	line-height: 1.4;
+	pointer-events: auto;
+}
+
+a.live-map-name {
+	text-decoration: none;
+}
+
+a.live-map-name:hover,
+a.live-map-name:focus-visible {
+	color: var(--orange);
+}
+
+.live-map-name.flip {
+	margin-left: -3.5%;
+	transform: translate(-100%, -50%);
+}
+
+/* A bot's hit area is a circle around its dot, and its name only shows while hovered, focused, or tapped open. */
+.live-map-bot {
+	position: absolute;
+	width: 24px;
+	height: 24px;
+	margin: -12px 0 0 -12px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: transparent;
+	font: inherit;
+	cursor: pointer;
+	pointer-events: auto;
+	touch-action: manipulation;
+}
+
+.live-map-bot .live-map-name {
+	display: none;
+	left: 12px;
+	top: 12px;
+	margin-left: 0;
+	transform: translate(14px, -50%);
+	color: var(--muted);
+}
+
+.live-map-bot.flip .live-map-name {
+	transform: translate(calc(-100% - 14px), -50%);
+}
+
+.live-map-bot:hover .live-map-name,
+.live-map-bot:focus-visible .live-map-name,
+.live-map-bot.open .live-map-name {
+	display: block;
+}
+
+.live-map-bot:hover,
+.live-map-bot:focus-visible,
+.live-map-bot.open {
+	z-index: 3;
+}
+
+.live-map-frame[hidden] {
+	display: none;
+}
+
 .section-title {
 	margin: 0 0 6px;
 	color: var(--muted);
@@ -991,6 +1149,17 @@ tr.best-map td.name a {
 	.player-heat-map {
 		max-width: 520px;
 	}
+
+	.live-grid.with-map {
+		grid-template-areas:
+			"map map"
+			"board feed";
+		grid-template-rows: auto auto;
+	}
+
+	.live-map-frame {
+		max-width: 520px;
+	}
 }
 
 @media (max-width: 700px) {
@@ -1001,6 +1170,13 @@ tr.best-map td.name a {
 	.live-grid {
 		grid-template-columns: minmax(0, 1fr);
 		padding: 12px 8px;
+	}
+
+	.live-grid.with-map {
+		grid-template-areas:
+			"map"
+			"board"
+			"feed";
 	}
 
 	th,
