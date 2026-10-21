@@ -120,6 +120,7 @@
 			radarUrl: null,
 			radarLoad: Promise.resolve(),
 			serverMap: null,
+			serverStartedAt: null,
 			request: 0,
 		};
 
@@ -305,17 +306,40 @@
 
 		on("snapshot", (snapshot) => {
 			const map = snapshot?.map;
-			if (!map || map === state.serverMap) {
+			if (!map) {
+				return;
+			}
+			// A later start on the same map is a new match too, such as a rotation that repeats the map.
+			const startedAt = Date.parse(snapshot.mapStartedAt ?? "");
+			const restarted = map === state.serverMap && Number.isFinite(startedAt) && Number.isFinite(state.serverStartedAt) && startedAt > state.serverStartedAt;
+			const newMap = map !== state.serverMap;
+			if (Number.isFinite(startedAt)) {
+				state.serverStartedAt = startedAt;
+			}
+			if (!newMap && !restarted) {
 				return;
 			}
 			state.serverMap = map;
 			showLive();
+			if (restarted) {
+				if (state.scope === "match" && state.view?.map === map) {
+					// Cleared at once, so the new match's first fights don't land on the old one's while the refetch runs.
+					state.cells = new Map();
+					showNote();
+					if (!canvas.hidden) {
+						draw();
+					}
+					load();
+				}
+				return;
+			}
 			// This match always follows the server, and so does All time while the player is on it.
 			const follows = state.scope === "match" || state.online;
 			if (follows && state.view && state.view.map !== map) {
 				load();
 			}
 		});
+
 
 		return { element, setOnline };
 	}
