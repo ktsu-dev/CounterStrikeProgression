@@ -1,6 +1,6 @@
-## v1.25.0 (minor)
+## v1.25.1 (patch)
 
-Changes since v1.24.0:
+Changes since v1.25.0:
 
-- [minor] Show kills and deaths on the live map (matt-edmondson)
+- [patch] Count only skill shots against humans toward the Most skill shots record (matt-edmondson)
 
