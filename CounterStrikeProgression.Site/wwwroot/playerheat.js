@@ -139,7 +139,8 @@
 			context.clearRect(0, 0, size, size);
 			if (state.radar) {
 				context.drawImage(state.radar, 0, 0, size, size);
-				context.fillStyle = "rgba(13,15,18,0.35)";
+				// Leaves the radar at 35% so its own colored outlines don't compete with the cells. Matches heatmaps.js.
+				context.fillStyle = "rgba(13,15,18,0.65)";
 				context.fillRect(0, 0, size, size);
 			} else {
 				context.fillStyle = "#101318";

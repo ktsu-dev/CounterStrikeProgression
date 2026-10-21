@@ -147,7 +147,8 @@
 		const radar = view.radar ? await loadImage(view.radar) : null;
 		if (radar) {
 			context.drawImage(radar, 0, 0, view.size, view.size);
-			context.fillStyle = "rgba(13,15,18,0.35)";
+			// Leaves the radar at 35% so its own colored outlines don't compete with the heat. Matches playerheat.js.
+			context.fillStyle = "rgba(13,15,18,0.65)";
 			context.fillRect(0, 0, view.size, view.size);
 		} else {
 			drawOutline(context, view);
