@@ -28,6 +28,9 @@ internal sealed class RecapTracker(DateTime startedAt)
 	/// <summary>Gets how many of <see cref="SkillShots"/> were against bots.</summary>
 	public int BotSkillShots { get; private set; }
 
+	/// <summary>Gets how many of <see cref="SkillShots"/> were against human players.</summary>
+	public int HumanSkillShots { get; private set; }
+
 	/// <summary>Gets a value indicating whether nothing has been earned since the session started.</summary>
 	public bool IsEmpty => (xp <= 0) && (best is null);
 
@@ -49,6 +52,11 @@ internal sealed class RecapTracker(DateTime startedAt)
 					if (notice.VsBot)
 					{
 						BotSkillShots++;
+					}
+
+					if (notice.VsHuman)
+					{
+						HumanSkillShots++;
 					}
 
 					break;
@@ -139,6 +147,7 @@ internal sealed class RecapTracker(DateTime startedAt)
 		xp = 0;
 		SkillShots = 0;
 		BotSkillShots = 0;
+		HumanSkillShots = 0;
 		levels = 0;
 		tiers = 0;
 		rankUps = 0;

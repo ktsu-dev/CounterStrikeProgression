@@ -138,7 +138,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 			return result;
 		}
 
-		Award award = NewAward(combat.Weapon, combat.VictimIsBot);
+		Award award = NewAward(combat.Weapon, combat.VictimIsBot, vsHuman: !combat.VictimIsBot);
 		WeaponProgress weapon = player.Weapon(combat.Weapon.Key);
 		weapon.IsDirty = true;
 
@@ -227,14 +227,14 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 	/// </summary>
 	/// <param name="player">The player's progress.</param>
 	/// <param name="skillShots">The skill shots they earned that map.</param>
-	/// <param name="botSkillShots">How many of those were against bots.</param>
+	/// <param name="humanSkillShots">How many of those were against human players.</param>
 	/// <returns>Any record it set.</returns>
-	public ProgressionResult ApplyMapRecords(PlayerProgress player, int skillShots, int botSkillShots)
+	public ProgressionResult ApplyMapRecords(PlayerProgress player, int skillShots, int humanSkillShots)
 	{
 		Ensure.NotNull(player);
 
 		ProgressionResult result = new();
-		int counted = Settings.RecordsCountBots ? skillShots : skillShots - botSkillShots;
+		int counted = Settings.RecordsCountBots ? skillShots : humanSkillShots;
 		if (counted >= Math.Max(1, Settings.RecordMinimumMapSkillShots))
 		{
 			TryRecord(player, RecordCatalog.MapSkillShotsId, counted, result);
@@ -287,7 +287,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		Ensure.NotNull(chicken);
 
 		ProgressionResult result = new();
-		Award award = NewAward(chicken.Weapon, vsBot: false);
+		Award award = NewAward(chicken.Weapon, vsBot: false, vsHuman: false);
 		WeaponProgress progress = player.Weapon(chicken.Weapon.Key);
 		progress.IsDirty = true;
 		award.EventXp += Settings.ChickenXp;
@@ -340,7 +340,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 
 		if (efficient)
 		{
-			AwardSkillShot(player, reload.Weapon, SkillShotCatalog.EfficientReload, vsBot: false, result);
+			AwardSkillShot(player, reload.Weapon, SkillShotCatalog.EfficientReload, vsBot: false, vsHuman: false, result);
 		}
 
 		return Settle(player, result);
@@ -368,18 +368,18 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 			double accuracy = Math.Min(1.0, (double)life.Hits / life.Shots);
 			if (accuracy >= Settings.MarksmanAccuracy)
 			{
-				AwardSkillShot(player, life.Weapon, SkillShotCatalog.Marksman, life.MostlyBots, result);
+				AwardSkillShot(player, life.Weapon, SkillShotCatalog.Marksman, life.MostlyBots, vsHuman: !life.MostlyBots, result);
 			}
 
 			if (accuracy >= Settings.SharpshooterAccuracy)
 			{
-				AwardSkillShot(player, life.Weapon, SkillShotCatalog.Sharpshooter, life.MostlyBots, result);
+				AwardSkillShot(player, life.Weapon, SkillShotCatalog.Sharpshooter, life.MostlyBots, vsHuman: !life.MostlyBots, result);
 			}
 		}
 
 		if ((life.Hits >= Settings.HeadhunterMinimumHits) && (((double)life.HeadshotHits / life.Hits) >= Settings.HeadhunterRatio))
 		{
-			AwardSkillShot(player, life.Weapon, SkillShotCatalog.Headhunter, life.MostlyBots, result);
+			AwardSkillShot(player, life.Weapon, SkillShotCatalog.Headhunter, life.MostlyBots, vsHuman: !life.MostlyBots, result);
 		}
 
 		return Settle(player, result);
@@ -397,7 +397,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		Ensure.NotNull(assist);
 
 		ProgressionResult result = new();
-		Award award = NewAward(assist.Weapon, assist.VictimIsBot);
+		Award award = NewAward(assist.Weapon, assist.VictimIsBot, vsHuman: !assist.VictimIsBot);
 		award.EventXp = Settings.AssistXp;
 		WeaponProgress weapon = player.Weapon(assist.Weapon.Key);
 		weapon.IsDirty = true;
@@ -427,7 +427,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		ProgressionResult result = new();
 		if (flash.BlindSeconds >= Settings.LongFlashSeconds)
 		{
-			AwardSkillShot(player, flash.Weapon, SkillShotCatalog.LongFlash, flash.VictimIsBot, result);
+			AwardSkillShot(player, flash.Weapon, SkillShotCatalog.LongFlash, flash.VictimIsBot, vsHuman: !flash.VictimIsBot, result);
 		}
 
 		return Settle(player, result);
@@ -455,14 +455,14 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		{
 			// No weapon to put the ladder progress on, so the clutch pays XP alone.
 			double xp = ScaleForBots(SkillShotXp(skillShot.Rarity), clutch.VsBots);
-			ProgressionNotice notice = new() { Kind = NoticeKind.SkillShot, SkillShot = skillShot, Xp = (long)Math.Round(xp), VsBot = clutch.VsBots };
+			ProgressionNotice notice = new() { Kind = NoticeKind.SkillShot, SkillShot = skillShot, Xp = (long)Math.Round(xp), VsBot = clutch.VsBots, VsHuman = !clutch.VsBots };
 			result.Notices.Add(notice);
 			result.Signals.Add(new(SignalKind.SkillShot, SkillShot: skillShot));
 			CreditRankXp(player, xp, result);
 			return Settle(player, result);
 		}
 
-		AwardSkillShot(player, clutch.LastWeapon, SkillShotCatalog.Clutch, clutch.VsBots, result);
+		AwardSkillShot(player, clutch.LastWeapon, SkillShotCatalog.Clutch, clutch.VsBots, vsHuman: !clutch.VsBots, result);
 		return Settle(player, result);
 	}
 
@@ -502,7 +502,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		_ => Settings.CommonSkillShotXp,
 	};
 
-	private void AwardSkillShot(PlayerProgress player, WeaponInfo weaponInfo, SkillShotId id, bool vsBot, ProgressionResult result)
+	private void AwardSkillShot(PlayerProgress player, WeaponInfo weaponInfo, SkillShotId id, bool vsBot, bool vsHuman, ProgressionResult result)
 	{
 		SkillShotDefinition skillShot = SkillShotCatalog.Get(id);
 		if (!skillShot.AppliesTo(weaponInfo))
@@ -510,7 +510,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 			return;
 		}
 
-		Award award = NewAward(weaponInfo, vsBot);
+		Award award = NewAward(weaponInfo, vsBot, vsHuman);
 		WeaponProgress weapon = player.Weapon(weaponInfo.Key);
 		weapon.IsDirty = true;
 		EarnSkillShot(weapon, award, skillShot, result);
@@ -521,7 +521,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 	{
 		int xp = SkillShotXp(skillShot.Rarity);
 		award.EventXp += xp;
-		result.Notices.Add(new() { Kind = NoticeKind.SkillShot, Weapon = award.Weapon, SkillShot = skillShot, Xp = (long)Math.Round(ScaleForBots(xp, award.VsBot)), VsBot = award.VsBot });
+		result.Notices.Add(new() { Kind = NoticeKind.SkillShot, Weapon = award.Weapon, SkillShot = skillShot, Xp = (long)Math.Round(ScaleForBots(xp, award.VsBot)), VsBot = award.VsBot, VsHuman = award.VsHuman });
 		result.Signals.Add(new(SignalKind.SkillShot, award.Weapon, SkillShot: skillShot));
 		Advance(weapon, award, skillShot.Id.WeakString, result);
 	}
@@ -768,14 +768,17 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 
 	private double ScaleForBots(double xp, bool vsBot) => vsBot ? xp * Settings.BotXpMultiplier : xp;
 
-	private Award NewAward(WeaponInfo weapon, bool vsBot) =>
-		new(weapon, vsBot, IsFeatured(weapon) ? Settings.FeaturedWeaponMultiplier : 1);
+	private Award NewAward(WeaponInfo weapon, bool vsBot, bool vsHuman) =>
+		new(weapon, vsBot, vsHuman, IsFeatured(weapon) ? Settings.FeaturedWeaponMultiplier : 1);
 
-	private sealed class Award(WeaponInfo weapon, bool vsBot, double multiplier)
+	private sealed class Award(WeaponInfo weapon, bool vsBot, bool vsHuman, double multiplier)
 	{
 		public WeaponInfo Weapon { get; } = weapon;
 
 		public bool VsBot { get; } = vsBot;
+
+		/// <summary>Gets a value indicating whether the opponent was a human player, which only decides what server records count.</summary>
+		public bool VsHuman { get; } = vsHuman;
 
 		/// <summary>Gets the featured multiplier on weapon XP, or 1 for a weapon that isn't featured.</summary>
 		public double Multiplier { get; } = multiplier;

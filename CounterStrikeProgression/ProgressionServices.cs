@@ -163,7 +163,7 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 		if ((valid is not null) && (session.Progress is PlayerProgress progress))
 		{
 			// Before the recap ends, so a record set here is its best moment.
-			Apply(valid, session, Engine.ApplyMapRecords(progress, session.Recap.SkillShots, session.Recap.BotSkillShots));
+			Apply(valid, session, Engine.ApplyMapRecords(progress, session.Recap.SkillShots, session.Recap.HumanSkillShots));
 		}
 
 		if (session.Recap.TryFinish(session.SteamId, name, map, stats?.Kills ?? 0, stats?.Deaths ?? 0, DateTime.UtcNow) is not { } recap)

@@ -166,11 +166,95 @@ public sealed class RecordTests
 	public void AMapCountsSkillShotsAgainstHumans()
 	{
 		ProgressionEngine engine = LoadedEngine();
-		Assert.IsEmpty(Records(engine.ApplyMapRecords(TestHelpers.Player(), 14, 5)));
-		RecordBreak broken = Records(engine.ApplyMapRecords(TestHelpers.Player(), 14, 2)).Single().Record!;
+		Assert.IsEmpty(Records(engine.ApplyMapRecords(TestHelpers.Player(), 14, 9)));
+		RecordBreak broken = Records(engine.ApplyMapRecords(TestHelpers.Player(), 14, 12)).Single().Record!;
 
 		Assert.AreEqual(RecordCatalog.MapSkillShotsId, broken.Definition.Id);
 		Assert.AreEqual(12, broken.Holder.Value);
+	}
+
+	private static RecapTracker RecapOf(params ProgressionResult[] results)
+	{
+		RecapTracker recap = new(DateTime.UtcNow);
+		foreach (ProgressionResult result in results)
+		{
+			recap.Add(result);
+		}
+
+		return recap;
+	}
+
+	private static ProgressionResult EfficientReload(ProgressionEngine engine) =>
+		engine.ApplyReload(TestHelpers.Player(), new ReloadEvent(TestHelpers.Weapon("ak47"), 9, 30, LoadsShellByShell: false));
+
+	private static IReadOnlyList<ProgressionNotice> MapRecords(ProgressionEngine engine, RecapTracker recap) =>
+		Records(engine.ApplyMapRecords(TestHelpers.Player(), recap.SkillShots, recap.HumanSkillShots));
+
+	[TestMethod]
+	public void EfficientReloadsDoNotCountTowardTheMapRecordWhenBotsDoNot()
+	{
+		ProgressionEngine engine = LoadedEngine(s => s.RecordMinimumMapSkillShots = 1);
+		RecapTracker recap = RecapOf(EfficientReload(engine), EfficientReload(engine));
+
+		Assert.AreEqual(2, recap.SkillShots);
+		Assert.IsEmpty(MapRecords(engine, recap));
+	}
+
+	[TestMethod]
+	public void EfficientReloadsCountTowardTheMapRecordWhenBotsDo()
+	{
+		ProgressionEngine engine = LoadedEngine(s =>
+		{
+			s.RecordMinimumMapSkillShots = 1;
+			s.RecordsCountBots = true;
+		});
+		RecapTracker recap = RecapOf(EfficientReload(engine), EfficientReload(engine));
+
+		RecordBreak broken = Assert.ContainsSingle(MapRecords(engine, recap)).Record!;
+		Assert.AreEqual(RecordCatalog.MapSkillShotsId, broken.Definition.Id);
+		Assert.AreEqual(2, broken.Holder.Value);
+	}
+
+	[TestMethod]
+	public void AChickenSkillShotDoesNotCountTowardTheMapRecordWhenBotsDoNot()
+	{
+		ProgressionEngine engine = LoadedEngine(s => s.RecordMinimumMapSkillShots = 1);
+		CombatEvent headshot = TestHelpers.Kill("ak47") with { IsHeadshot = true, Penetrations = 1 };
+		RecapTracker recap = RecapOf(engine.ApplyChickenKill(TestHelpers.Player(), headshot));
+
+		Assert.IsGreaterThan(0, recap.SkillShots);
+		Assert.IsEmpty(MapRecords(engine, recap));
+	}
+
+	[TestMethod]
+	public void ASkillShotFromAKillOnAHumanCountsTowardTheMapRecordButOneOnABotDoesNot()
+	{
+		CombatEvent longKill = TestHelpers.Kill("ak47") with { Distance = 2500 };
+
+		ProgressionEngine humanEngine = LoadedEngine(s => s.RecordMinimumMapSkillShots = 1);
+		RecapTracker human = RecapOf(humanEngine.ApplyCombat(TestHelpers.Player(), longKill));
+		Assert.HasCount(1, MapRecords(humanEngine, human));
+
+		ProgressionEngine botEngine = LoadedEngine(s => s.RecordMinimumMapSkillShots = 1);
+		RecapTracker bot = RecapOf(botEngine.ApplyCombat(TestHelpers.Player(), longKill with { VictimIsBot = true }));
+		Assert.IsGreaterThan(0, bot.SkillShots);
+		Assert.IsEmpty(MapRecords(botEngine, bot));
+	}
+
+	[TestMethod]
+	public void TheRecapCountsSkillShotsAgainstHumans()
+	{
+		ProgressionEngine engine = TestHelpers.Engine();
+		CombatEvent longKill = TestHelpers.Kill("ak47") with { Distance = 2500 };
+		RecapTracker recap = RecapOf(
+			engine.ApplyCombat(TestHelpers.Player(), longKill),
+			engine.ApplyCombat(TestHelpers.Player(), longKill with { VictimIsBot = true }),
+			EfficientReload(engine));
+
+		Assert.AreEqual(3, recap.SkillShots);
+		Assert.AreEqual(1, recap.HumanSkillShots);
+		recap.Restart(DateTime.UtcNow);
+		Assert.AreEqual(0, recap.HumanSkillShots);
 	}
 
 	[TestMethod]

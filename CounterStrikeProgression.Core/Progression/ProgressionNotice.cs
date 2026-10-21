@@ -66,6 +66,13 @@ internal sealed record ProgressionNotice
 
 	/// <summary>Gets a value indicating whether a skill shot was earned against a bot, which server records don't count by default.</summary>
 	public bool VsBot { get; init; }
+
+	/// <summary>
+	/// Gets a value indicating whether a skill shot was earned against a human player. It's separate from
+	/// <see cref="VsBot"/>, which scales XP, because a skill shot can be against neither, such as an efficient reload
+	/// or a chicken skill shot.
+	/// </summary>
+	public bool VsHuman { get; init; }
 }
 
 /// <summary>
