@@ -26,6 +26,8 @@
 	// Half the width of a kill's cross, in screen pixels.
 	const CROSS_HALF = 5;
 	const STEAM_ID = /^\d+$/;
+	// A bot with a persona has a 17-digit id and a player page, like a human. A bot without one sends 0.
+	const PERSONA_ID = /^\d{17}$/;
 
 	function el(tag, className, text) {
 		const node = document.createElement(tag);
@@ -217,14 +219,29 @@
 		function makeMarker(player) {
 			const { pin, turn } = makePin(player.isBot);
 			let label;
+			let text = null;
 			if (player.isBot) {
-				// A bot's name shows on hover, or on a tap that keeps it open until the next tap elsewhere.
-				label = el("button", "live-map-bot");
-				label.type = "button";
-				label.append(el("span", "live-map-name"));
+				// A bot's name shows on hover, or on a tap that keeps it open until the next tap elsewhere. A persona's
+				// marker is a link to its page, which a mouse click follows and a tap follows once the name is open.
+				const persona = PERSONA_ID.test(String(player.steamId ?? ""));
+				label = el(persona ? "a" : "button", "live-map-bot");
+				if (!persona) {
+					label.type = "button";
+				}
+				const name = el("span", "live-map-name");
+				text = el("span");
+				name.append(text);
+				if (persona) {
+					name.append(el("span", "bot-tag", "BOT"));
+				}
+				label.append(name);
 				label.addEventListener("click", (event) => {
 					event.stopPropagation();
 					const key = label.dataset.key;
+					if (persona && (event.pointerType === "mouse" || state.open === key)) {
+						return;
+					}
+					event.preventDefault();
 					state.open = state.open === key ? null : key;
 					showOpen();
 				});
@@ -232,7 +249,7 @@
 				label = el("a", "live-map-name");
 			}
 			layer.append(pin, label);
-			return { pin, turn, label };
+			return { pin, turn, label, text };
 		}
 
 		function showOpen() {
@@ -330,8 +347,11 @@
 				marker.label.dataset.key = key;
 				const name = String(player.name ?? "");
 				if (player.isBot) {
-					marker.label.firstChild.textContent = name;
+					marker.text.textContent = name;
 					marker.label.setAttribute("aria-label", `${name} (bot)`);
+					if (marker.label.tagName === "A") {
+						marker.label.href = `/players/${String(player.steamId)}`;
+					}
 				} else {
 					marker.label.textContent = name;
 					const id = String(player.steamId ?? "");

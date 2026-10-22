@@ -21,7 +21,7 @@ internal sealed class KillPointBuffer(HeatmapSettings settings)
 	private int QueueLimit => Math.Max(100, settings.QueueLimit);
 
 	/// <summary>
-	/// Offers a kill. Kills between two bots, and kills the sampling skips, aren't kept.
+	/// Offers a kill. Kills with no id on either end (two bots with no persona), and kills the sampling skips, aren't kept.
 	/// </summary>
 	/// <param name="point">The kill.</param>
 	/// <returns>Whether it was kept.</returns>

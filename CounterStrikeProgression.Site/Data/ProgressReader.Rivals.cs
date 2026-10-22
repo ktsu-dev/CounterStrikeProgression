@@ -15,7 +15,7 @@ internal sealed partial class ProgressReader
 	private readonly SharedCache<ulong, IReadOnlyList<HeadToHead>> headToHeads = new(MaxCachedPlayers);
 
 	/// <summary>
-	/// Gets a player's record against the humans they've killed or been killed by.
+	/// Gets a player's record against the humans and bot personas they've killed or been killed by.
 	/// </summary>
 	/// <param name="steamId">The 64-bit Steam ID.</param>
 	/// <param name="cancellationToken">Stops this caller waiting. A query other callers share runs on.</param>

@@ -4,11 +4,14 @@ namespace ktsu.CounterStrikeProgression.Core.Players;
 
 /// <summary>
 /// Gives each bot name a stable player id, so a bot keeps one progression row across restarts. The ids sit in a
-/// range above every SteamID64, so a bot id can never collide with a human's.
+/// range below the lowest individual-account SteamID64 (76561197960265729), so a bot id can never collide with a human's.
 /// </summary>
 internal static class BotIds
 {
-	/// <summary>The lowest bot id. It has 17 digits, which no SteamID64 reaches.</summary>
+	/// <summary>
+	/// The lowest bot id. Bot ids have 17 digits like a SteamID64, so they pass the same id checks, and the whole range
+	/// sits far below the lowest individual-account SteamID64.
+	/// </summary>
 	public const ulong First = 10_000_000_000_000_000;
 
 	/// <summary>The number of ids in the bot range.</summary>

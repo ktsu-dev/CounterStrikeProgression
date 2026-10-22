@@ -19,6 +19,7 @@ internal static class CardRenderer
 	public const int Height = 630;
 
 	private const string ServerName = "ktsu.dev CS2";
+	private const string BotTag = "BOT";
 	private const float Pad = 56;
 	private const float Gap = 24;
 	private const float BadgeScale = 6;
@@ -66,7 +67,7 @@ internal static class CardRenderer
 		}
 
 		DrawHeader(canvas, card);
-		DrawText(canvas, Printable(card.Name, Bold), Pad, 172, Bold, 64, Text, Width - (2 * Pad));
+		DrawName(canvas, card);
 		DrawRank(canvas, card, rank, rankColor);
 		DrawWeapons(canvas, card);
 
@@ -126,6 +127,33 @@ internal static class CardRenderer
 		{
 			DrawText(canvas, $"{card.Season} · no season XP yet", Width - Pad, 84, Regular, 24, Muted, 640, SKTextAlign.Right);
 		}
+	}
+
+	// The name, and for a bot persona the site's BOT pill after it, with room kept for the pill.
+	private static void DrawName(SKCanvas canvas, PlayerCard card)
+	{
+		const float baseline = 172;
+		const float size = 64;
+		const float tagSize = size * 0.7f;
+		float maxWidth = Width - (2 * Pad);
+		if (!card.IsBot)
+		{
+			DrawText(canvas, Printable(card.Name, Bold), Pad, baseline, Bold, size, Text, maxWidth);
+			return;
+		}
+
+		using SKFont tagFont = new(Bold, tagSize) { Subpixel = true, Edging = SKFontEdging.Antialias };
+		float padding = tagSize * 0.35f;
+		float margin = size * 0.35f;
+		float tagWidth = tagFont.MeasureText(BotTag) + (2 * padding);
+		float nameWidth = DrawText(canvas, Printable(card.Name, Bold), Pad, baseline, Bold, size, Text, maxWidth - margin - tagWidth);
+
+		float left = Pad + nameWidth + margin;
+		float height = tagSize * 1.25f;
+		float top = baseline - (size * 0.36f) - (height / 2);
+		using SKPaint border = Stroke(Muted, 2);
+		canvas.DrawRoundRect(left, top, tagWidth, height, 6, 6, border);
+		DrawText(canvas, BotTag, left + padding, top + (height / 2) + (tagSize * 0.36f), Bold, tagSize, Muted, tagWidth);
 	}
 
 	private static void DrawRank(SKCanvas canvas, PlayerCard card, int rank, SKColor color)
@@ -300,7 +328,8 @@ internal static class CardRenderer
 	}
 
 	// Draws one line, shrinking it to fit the width down to two thirds of its size, then cutting it with an ellipsis.
-	private static void DrawText(SKCanvas canvas, string text, float x, float y, SKTypeface typeface, float size, SKColor color, float maxWidth, SKTextAlign align = SKTextAlign.Left)
+	// Returns the width the line takes.
+	private static float DrawText(SKCanvas canvas, string text, float x, float y, SKTypeface typeface, float size, SKColor color, float maxWidth, SKTextAlign align = SKTextAlign.Left)
 	{
 		using SKFont font = new(typeface, size) { Subpixel = true, Edging = SKFontEdging.Antialias };
 		float smallest = size * 2 / 3;
@@ -323,6 +352,7 @@ internal static class CardRenderer
 
 		using SKPaint paint = Fill(color);
 		canvas.DrawText(shown, x, y, align, font, paint);
+		return font.MeasureText(shown);
 	}
 
 	private static SKPaint Fill(SKColor color) => new() { Color = color, IsAntialias = true, Style = SKPaintStyle.Fill };

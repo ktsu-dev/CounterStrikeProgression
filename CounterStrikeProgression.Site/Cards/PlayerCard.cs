@@ -3,6 +3,7 @@
 namespace ktsu.CounterStrikeProgression.Site.Cards;
 
 using System.Globalization;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Site.Views;
 
 /// <summary>One weapon on a share card.</summary>
@@ -67,8 +68,17 @@ internal sealed record PlayerCard(
 			seasons.Players);
 	}
 
+	/// <summary>The suffix a bot persona's name gets where only text fits, such as a page title.</summary>
+	public const string BotSuffix = " [BOT]";
+
+	/// <summary>Gets whether the card is a bot persona's, from its id.</summary>
+	public bool IsBot => ulong.TryParse(SteamId, NumberStyles.None, CultureInfo.InvariantCulture, out ulong id) && BotIds.IsBot(id);
+
+	/// <summary>Gets the name as text shows it: with <see cref="BotSuffix"/> for a bot persona.</summary>
+	public string Label => IsBot ? Name + BotSuffix : Name;
+
 	/// <summary>Gets the link preview's title.</summary>
-	public string Title => $"{Name} · {RankName}";
+	public string Title => $"{Label} · {RankName}";
 
 	/// <summary>Gets the link preview's description, such as <c>12,345 XP · 3rd of 40 in Oct–Dec 2026 · Best weapons: AK-47 12, AWP 9</c>.</summary>
 	public string Description

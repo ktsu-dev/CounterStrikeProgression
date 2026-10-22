@@ -53,6 +53,8 @@
 	const REFETCH_EVERY_MS = 2000;
 	const STREAM_GRACE_MS = 15000;
 	const STEAM_ID = /^\d{17}$/;
+	// A bot persona's id, from BotIds in the plugin: 10000000000000000 to 10000000099999999.
+	const BOT_ID = /^100000000\d{8}$/;
 	const GOLD_KINDS = new Set(["RankUp", "WeaponLevelUp", "TierCompleted", "FeatEarned", "ContractCompleted", "MasteryStar", "RecordBroken"]);
 	const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 
@@ -288,6 +290,19 @@
 		return badge;
 	}
 
+	function isBotId(id) {
+		return BOT_ID.test(String(id ?? ""));
+	}
+
+	function botTag() {
+		return el("span", "bot-tag", "BOT");
+	}
+
+	// The name as text shows it where the pill can't go, such as a document title or a select option.
+	function botLabel(id, name) {
+		return isBotId(id) ? `${name} [BOT]` : name;
+	}
+
 	function playerLink(steamId, name) {
 		const id = String(steamId ?? "");
 		if (!STEAM_ID.test(id)) {
@@ -295,7 +310,12 @@
 		}
 		const link = el("a", null, name);
 		link.href = `/players/${id}`;
-		return link;
+		if (!isBotId(id)) {
+			return link;
+		}
+		const named = el("span", "bot-name");
+		named.append(link, botTag());
+		return named;
 	}
 
 	function cell(className, content) {
@@ -549,19 +569,21 @@
 			const players = [...snapshot.players].sort((a, b) => (b.kills - a.kills) || (a.deaths - b.deaths));
 			const rows = players.map((player) => {
 				const tr = el("tr");
-				const name = player.isBot ? el("span", null, player.name) : playerLink(player.steamId, player.name);
+				// A bot with a persona id plays like a human. Only a bot with id 0 has no page and no progress.
+				const anonymous = player.isBot && String(player.steamId) === "0";
+				const name = anonymous ? el("span", null, player.name) : playerLink(player.steamId, player.name);
 				const nameCell = el("span");
 				nameCell.append(name);
-				if (!player.isBot && feats[String(player.steamId)]) {
+				if (!anonymous && feats[String(player.steamId)]) {
 					nameCell.append(featIcons(feats[String(player.steamId)]));
 				}
-				const badge = player.isBot ? el("span", "rank bot", "bot") : rankBadge(player.rank);
+				const badge = anonymous ? el("span", "rank bot", "bot") : rankBadge(player.rank);
 				tr.append(
 					cell("name", nameCell),
 					cell(null, badge),
 					cell("num", player.kills),
 					cell("num", player.deaths),
-					cell("num", player.isBot ? "—" : formatXp(player.mapXp)),
+					cell("num", anonymous ? "—" : formatXp(player.mapXp)),
 				);
 				return tr;
 			});
@@ -761,7 +783,7 @@
 			}
 		});
 		on("snapshot", (snapshot) => {
-			const present = new Set(snapshot.players.filter((p) => !p.isBot).map((p) => String(p.steamId)).filter((id) => id !== "0"));
+			const present = new Set(snapshot.players.map((p) => String(p.steamId)).filter((id) => id !== "0"));
 			const joinedOrLeft = [...ids].some((id) => present.has(id) !== onlineIds.has(id));
 			const unseen = [...present].filter((id) => !ids.has(id) && !sought.has(id));
 			for (const id of unseen) {
@@ -1598,12 +1620,16 @@
 		function render(player) {
 			last = player;
 			online = Boolean(player.online);
-			document.title = `${player.name} · ${SERVER_NAME}`;
+			document.title = `${botLabel(id, player.name)} · ${SERVER_NAME}`;
 			tab = tab ?? tabFromHash() ?? nextTab(player);
 
 			const head = el("div", "top player-head");
 			const left = el("span");
-			left.append(el("b", "name", player.name), " · ");
+			left.append(el("b", "name", player.name));
+			if (isBotId(id)) {
+				left.append(botTag());
+			}
+			left.append(" · ");
 			left.append(online ? el("span", "online", "online now") : el("span", null, `last seen ${ago(player.lastSeen)}`));
 			const steam = el("a", null, "Steam profile");
 			steam.href = `https://steamcommunity.com/profiles/${id}`;
@@ -1619,7 +1645,11 @@
 			const links = el("span", "player-links");
 			const heat = el("a", null, "Heatmap");
 			heat.href = `/heatmaps?player=${id}`;
-			links.append(compare, heat, card, steam);
+			// A bot persona has no Steam account, so its page has no Steam profile link.
+			links.append(compare, heat, card);
+			if (!isBotId(id)) {
+				links.append(steam);
+			}
 			head.append(left, links);
 
 			const summary = el("div", "pad");
@@ -1706,7 +1736,7 @@
 			}
 		});
 		on("snapshot", (snapshot) => {
-			const present = snapshot.players.some((p) => !p.isBot && String(p.steamId) === id);
+			const present = snapshot.players.some((p) => String(p.steamId) !== "0" && String(p.steamId) === id);
 			if (present !== online) {
 				refetch();
 			}
@@ -2389,7 +2419,7 @@
 		}
 
 		function renderControls() {
-			const options = players.map((row) => [String(row.steamId), row.name]);
+			const options = players.map((row) => [String(row.steamId), botLabel(row.steamId, row.name)]);
 			const choose = (label, selected, onChange) => {
 				const list = selected && !options.some(([value]) => value === selected) ? [[selected, selected], ...options] : options;
 				return picker(label, [["Players", [["", "Pick a player"], ...list]]], selected ?? "", (value) => {
@@ -2411,7 +2441,9 @@
 
 		function render(view) {
 			const { a: left, b: right } = view;
-			document.title = `${left.name} vs ${right.name} · ${SERVER_NAME}`;
+			const leftName = botLabel(left.steamId, left.name);
+			const rightName = botLabel(right.steamId, right.name);
+			document.title = `${leftName} vs ${rightName} · ${SERVER_NAME}`;
 			const title = el("span");
 			title.append(el("b", null, "Compare"));
 			top.replaceChildren(title, el("span", null, view.season));
@@ -2445,14 +2477,14 @@
 
 			const sections = [
 				heads,
-				table([[""], [left.name, "num"], [right.name, "num"]], totals),
+				table([[""], [leftName, "num"], [rightName, "num"]], totals),
 				el("h2", "section-title pad", "Weapons"),
 				weapons.length > 0
-					? table([["Weapon"], [`${left.name} level`, "num"], [`${right.name} level`, "num"], [`${left.name} kills`, "num"], [`${right.name} kills`, "num"]], weapons)
+					? table([["Weapon"], [`${leftName} level`, "num"], [`${rightName} level`, "num"], [`${leftName} kills`, "num"], [`${rightName} kills`, "num"]], weapons)
 					: message("Neither player has weapon progress yet."),
 				el("h2", "section-title pad", "Skill shots"),
 				shots.length > 0
-					? table([["Skill shot"], [left.name, "num"], [right.name, "num"]], shots)
+					? table([["Skill shot"], [leftName, "num"], [rightName, "num"]], shots)
 					: message("Neither player has landed a skill shot yet."),
 			];
 			body.replaceChildren(...sections);

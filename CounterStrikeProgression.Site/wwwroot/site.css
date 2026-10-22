@@ -200,6 +200,22 @@ td.name {
 	color: var(--muted);
 }
 
+/* The mark after a bot persona's name, wherever the name shows. */
+.bot-tag {
+	display: inline-block;
+	margin-left: 0.35em;
+	padding: 0 0.35em;
+	border: 1px solid var(--muted);
+	border-radius: 3px;
+	color: var(--muted);
+	font-size: 0.7em;
+	font-weight: normal;
+	letter-spacing: 0.06em;
+	line-height: 1.4;
+	text-transform: uppercase;
+	vertical-align: middle;
+}
+
 .badge {
 	display: inline-flex;
 	align-items: center;

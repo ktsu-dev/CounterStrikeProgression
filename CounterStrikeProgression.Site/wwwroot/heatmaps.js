@@ -5,6 +5,8 @@
 (() => {
 	const SERVER_NAME = "ktsu.dev CS2";
 	const STEAM_ID = /^\d{17}$/;
+	// A bot persona's id, from BotIds in the plugin: 10000000000000000 to 10000000099999999.
+	const BOT_ID = /^100000000\d{8}$/;
 
 	// Dark blue through orange to near white, the usual heatmap ramp, read by intensity.
 	const RAMP = [
@@ -235,7 +237,11 @@
 					state.player = "";
 					load();
 				});
-				back.append(link, " · ", all);
+				back.append(link);
+				if (BOT_ID.test(String(view.player.steamId))) {
+					back.append(el("span", "bot-tag", "BOT"));
+				}
+				back.append(" · ", all);
 				head.append(back);
 			}
 
@@ -288,7 +294,8 @@
 				}
 				state.map = view.map ?? "";
 				writeQuery(state);
-				document.title = view.player?.name ? `${view.player.name} · Heatmaps · ${SERVER_NAME}` : `Heatmaps · ${SERVER_NAME}`;
+				const botSuffix = BOT_ID.test(String(view.player?.steamId ?? "")) ? " [BOT]" : "";
+				document.title = view.player?.name ? `${view.player.name}${botSuffix} · Heatmaps · ${SERVER_NAME}` : `Heatmaps · ${SERVER_NAME}`;
 				render(view);
 			} catch {
 				if (mine === request) {

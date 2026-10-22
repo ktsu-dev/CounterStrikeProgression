@@ -34,7 +34,7 @@ internal sealed class MySqlKillMapStore(DatabaseSettings settings) : IKillMapSto
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 		""";
 
-	// A table made before bot fights were kept has no bot_fight column, so its rows default to 0 (a human was involved).
+	// Tables created without the bot_fight column get it here, and existing rows default to 0, because a human was involved.
 	private const string AddBotFightColumn = "ALTER TABLE csp_kills ADD COLUMN IF NOT EXISTS bot_fight TINYINT(1) NOT NULL DEFAULT 0;";
 
 	private const string AddBotFightIndex = "ALTER TABLE csp_kills ADD INDEX IF NOT EXISTS idx_csp_kills_pair (map, bot_fight, id);";
@@ -213,8 +213,8 @@ internal sealed class MySqlKillMapStore(DatabaseSettings settings) : IKillMapSto
 
 	/// <summary>A kill as read, with the column types the driver returns.</summary>
 	/// <param name="Map">The map.</param>
-	/// <param name="KillerId">The killer's Steam ID, or 0 for a bot.</param>
-	/// <param name="VictimId">The victim's Steam ID, or 0 for a bot.</param>
+	/// <param name="KillerId">The killer's Steam ID or bot persona id, or 0 for a bot with no persona.</param>
+	/// <param name="VictimId">The victim's Steam ID or bot persona id, or 0 for a bot with no persona.</param>
 	/// <param name="Weapon">The weapon key.</param>
 	/// <param name="Headshot">Whether it was a headshot.</param>
 	/// <param name="KillerX">The killer's X position.</param>

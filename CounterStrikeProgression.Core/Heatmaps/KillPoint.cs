@@ -9,8 +9,8 @@ using ktsu.CounterStrikeProgression.Core.Players;
 /// Where one kill happened: both players' positions in world units, rounded to whole units.
 /// </summary>
 /// <param name="Map">The map, such as <c>de_dust2</c>.</param>
-/// <param name="KillerId">The killer's 64-bit Steam ID, or 0 for a bot.</param>
-/// <param name="VictimId">The victim's 64-bit Steam ID, or 0 for a bot.</param>
+/// <param name="KillerId">The killer's 64-bit Steam ID or bot persona id, or 0 for a bot with no persona.</param>
+/// <param name="VictimId">The victim's 64-bit Steam ID or bot persona id, or 0 for a bot with no persona.</param>
 /// <param name="Weapon">The weapon key.</param>
 /// <param name="Headshot">Whether it was a headshot.</param>
 /// <param name="KillerX">The killer's X position.</param>

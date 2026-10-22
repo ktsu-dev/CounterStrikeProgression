@@ -23,12 +23,13 @@ Players climb an up-only rank ladder from Silver I to Global Elite. Every weapon
 - **Weapon ladders**: Kills, Headshots, and Hits, plus one challenge for every skill shot the weapon can earn, each with five tiers. Skill tiers pay more than volume tiers.
 - **Skill shots**: about 50, covering movement, distance, wallbangs and smokes, scopes, utility and melee, timing and aim, multi-kills, and round situations.
 - **Daily and weekly contracts**: three daily contracts and one weekly, such as "Get 20 kills with SMGs" or "Get 2 kills through walls", pay 500 and 2,500 rank XP. The picks come from the UTC date, so everyone gets the same ones, and they reset at midnight UTC and on Monday. `!contracts` opens them in the panel, and the site's player page shows your progress.
-- **Server records**: a hall of fame of single-moment bests: the longest kill with each gun class, the longest no-scope, the most kills in one life, the best accuracy over one life (from 30 shots), and the most skill shots in one map. Beating one is announced to the server, to the site's feed, and to Discord, naming the holder it was taken from, and the site's Leaderboards page lists every record. A record has to be beaten outright, and kills and skill shots against bots don't count unless `RecordsCountBots` is on. `RecordsEnabled` turns them off.
-- **Bounty on the leader**: the human player on the longest current life streak, once it reaches 5 kills, carries a bounty worth 50 rank XP per kill in the streak. Whoever ends the streak collects it, and chat hears when a bounty is placed, every 5 kills after, and when it's collected. Bots never carry one, and `BountyStartKills` and `BountyXpPerKill` tune it (0 turns it off).
+- **Server records**: a hall of fame of single-moment bests: the longest kill with each gun class, the longest no-scope, the most kills in one life, the best accuracy over one life (from 30 shots), and the most skill shots in one map. Beating one is announced to the server, to the site's feed, and to Discord, naming the holder it was taken from, and the site's Leaderboards page lists every record. A record has to be beaten outright, a bot never holds one, and kills and skill shots against bots don't count unless `RecordsCountBots` is on. `RecordsEnabled` turns them off.
+- **Bounty on the leader**: the player on the longest current life streak, once it reaches 5 kills, carries a bounty worth 50 rank XP per kill in the streak. Whoever ends the streak collects it, and chat hears when a bounty is placed, every 5 kills after, and when it's collected. A bot persona carries and collects a bounty like a human (see [Bot personas](#bot-personas)), and `BountyStartKills` and `BountyXpPerKill` tune it (0 turns it off).
 - **Bots count, at a reduced rate**: rank XP against bots is scaled down, while weapon levels and ladders still move, so practice against bots isn't wasted.
+- **Bot personas**: each bot name is a persistent player with its own rank, progress, and player page, marked as a bot everywhere it shows. Bots are tracked only while a human is on, and they're kept out of server records and the global feed. See [Bot personas](#bot-personas).
 - **Featured weapon of the day**: one gun class (pistols, SMGs, rifles, snipers, shotguns, or machine guns) earns double weapon XP each UTC day. Challenge ladders move at the usual pace. The pick comes from the date, so the panel overview and the site's live page always agree. `FeaturedWeaponMultiplier` sets the multiplier, and 1 turns it off.
 - **Welcome-back bonus**: a player back after 7 or more days away earns double rank XP until they've had 2,000 bonus XP. The join message and the panel overview say how much is left, and what's left is saved, so it carries over between visits. `WelcomeBackDays` sets the gap, and `WelcomeBackXp` the bonus, where 0 turns it off.
-- **Nemesis and rivals**: kills between human players are counted per pair. Your nemesis is whoever has killed you most, at least 3 times, and killing them pays 50 bonus rank XP with a floatie. `!stats` names your nemesis and favourite victim, and the site's player page has a Rivals tab with every head-to-head. `NemesisMinimumKills` and `NemesisKillXp` set the numbers, where 0 XP turns the bonus off. Bots never count.
+- **Nemesis and rivals**: kills between players, bot personas included, are counted per pair. Your nemesis is whoever has killed you most, at least 3 times, and killing them pays 50 bonus rank XP with a floatie. `!stats` names your nemesis and favourite victim, and the site's player page has a Rivals tab with every head-to-head. `NemesisMinimumKills` and `NemesisKillXp` set the numbers, where 0 XP turns the bonus off. A bot persona can be your nemesis, and a bot with no persona never counts.
 - **In-game panel**: `!rank` opens a side panel to the right of the view. It falls back to a center-screen card and then to chat if a way of drawing fails.
 - **XP floaties**: every XP gain floats up as "+XP" text from the center of your screen. Only you see your own. Quick gains add up in one floatie, and skill shots, tiers, and level-ups are named under the number in gold. A `World` mode floats them above the target instead.
 - **Daily play streak**: every UTC day in a row with any rank XP adds to the streak. Each new day of a streak is told to the player in chat, and the streak shows on the panel overview and the player page. It's worked out from the daily XP rows already stored, so nothing new is saved.
@@ -78,7 +79,7 @@ All three require `@css/root`.
 | `css_csp_grant <player> <xp>` | Add rank XP, or take it away with a negative amount. Taking XP away also takes away the ranks it bought, and it stops at 0 |
 | `css_csp_reset <player>` | Delete every rank, weapon, and ladder row the player has. Run it twice within 15 seconds to confirm, because it can't be undone |
 
-`<player>` is `#userid`, part of a connected player's name, or a SteamID64, which also works for players who aren't on the server. Both corrections are written to the database straight away and logged with the admin, the player, and the XP and rank before and after.
+`<player>` is `#userid`, part of a connected player's name, a SteamID64 or bot id, or `bot:<name>` for a bot persona. A SteamID64, a bot id, and `bot:<name>` also work for players who aren't on the server. Both corrections are written to the database straight away and logged with the admin, the player, and the XP and rank before and after.
 
 ### Basic configuration
 
@@ -125,6 +126,27 @@ Settings left out keep their defaults.
 ### Rank tags
 
 `RankTags` turns the scoreboard clan tag (`ClanTag`) and the chat prefix (`ChatPrefix`) on or off. Both are on by default. The clan tag replaces any Steam group tag the player has. The chat prefix is added to the name in the chat message itself, so gags, team chat, and dead chat work as before, and CS2-SimpleAdmin's gag hook is unaffected.
+
+### Bot personas
+
+Bots are players too. Each bot name is a persona with its own progress, kept across maps, days, and restarts: XP and rank, weapon levels and mastery stars, challenge ladders, skill shots, feats, contracts, the play streak, season XP, per-map totals, rivals, and kill positions. A persona earns by the same rules and numbers as a human, including `BotXpMultiplier` for its kills on other bots, and a human's XP for killing a bot is unchanged. A persona can be a human's nemesis, and it carries and collects bounties like a human.
+
+Bots are tracked only while at least one human is on the server, so an empty server can't farm XP, streaks, or season standings.
+
+Each persona's id comes from its name, from 10000000000000000 to 10000000099999999. That range sits below every individual-account SteamID64, so a bot id never collides with a human's, and the site can tell a bot from its id alone. A human using a bot's name is still a different player, keyed by their SteamID64. A bot with no usable name gets id 0 and isn't tracked.
+
+A persona appears with the humans everywhere a player shows: the ranks, ladder, leaderboards, seasons, compare, rivals, the live scoreboard and map, `!top`, and `!stats`. The site marks it with a BOT pill after its name, and its share card draws the same pill. Where only text fits, such as chat, a page title, or a link preview, the name ends in ` [BOT]`. A persona has its own player page, feed, fights map, and share card, but no Steam profile link.
+
+Personas are left out of:
+
+- server records, which stay human-only even with `RecordsCountBots` on,
+- the home page's live feed, Discord posts, the weekly digest, and chat announcements to the server, though each persona's moments still show on its own page,
+- anything drawn or sent to a player, such as the panel, chat lines, and floaties, since a bot has no client,
+- the admin panel (CSS-BANS and SimpleAdmin).
+
+`css_csp_grant` and `css_csp_reset` take `bot:<name>`, such as `css_csp_reset bot:Muhlik`, or the persona's id, to correct or reset a persona whether it's on the server or not.
+
+Kills between two personas are stored for the heatmaps under their own per-map cap, `MaxBotFightsPerMap`, so they never push out a human's kills (see [Kill heatmaps](#kill-heatmaps)).
 
 ### Progression site
 
@@ -212,7 +234,7 @@ Kills are written in one batch per save interval, on the thread pool. The heatma
 
 #### The site
 
-The site is a small ASP.NET Core app, published as the image `ghcr.io/ktsu-dev/counterstrikeprogression-site:<version>` with each release (and as `latest`). It shows the live scoreboard, the feed, and a live map of every player on `/`, the rank ladder on `/ranks`, leaderboards for every weapon (by level) and every skill shot (by count), plus the most feats and the rarest skill shots, on `/leaderboards`, a guide to every skill shot with its rarity, weapons, XP, tiers, and how many players have earned it on `/skillshots`, kill heatmaps on `/heatmaps`, and each player's profile on `/players/{steamId}` (a SteamID64), with their XP feed, suggested next challenges, and a live map of where they win and lose fights. The home page's map draws everyone on the current map's radar, moving with each batch: humans as bright dots named and linked to their player page, bots as smaller, dimmer dots named on hover or tap, and nobody while dead. Each kill draws a thin line from the killer to an ✕ where the victim fell, brighter for a headshot, and fades out over about 10 seconds, so the map shows the recent fighting. Hovering or tapping an ✕ names the killer, the victim, and the weapon. Kills between bots show too. When the server goes offline, the last positions stay, faded. The fights map marks where the player is now while they're on the map it shows, and keeps their last known spot, faded, while they're dead or gone. Live positions are exact and public, held only in memory, and never stored. Ranks show as badges: the color and emblem mark the rank's family, and the pips along the bottom fill with the stage. Pages update live over server-sent events, and a server counts as offline after a few seconds without a batch.
+The site is a small ASP.NET Core app, published as the image `ghcr.io/ktsu-dev/counterstrikeprogression-site:<version>` with each release (and as `latest`). It shows the live scoreboard, the feed, and a live map of every player on `/`, the rank ladder on `/ranks`, leaderboards for every weapon (by level) and every skill shot (by count), plus the most feats and the rarest skill shots, on `/leaderboards`, a guide to every skill shot with its rarity, weapons, XP, tiers, and how many players have earned it on `/skillshots`, kill heatmaps on `/heatmaps`, and each player's profile on `/players/{steamId}` (a SteamID64, or a bot persona's id), with their XP feed, suggested next challenges, and a live map of where they win and lose fights. The home page's map draws everyone on the current map's radar, moving with each batch: humans as bright dots named and linked to their player page, bots as smaller, dimmer dots named on hover or tap (a bot persona's name links to its page, with the BOT mark), and nobody while dead. Each kill draws a thin line from the killer to an ✕ where the victim fell, brighter for a headshot, and fades out over about 10 seconds, so the map shows the recent fighting. Hovering or tapping an ✕ names the killer, the victim, and the weapon. Kills between bots show too. When the server goes offline, the last positions stay, faded. The fights map marks where the player is now while they're on the map it shows, and keeps their last known spot, faded, while they're dead or gone. Live positions are exact and public, held only in memory, and never stored. Ranks show as badges: the color and emblem mark the rank's family, and the pips along the bottom fill with the stage. Pages update live over server-sent events, and a server counts as offline after a few seconds without a batch.
 
 The image listens on two ports:
 
@@ -271,7 +293,7 @@ Point the plugin's `Site.Url` at port 8081 and set `Site.Token` to the same valu
 | `csp_weapons` | Steam ID, weapon, weapon XP, level, kills, headshots, hits, shots |
 | `csp_challenges` | Steam ID, weapon, challenge, count, tier reached |
 | `csp_seasons` | Steam ID, season start, rank XP earned in the season |
-| `csp_kills` | Map, killer and victim Steam IDs (0 for a bot), weapon, headshot, both positions, time |
+| `csp_kills` | Map, killer and victim Steam IDs or bot persona ids (0 for a bot with no persona), weapon, headshot, whether both ends are bot personas (`bot_fight`), both positions, time |
 | `csp_rivals` | Killer's Steam ID, victim's Steam ID, kills |
 | `csp_records` | Record id, the holder's Steam ID, name, and value, when it was set, and the holder it was taken from |
 | `csp_schema` | The schema version |

@@ -23,7 +23,7 @@ using Microsoft.Extensions.FileProviders;
 /// </summary>
 internal static class CardEndpoints
 {
-	/// <summary>The card route. The id is a SteamID64.</summary>
+	/// <summary>The card route. The id is a SteamID64 or a bot persona id.</summary>
 	public const string CardRoute = "/card/{id}.png";
 
 	private const string ServerName = "ktsu.dev CS2";
@@ -146,7 +146,7 @@ internal static class CardEndpoints
 		tags.Append("\t<meta property=\"og:image:alt\" content=\"").Append(title).Append("\">\n");
 		tags.Append("\t<meta name=\"twitter:card\" content=\"summary_large_image\">\n");
 
-		string named = html.Replace($"<title>Player · {ServerName}</title>", $"<title>{Encode(card.Name)} · {ServerName}</title>", StringComparison.Ordinal);
+		string named = html.Replace($"<title>Player · {ServerName}</title>", $"<title>{Encode(card.Label)} · {ServerName}</title>", StringComparison.Ordinal);
 		int head = named.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
 		return head < 0 ? named : named.Insert(head, tags.ToString());
 	}

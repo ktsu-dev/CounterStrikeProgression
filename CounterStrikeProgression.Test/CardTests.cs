@@ -4,6 +4,7 @@ namespace ktsu.CounterStrikeProgression.Test;
 
 using System.Globalization;
 using ktsu.CounterStrikeProgression.Core;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Site;
@@ -41,12 +42,11 @@ public sealed class CardTests
 	private static PlayerCard Card(string name = "Tester", long? place = 3, params CardWeapon[] weapons) =>
 		new("76561198000000001", name, 17, "Gold Nova · III", 12345, 0.4, weapons, "Oct–Dec 2026", place, 40);
 
-	private async Task<InMemoryProgressionStore> StoreWithPlayerAsync()
+	private async Task<InMemoryProgressionStore> StoreWithPlayerAsync(ulong id = TestHelpers.SteamId, string name = "Tester")
 	{
 		InMemoryProgressionStore store = new();
-		ulong id = TestHelpers.SteamId;
 		ProgressSnapshot rows = new(
-			new PlayerRow(id, "Tester", 12345, 0, Seen, Seen),
+			new PlayerRow(id, name, 12345, 0, Seen, Seen),
 			[
 				new WeaponRow(id, "ak47", 9000, 0, 300, 120, 900, 2000),
 				new WeaponRow(id, "awp", 7000, 0, 150, 20, 160, 300),
@@ -183,6 +183,38 @@ public sealed class CardTests
 		Assert.IsInstanceOfType<NotFound>(await CardEndpoints.CardAsync("nope", new DefaultHttpContext(), reader, live, time, cache).ConfigureAwait(false));
 		Assert.IsInstanceOfType<NotFound>(await CardEndpoints.CardAsync("76561198999999999", new DefaultHttpContext(), reader, live, time, cache).ConfigureAwait(false));
 		Assert.AreEqual(1, cache.Count);
+	}
+
+	[TestMethod]
+	public async Task Card_ForABotPersona_IsMarkedAsABot()
+	{
+		ulong botId = BotIds.For("Muhlik");
+		ManualTime time = new();
+		using ProgressReader botReader = new(await StoreWithPlayerAsync(botId, "Muhlik").ConfigureAwait(false), time);
+		using ProgressReader humanReader = new(await StoreWithPlayerAsync().ConfigureAwait(false), time);
+		LiveState live = NewState(time);
+		CardCache botCache = new(time);
+		CardCache humanCache = new(time);
+
+		IResult result = await CardEndpoints.CardAsync(botId.ToString(CultureInfo.InvariantCulture), new DefaultHttpContext(), botReader, live, time, botCache).ConfigureAwait(false);
+		await CardEndpoints.CardAsync(TestHelpers.SteamId.ToString(CultureInfo.InvariantCulture), new DefaultHttpContext(), humanReader, live, time, humanCache).ConfigureAwait(false);
+
+		CachedCard? bot = await botCache.GetAsync(botId, () => Task.FromResult<PlayerCard?>(null)).ConfigureAwait(false);
+		CachedCard? human = await humanCache.GetAsync(TestHelpers.SteamId, () => Task.FromResult<PlayerCard?>(null)).ConfigureAwait(false);
+		Assert.IsNotNull(bot);
+		Assert.IsNotNull(human);
+		Assert.IsTrue(bot.Card.IsBot);
+		Assert.IsFalse(human.Card.IsBot);
+		Assert.AreEqual("Muhlik [BOT] · " + bot.Card.RankName, bot.Card.Title);
+
+		FileContentHttpResult file = Assert.IsInstanceOfType<FileContentHttpResult>(result);
+		using SKBitmap bitmap = SKBitmap.Decode(file.FileContents.ToArray());
+		Assert.AreEqual(CardRenderer.Width, bitmap.Width);
+		Assert.AreEqual(CardRenderer.Height, bitmap.Height);
+
+		string html = CardEndpoints.WithCard("<html><head>\n\t<title>Player · ktsu.dev CS2</title>\n</head></html>", bot.Card, "https://cs2.example.com");
+		Assert.Contains("<title>Muhlik [BOT] · ktsu.dev CS2</title>", html);
+		Assert.Contains("<meta property=\"og:title\" content=\"Muhlik [BOT] &#183; ", html);
 	}
 
 	[TestMethod]
