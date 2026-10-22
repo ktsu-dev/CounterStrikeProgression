@@ -2,6 +2,9 @@
 
 namespace ktsu.CounterStrikeProgression.Core.Heatmaps;
 
+using System.Text.Json.Serialization;
+using ktsu.CounterStrikeProgression.Core.Players;
+
 /// <summary>
 /// Where one kill happened: both players' positions in world units, rounded to whole units.
 /// </summary>
@@ -35,6 +38,12 @@ internal sealed record KillPoint(
 	string? KillerName = null,
 	string? VictimName = null)
 {
+	/// <summary>
+	/// Gets a value indicating whether both ends are bot personas. Kept out of the live batch's JSON, because it follows from the two IDs.
+	/// </summary>
+	[JsonIgnore]
+	public bool IsBotFight => BotIds.IsBot(KillerId) && BotIds.IsBot(VictimId);
+
 	/// <summary>
 	/// Rounds a world coordinate to a stored one. CS2 maps fit in ±16384 units, so anything past a short's range is clamped.
 	/// </summary>

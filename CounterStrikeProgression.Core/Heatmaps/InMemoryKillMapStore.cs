@@ -17,7 +17,7 @@ internal sealed class InMemoryKillMapStore : IKillMapStore
 	public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
 	/// <inheritdoc/>
-	public Task AddAsync(IReadOnlyList<KillPoint> points, int maxPerMap, CancellationToken cancellationToken)
+	public Task AddAsync(IReadOnlyList<KillPoint> points, int maxPerMap, int maxBotFightsPerMap, CancellationToken cancellationToken)
 	{
 		Ensure.NotNull(points);
 		lock (gate)
@@ -32,11 +32,8 @@ internal sealed class InMemoryKillMapStore : IKillMapStore
 
 			foreach (string map in points.Select(p => p.Map).Distinct())
 			{
-				List<KillPoint> kept = maps[map];
-				if (kept.Count > maxPerMap)
-				{
-					kept.RemoveRange(0, kept.Count - maxPerMap);
-				}
+				Prune(maps[map], botFight: false, maxPerMap);
+				Prune(maps[map], botFight: true, maxBotFightsPerMap);
 			}
 		}
 
@@ -100,6 +97,16 @@ internal sealed class InMemoryKillMapStore : IKillMapStore
 		{
 			string? map = lastMaps.GetValueOrDefault(steamId);
 			return Task.FromResult(map);
+		}
+	}
+
+	private static void Prune(List<KillPoint> kept, bool botFight, int max)
+	{
+		int excess = kept.Count(p => p.IsBotFight == botFight) - max;
+		if (excess > 0)
+		{
+			// Kills are stored oldest first, so the first of a class are its oldest.
+			kept.RemoveAll(p => (p.IsBotFight == botFight) && (excess-- > 0));
 		}
 	}
 }

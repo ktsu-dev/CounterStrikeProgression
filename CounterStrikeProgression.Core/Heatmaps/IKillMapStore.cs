@@ -16,13 +16,15 @@ internal interface IKillMapStore
 	public Task InitializeAsync(CancellationToken cancellationToken);
 
 	/// <summary>
-	/// Adds kills, then deletes each of their maps' oldest kills past the cap, in one transaction.
+	/// Adds kills, then deletes each of their maps' oldest kills past the caps, in one transaction. Kills with a human on
+	/// either end and kills between two bots are counted apart, so neither pushes out the other.
 	/// </summary>
 	/// <param name="points">The kills.</param>
-	/// <param name="maxPerMap">How many kills each map keeps.</param>
+	/// <param name="maxPerMap">How many kills with a human on either end each map keeps.</param>
+	/// <param name="maxBotFightsPerMap">How many kills between two bots each map keeps.</param>
 	/// <param name="cancellationToken">Cancels the operation.</param>
 	/// <returns>A task that completes when the kills are written.</returns>
-	public Task AddAsync(IReadOnlyList<KillPoint> points, int maxPerMap, CancellationToken cancellationToken);
+	public Task AddAsync(IReadOnlyList<KillPoint> points, int maxPerMap, int maxBotFightsPerMap, CancellationToken cancellationToken);
 
 	/// <summary>
 	/// Gets every map with kills kept, and how many.

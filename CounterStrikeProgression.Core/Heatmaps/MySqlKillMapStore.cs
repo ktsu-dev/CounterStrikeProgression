@@ -34,15 +34,21 @@ internal sealed class MySqlKillMapStore(DatabaseSettings settings) : IKillMapSto
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 		""";
 
+	// A table made before bot fights were kept has no bot_fight column, so its rows default to 0 (a human was involved).
+	private const string AddBotFightColumn = "ALTER TABLE csp_kills ADD COLUMN IF NOT EXISTS bot_fight TINYINT(1) NOT NULL DEFAULT 0;";
+
+	private const string AddBotFightIndex = "ALTER TABLE csp_kills ADD INDEX IF NOT EXISTS idx_csp_kills_pair (map, bot_fight, id);";
+
 	private const string Insert = """
-		INSERT INTO csp_kills (map, killer_id, victim_id, weapon, headshot, killer_x, killer_y, killer_z, victim_x, victim_y, victim_z, at)
-		VALUES (@Map, @KillerId, @VictimId, @Weapon, @Headshot, @KillerX, @KillerY, @KillerZ, @VictimX, @VictimY, @VictimZ, @At);
+		INSERT INTO csp_kills (map, killer_id, victim_id, weapon, headshot, bot_fight, killer_x, killer_y, killer_z, victim_x, victim_y, victim_z, at)
+		VALUES (@Map, @KillerId, @VictimId, @Weapon, @Headshot, @IsBotFight, @KillerX, @KillerY, @KillerZ, @VictimX, @VictimY, @VictimZ, @At);
 		""";
 
-	// The derived table stops MariaDB refusing a delete that reads its own table, and finds the newest id past the cap.
+	// The derived table stops MariaDB refusing a delete that reads its own table, and finds the newest id past the cap
+	// among the map's kills of one class (@botFight 0 for those with a human, 1 for those between bots).
 	private const string Prune = """
-		DELETE FROM csp_kills WHERE map = @map AND id <= (
-			SELECT id FROM (SELECT id FROM csp_kills WHERE map = @map ORDER BY id DESC LIMIT 1 OFFSET @max) cutoff);
+		DELETE FROM csp_kills WHERE map = @map AND bot_fight = @botFight AND id <= (
+			SELECT id FROM (SELECT id FROM csp_kills WHERE map = @map AND bot_fight = @botFight ORDER BY id DESC LIMIT 1 OFFSET @max) cutoff);
 		""";
 
 	private const string SelectMaps = "SELECT map AS Map, COUNT(*) AS Points FROM csp_kills GROUP BY map ORDER BY Points DESC, Map ASC";
@@ -73,10 +79,12 @@ internal sealed class MySqlKillMapStore(DatabaseSettings settings) : IKillMapSto
 		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
 		await connection.ExecuteAsync(new CommandDefinition(CreateTable, cancellationToken: cancellationToken)).ConfigureAwait(false);
+		await connection.ExecuteAsync(new CommandDefinition(AddBotFightColumn, cancellationToken: cancellationToken)).ConfigureAwait(false);
+		await connection.ExecuteAsync(new CommandDefinition(AddBotFightIndex, cancellationToken: cancellationToken)).ConfigureAwait(false);
 	}
 
 	/// <inheritdoc/>
-	public async Task AddAsync(IReadOnlyList<KillPoint> points, int maxPerMap, CancellationToken cancellationToken)
+	public async Task AddAsync(IReadOnlyList<KillPoint> points, int maxPerMap, int maxBotFightsPerMap, CancellationToken cancellationToken)
 	{
 		Ensure.NotNull(points);
 		if (points.Count == 0)
@@ -92,7 +100,8 @@ internal sealed class MySqlKillMapStore(DatabaseSettings settings) : IKillMapSto
 		await connection.ExecuteAsync(new CommandDefinition(Insert, points, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
 		foreach (string map in points.Select(p => p.Map).Distinct(StringComparer.Ordinal))
 		{
-			await connection.ExecuteAsync(new CommandDefinition(Prune, new { map, max = maxPerMap }, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+			await connection.ExecuteAsync(new CommandDefinition(Prune, new { map, botFight = 0, max = maxPerMap }, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
+			await connection.ExecuteAsync(new CommandDefinition(Prune, new { map, botFight = 1, max = maxBotFightsPerMap }, transaction, cancellationToken: cancellationToken)).ConfigureAwait(false);
 		}
 
 		await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);

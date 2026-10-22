@@ -3,6 +3,7 @@
 namespace ktsu.CounterStrikeProgression.Test;
 
 using ktsu.CounterStrikeProgression.Core.Heatmaps;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Site;
 using ktsu.CounterStrikeProgression.Site.Data;
@@ -21,6 +22,56 @@ public sealed class HeatmapTests
 
 	private static KillPoint Kill(string map = "de_dust2", ulong killer = TestHelpers.SteamId, ulong victim = Other, short x = 0, short y = 0, short victimX = 10, short victimY = 10) =>
 		new(map, killer, victim, "ak47", false, x, y, 0, victimX, victimY, 0, At);
+
+	[TestMethod]
+	public async Task Add_KeepsBotFightsUnderTheirOwnCap()
+	{
+		InMemoryKillMapStore store = new();
+		CancellationToken token = TestContext.CancellationToken;
+		ulong muhlik = BotIds.For("Muhlik");
+		ulong rock = BotIds.For("Rock");
+		await store.AddAsync([.. Enumerable.Range(0, 150).Select(i => Kill(killer: TestHelpers.SteamId, victim: muhlik, x: (short)i))], 100, 120, token).ConfigureAwait(false);
+		await store.AddAsync([.. Enumerable.Range(0, 300).Select(i => Kill(killer: rock, victim: muhlik, x: (short)i))], 100, 120, token).ConfigureAwait(false);
+
+		IReadOnlyList<KillPoint> human = await store.FightsAsync("de_dust2", TestHelpers.SteamId, null, 1000, token).ConfigureAwait(false);
+		IReadOnlyList<KillPoint> bots = await store.FightsAsync("de_dust2", rock, null, 1000, token).ConfigureAwait(false);
+
+		Assert.HasCount(100, human);
+		Assert.HasCount(120, bots);
+	}
+
+	[TestMethod]
+	public async Task Add_BotFightsNeverPushOutHumanKills()
+	{
+		InMemoryKillMapStore store = new();
+		CancellationToken token = TestContext.CancellationToken;
+		await store.AddAsync([.. Enumerable.Range(0, 100).Select(i => Kill(killer: TestHelpers.SteamId, victim: BotIds.For("Muhlik"), x: (short)i))], 100, 100, token).ConfigureAwait(false);
+		await store.AddAsync([.. Enumerable.Range(0, 500).Select(i => Kill(killer: BotIds.For("Rock"), victim: BotIds.For("Muhlik"), x: (short)i))], 100, 100, token).ConfigureAwait(false);
+
+		IReadOnlyList<KillPoint> human = await store.FightsAsync("de_dust2", TestHelpers.SteamId, null, 1000, token).ConfigureAwait(false);
+
+		Assert.HasCount(100, human);
+		Assert.AreEqual((short)0, human[^1].KillerX);
+	}
+
+	[TestMethod]
+	public void IsBotFight_NeedsABotPersonaOnBothEnds()
+	{
+		Assert.IsTrue(Kill(killer: BotIds.For("Rock"), victim: BotIds.For("Muhlik")).IsBotFight);
+		Assert.IsFalse(Kill(killer: TestHelpers.SteamId, victim: BotIds.For("Muhlik")).IsBotFight);
+		Assert.IsFalse(Kill(killer: 0, victim: BotIds.For("Muhlik")).IsBotFight);
+	}
+
+	[TestMethod]
+	public void Add_DropsAKillBetweenTwoUntrackedBots()
+	{
+		KillPointBuffer buffer = new(new HeatmapSettings());
+		Assert.IsFalse(buffer.Add(Kill(killer: 0, victim: 0)));
+		Assert.IsTrue(buffer.Add(Kill(killer: BotIds.For("Rock"), victim: BotIds.For("Muhlik"))));
+	}
+
+	[TestMethod]
+	public void Settings_BotFightCapDefaultsTo10000() => Assert.AreEqual(10_000, new HeatmapSettings().MaxBotFightsPerMap);
 
 	[TestMethod]
 	public void BufferSkipsKillsBetweenBotsAndWhenOff()
@@ -122,7 +173,7 @@ public sealed class HeatmapTests
 		InMemoryKillMapStore store = new();
 		List<KillPoint> points = [.. Enumerable.Range(0, 120).Select(i => Kill(x: (short)i, killer: i % 2 == 0 ? TestHelpers.SteamId : Other, victim: i % 2 == 0 ? Other : TestHelpers.SteamId))];
 		points.Add(Kill("de_mirage"));
-		await store.AddAsync(points, 100, TestContext.CancellationToken).ConfigureAwait(false);
+		await store.AddAsync(points, 100, 100, TestContext.CancellationToken).ConfigureAwait(false);
 
 		IReadOnlyList<MapPointCount> maps = await store.MapsAsync(TestContext.CancellationToken).ConfigureAwait(false);
 		Assert.AreEqual(new MapPointCount("de_dust2", 100), maps[0]);
@@ -166,7 +217,7 @@ public sealed class HeatmapTests
 		{
 			await File.WriteAllBytesAsync(Path.Combine(directory, "radar", "de_mirage.png"), [1, 2, 3], TestContext.CancellationToken).ConfigureAwait(false);
 			InMemoryKillMapStore store = new();
-			await store.AddAsync([Kill(), Kill("de_mirage", x: -1000, y: 0), Kill("de_mirage", x: -1000, y: 0)], 100, TestContext.CancellationToken).ConfigureAwait(false);
+			await store.AddAsync([Kill(), Kill("de_mirage", x: -1000, y: 0), Kill("de_mirage", x: -1000, y: 0)], 100, 100, TestContext.CancellationToken).ConfigureAwait(false);
 			using HeatmapReader heatmaps = new(store);
 			using ProgressReader reader = new(new InMemoryProgressionStore());
 			RadarImages radars = new(new SiteOptions { DataPath = directory });
@@ -224,8 +275,8 @@ public sealed class HeatmapTests
 		await store.InitializeAsync(token).ConfigureAwait(false);
 
 		string map = "de_test_" + Random.Shared.Next(1_000, 1_000_000).ToString(System.Globalization.CultureInfo.InvariantCulture);
-		await store.AddAsync([.. Enumerable.Range(0, 80).Select(i => Kill(map, x: (short)i))], 100, token).ConfigureAwait(false);
-		await store.AddAsync([.. Enumerable.Range(80, 70).Select(i => Kill(map, killer: Other, victim: TestHelpers.SteamId, x: (short)i))], 100, token).ConfigureAwait(false);
+		await store.AddAsync([.. Enumerable.Range(0, 80).Select(i => Kill(map, x: (short)i))], 100, 100, token).ConfigureAwait(false);
+		await store.AddAsync([.. Enumerable.Range(80, 70).Select(i => Kill(map, killer: Other, victim: TestHelpers.SteamId, x: (short)i))], 100, 100, token).ConfigureAwait(false);
 
 		IReadOnlyList<MapPointCount> maps = await store.MapsAsync(token).ConfigureAwait(false);
 		Assert.AreEqual(100, maps.Single(m => m.Map == map).Points);
@@ -251,7 +302,7 @@ public sealed class HeatmapTests
 			Kill(killer: 0, victim: 7, x: 2),
 			Kill(killer: 8, victim: 9, x: 3),
 			Kill("de_nuke", killer: 7, victim: 0, x: 4),
-		], 100, token).ConfigureAwait(false);
+		], 100, 100, token).ConfigureAwait(false);
 
 		IReadOnlyList<KillPoint> fights = await store.FightsAsync("de_dust2", 7, null, 100, token).ConfigureAwait(false);
 
@@ -263,7 +314,7 @@ public sealed class HeatmapTests
 	{
 		InMemoryKillMapStore store = new();
 		CancellationToken token = TestContext.CancellationToken;
-		await store.AddAsync([Kill(x: 1), Kill(x: 2) with { At = At.AddMinutes(10) }], 100, token).ConfigureAwait(false);
+		await store.AddAsync([Kill(x: 1), Kill(x: 2) with { At = At.AddMinutes(10) }], 100, 100, token).ConfigureAwait(false);
 
 		IReadOnlyList<KillPoint> fights = await store.FightsAsync("de_dust2", TestHelpers.SteamId, At.AddMinutes(5), 100, token).ConfigureAwait(false);
 
@@ -275,7 +326,7 @@ public sealed class HeatmapTests
 	{
 		InMemoryKillMapStore store = new();
 		CancellationToken token = TestContext.CancellationToken;
-		await store.AddAsync([Kill(killer: 7, victim: 8), Kill(killer: 9, victim: 0), Kill("de_nuke")], 100, token).ConfigureAwait(false);
+		await store.AddAsync([Kill(killer: 7, victim: 8), Kill(killer: 9, victim: 0), Kill("de_nuke")], 100, 100, token).ConfigureAwait(false);
 
 		IReadOnlyList<KillPoint> fights = await store.FightsAsync("de_dust2", null, null, 100, token).ConfigureAwait(false);
 
@@ -287,7 +338,7 @@ public sealed class HeatmapTests
 	{
 		InMemoryKillMapStore store = new();
 		CancellationToken token = TestContext.CancellationToken;
-		await store.AddAsync([Kill("de_nuke", killer: 7), Kill("de_dust2", victim: 7, killer: 0)], 100, token).ConfigureAwait(false);
+		await store.AddAsync([Kill("de_nuke", killer: 7), Kill("de_dust2", victim: 7, killer: 0)], 100, 100, token).ConfigureAwait(false);
 
 		Assert.AreEqual("de_dust2", await store.LastMapAsync(7, token).ConfigureAwait(false));
 		Assert.IsNull(await store.LastMapAsync(99, token).ConfigureAwait(false));
@@ -317,8 +368,8 @@ public sealed class HeatmapTests
 			Kill(map, killer: 0, victim: 7, x: 2) with { At = At.AddMinutes(10) },
 			Kill(map, killer: 8, victim: 9, x: 3) with { At = At.AddMinutes(20) },
 		];
-		await mySql.AddAsync(kills, 100, token).ConfigureAwait(false);
-		await memory.AddAsync(kills, 100, token).ConfigureAwait(false);
+		await mySql.AddAsync(kills, 100, 100, token).ConfigureAwait(false);
+		await memory.AddAsync(kills, 100, 100, token).ConfigureAwait(false);
 
 		foreach ((ulong? steamId, DateTime? since, int limit) in new (ulong?, DateTime?, int)[] { (7, null, 100), (7, At.AddMinutes(5), 100), (null, null, 100), (null, null, 2) })
 		{

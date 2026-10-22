@@ -526,7 +526,7 @@ public sealed class SiteLiveTests
 	{
 		InMemoryKillMapStore store = new();
 		KillPoint[] match = [Kill("de_dust2", 7, 0, Start), Kill("de_dust2", 0, 7, Start.AddSeconds(5)), Kill("de_dust2", 7, 8, Start.AddSeconds(9))];
-		await store.AddAsync([Kill("de_dust2", 7, 0, Start.AddSeconds(-1)), .. match], 100, CancellationToken.None).ConfigureAwait(false);
+		await store.AddAsync([Kill("de_dust2", 7, 0, Start.AddSeconds(-1)), .. match], 100, 100, CancellationToken.None).ConfigureAwait(false);
 		MatchFights fights = NewFights(store);
 
 		IReadOnlyList<KillPoint> kept = fights.Apply(Server(Start.AddMinutes(1)) with { MapStartedAt = Start }, null);
@@ -541,7 +541,7 @@ public sealed class SiteLiveTests
 	{
 		InMemoryKillMapStore store = new();
 		KillPoint stored = Kill("de_dust2", 7, 0, Start);
-		await store.AddAsync([stored], 100, CancellationToken.None).ConfigureAwait(false);
+		await store.AddAsync([stored], 100, 100, CancellationToken.None).ConfigureAwait(false);
 		MatchFights fights = NewFights(store);
 
 		fights.Apply(Server(Start.AddMinutes(1)) with { MapStartedAt = Start.AddMilliseconds(500) }, null);
@@ -567,7 +567,7 @@ public sealed class SiteLiveTests
 	{
 		InMemoryKillMapStore store = new();
 		KillPoint stored = Kill("de_dust2", 7, 0, Start);
-		await store.AddAsync([stored], 100, CancellationToken.None).ConfigureAwait(false);
+		await store.AddAsync([stored], 100, 100, CancellationToken.None).ConfigureAwait(false);
 		MatchFights fights = NewFights(store);
 		KillPoint live = stored with { At = Start.AddMilliseconds(300), KillerName = "Tester", VictimName = "Bot Ringo" };
 

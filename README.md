@@ -186,7 +186,7 @@ Posting runs on the thread pool, at most one post a second. Lines that arrive me
 
 ### Kill heatmaps
 
-`Heatmaps` records where kills happen, so the site can draw them over each map's radar at `/heatmaps`, for the whole server or one player (where they got their kills, or where they died). Only kills with a human on either end are kept, each map keeps only its latest `MaxPointsPerMap`, and the oldest are deleted as new ones arrive, so the `csp_kills` table stays a fixed size.
+`Heatmaps` records where kills happen, so the site can draw them over each map's radar at `/heatmaps`, for the whole server or one player (where they got their kills, or where they died). Kills with a human on either end and kills between two bot personas are kept apart. Each map keeps only its latest `MaxPointsPerMap` of the first and its latest `MaxBotFightsPerMap` of the second, and the oldest are deleted as new ones arrive, so the `csp_kills` table stays a fixed size and bot fights never push out a human's kills.
 
 Each player's page also shows where that player wins and loses fights, above their XP feed. A won fight is a kill, placed where the player stood, and a lost fight is a death, placed where they died, against humans and bots alike. Each area of the radar is colored by the balance of the two, green where they win most, red where they lose most, and grey where it's about even, and an area with only one or two fights stays faint. Hovering or tapping an area shows its counts. **This match** shows the map being played since it started, and **All time** shows every stored fight on that map. The panel opens on **This match** while the player is online and on **All time**, for the map they last played, while they're offline, and each browser remembers the last choice for each. New fights arrive within a couple of seconds, without a refresh, and a map change switches the panel to the new map. A map with no radar calibration shows no fights.
 
@@ -196,6 +196,7 @@ Each player's page also shows where that player wins and loses fights, above the
     "Enabled": true,
     "SampleEvery": 1,
     "MaxPointsPerMap": 30000,
+    "MaxBotFightsPerMap": 10000,
     "QueueLimit": 5000
   }
 }
@@ -203,7 +204,8 @@ Each player's page also shows where that player wins and loses fights, above the
 
 - **`Enabled`:** whether kill positions are recorded.
 - **`SampleEvery`:** keep one kill in this many on each map. 1 keeps every kill.
-- **`MaxPointsPerMap`:** how many kills each map keeps. Values under 100 count as 100.
+- **`MaxPointsPerMap`:** how many kills with a human on either end each map keeps. Values under 100 count as 100.
+- **`MaxBotFightsPerMap`:** how many kills between two bot personas each map keeps, counted apart from `MaxPointsPerMap`. Values under 100 count as 100.
 - **`QueueLimit`:** how many kills wait to be written while the database is down. Past this, the oldest are dropped.
 
 Kills are written in one batch per save interval, on the thread pool. The heatmaps send cell counts on a 128 by 128 grid, never exact kill positions. The official maps line up with the game's radar from each map's overview file; any other map gets a square fitted around its kills. Radar images aren't shipped, because they're Valve's art. Instead, point `Site__GamePath` at the game server's `csgo` folder (mounted read-only) and the site reads each map's radar out of that install's own `pak01_dir.vpk` the first time the map is shown, keeping a 1024 by 1024 PNG under `<DataPath>/radar/game` until the next game update. A PNG put at `<DataPath>/radar/<map>.png` by hand wins over it. Without either, the page draws an outline from where people fight.

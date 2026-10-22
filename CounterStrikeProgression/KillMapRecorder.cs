@@ -119,10 +119,11 @@ internal sealed class KillMapRecorder(HeatmapSettings settings, IKillMapStore st
 
 		IReadOnlyList<KillPoint> points = buffer.Drain();
 		int max = Math.Max(100, settings.MaxPointsPerMap);
+		int maxBotFights = Math.Max(100, settings.MaxBotFightsPerMap);
 		writing = true;
 		_ = Task.Run(async () =>
 		{
-			bool written = await WriteAsync(points, max).ConfigureAwait(false);
+			bool written = await WriteAsync(points, max, maxBotFights).ConfigureAwait(false);
 			await Server.NextFrameAsync(() =>
 			{
 				writing = false;
@@ -146,7 +147,7 @@ internal sealed class KillMapRecorder(HeatmapSettings settings, IKillMapStore st
 		}
 
 		IReadOnlyList<KillPoint> points = buffer.Drain();
-		_ = Task.Run(() => WriteAsync(points, Math.Max(100, settings.MaxPointsPerMap))).Wait(timeout);
+		_ = Task.Run(() => WriteAsync(points, Math.Max(100, settings.MaxPointsPerMap), Math.Max(100, settings.MaxBotFightsPerMap))).Wait(timeout);
 	}
 
 	[SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "This runs unobserved on the thread pool, so anything it throws must be logged here or it vanishes.")]
@@ -166,7 +167,7 @@ internal sealed class KillMapRecorder(HeatmapSettings settings, IKillMapStore st
 	}
 
 	[SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "The write runs unobserved on the thread pool, so anything it throws must be logged here or it vanishes.")]
-	private async Task<bool> WriteAsync(IReadOnlyList<KillPoint> points, int max)
+	private async Task<bool> WriteAsync(IReadOnlyList<KillPoint> points, int max, int maxBotFights)
 	{
 		try
 		{
@@ -176,7 +177,7 @@ internal sealed class KillMapRecorder(HeatmapSettings settings, IKillMapStore st
 				initialized = true;
 			}
 
-			await store.AddAsync(points, max, CancellationToken.None).ConfigureAwait(false);
+			await store.AddAsync(points, max, maxBotFights, CancellationToken.None).ConfigureAwait(false);
 			return true;
 		}
 		catch (Exception exception)

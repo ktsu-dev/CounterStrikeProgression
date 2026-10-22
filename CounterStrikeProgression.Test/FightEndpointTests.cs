@@ -73,7 +73,7 @@ public sealed class FightEndpointTests
 	public async Task Fights_AllScopeReadsTheStore()
 	{
 		InMemoryKillMapStore store = new();
-		await store.AddAsync([Kill(Dust, Player, Rival), Kill(Dust, Player, 0, 1)], 100, TestContext.CancellationToken).ConfigureAwait(false);
+		await store.AddAsync([Kill(Dust, Player, Rival), Kill(Dust, Player, 0, 1)], 100, 100, TestContext.CancellationToken).ConfigureAwait(false);
 		MatchFights match = new(store, NullLogger<MatchFights>.Instance);
 
 		FightView view = View(await CallAsync(Text(Player), "all", Dust, store, match).ConfigureAwait(false));
@@ -88,7 +88,7 @@ public sealed class FightEndpointTests
 	public async Task Fights_AllScopeFallsBackToTheLastMapPlayed()
 	{
 		InMemoryKillMapStore store = new();
-		await store.AddAsync([Kill(Dust, Player, Rival)], 100, TestContext.CancellationToken).ConfigureAwait(false);
+		await store.AddAsync([Kill(Dust, Player, Rival)], 100, 100, TestContext.CancellationToken).ConfigureAwait(false);
 		MatchFights match = new(store, NullLogger<MatchFights>.Instance);
 
 		FightView view = View(await CallAsync(Text(Player), null, null, store, match).ConfigureAwait(false));
@@ -112,7 +112,7 @@ public sealed class FightEndpointTests
 	public async Task Fights_UncalibratedMapHasNoCells()
 	{
 		InMemoryKillMapStore store = new();
-		await store.AddAsync([Kill("de_unknown", Player, Rival)], 100, TestContext.CancellationToken).ConfigureAwait(false);
+		await store.AddAsync([Kill("de_unknown", Player, Rival)], 100, 100, TestContext.CancellationToken).ConfigureAwait(false);
 		MatchFights match = new(store, NullLogger<MatchFights>.Instance);
 
 		FightView view = View(await CallAsync(Text(Player), "all", "de_unknown", store, match).ConfigureAwait(false));
@@ -134,7 +134,7 @@ public sealed class FightEndpointTests
 	public async Task Fights_AllScopeUsesTheServerMapForAPlayerPlaying()
 	{
 		InMemoryKillMapStore store = new();
-		await store.AddAsync([Kill(Dust, Player, Rival), Kill("de_mirage", Player, Rival), Kill("de_mirage", Player, Rival, 1)], 100, TestContext.CancellationToken).ConfigureAwait(false);
+		await store.AddAsync([Kill(Dust, Player, Rival), Kill("de_mirage", Player, Rival), Kill("de_mirage", Player, Rival, 1)], 100, 100, TestContext.CancellationToken).ConfigureAwait(false);
 		MatchFights match = new(store, NullLogger<MatchFights>.Instance);
 		LiveState live = new(new SiteOptions(), new FeedStore(Path.Combine(directory, "feed.json")), new ManualTime(), NullLogger<LiveState>.Instance);
 		live.Apply(Batch("de_mirage", Human(Player)));
@@ -149,7 +149,7 @@ public sealed class FightEndpointTests
 	public async Task Fights_AllScopeUsesTheLastMapWhenTheServerIsOffline()
 	{
 		InMemoryKillMapStore store = new();
-		await store.AddAsync([Kill("de_mirage", Player, Rival), Kill(Dust, Player, Rival, 1)], 100, TestContext.CancellationToken).ConfigureAwait(false);
+		await store.AddAsync([Kill("de_mirage", Player, Rival), Kill(Dust, Player, Rival, 1)], 100, 100, TestContext.CancellationToken).ConfigureAwait(false);
 		MatchFights match = new(store, NullLogger<MatchFights>.Instance);
 		ManualTime time = new();
 		LiveState live = new(new SiteOptions(), new FeedStore(Path.Combine(directory, "feed.json")), time, NullLogger<LiveState>.Instance);
