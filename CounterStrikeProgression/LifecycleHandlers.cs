@@ -223,7 +223,9 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 		services.Bounties.Clear();
 		foreach (PlayerSession session in Sessions.All)
 		{
+			// The new map's scoreboard starts empty, whatever the last one showed.
 			session.Recap.Restart(DateTime.UtcNow);
+			session.Recap.StartScoreboard(default);
 		}
 
 		services.Digest?.Check(DateTime.UtcNow);

@@ -150,6 +150,9 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 		DisconnectSlot(player.Slot);
 
 		PlayerSession session = new(player.Slot, id);
+
+		// A bot that stays on while untracked keeps its kills on the scoreboard, so the recap counts from here.
+		session.Recap.StartScoreboard(GameState.ScoreboardOf(player));
 		sessions[player.Slot] = session;
 		string name = player.PlayerName;
 

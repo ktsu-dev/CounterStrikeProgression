@@ -202,6 +202,97 @@ public sealed class RecapTests
 	}
 
 	[TestMethod]
+	public void Tracker_Finish_CountsOnlyTheScoreboardSinceItStarted()
+	{
+		RecapTracker tracker = new(Start);
+		tracker.StartScoreboard(new Scoreboard(4, 1));
+		tracker.Add(Result(5));
+
+		MapRecap recap = tracker.Finish(1, "a", "m", 10, 3, Start.AddMinutes(5));
+
+		Assert.AreEqual(6, recap.Kills);
+		Assert.AreEqual(2, recap.Deaths);
+	}
+
+	[TestMethod]
+	public void Tracker_Finish_TheNextRecapStartsFromTheLastReading()
+	{
+		RecapTracker tracker = new(Start);
+		tracker.Add(Result(5));
+		Assert.AreEqual(5, tracker.Finish(1, "a", "m", 5, 2, Start.AddMinutes(5)).Kills);
+
+		tracker.Add(Result(5));
+		MapRecap next = tracker.Finish(1, "a", "m", 8, 3, Start.AddMinutes(9));
+
+		Assert.AreEqual(3, next.Kills);
+		Assert.AreEqual(1, next.Deaths);
+	}
+
+	[TestMethod]
+	public void Tracker_TryFinish_NothingEarned_StillMovesTheScoreboardOn()
+	{
+		RecapTracker tracker = new(Start);
+		Assert.IsNull(tracker.TryFinish(1, "a", "m", 3, 2, Start.AddMinutes(4)));
+
+		tracker.Add(Result(2));
+		MapRecap? recap = tracker.TryFinish(1, "a", "m", 5, 2, Start.AddMinutes(6));
+
+		Assert.IsNotNull(recap);
+		Assert.AreEqual(2, recap.Kills);
+		Assert.AreEqual(0, recap.Deaths);
+	}
+
+	[TestMethod]
+	public void Tracker_Finish_ABotLeftOnWhileUntracked_CountsOnlyItsTrackedKills()
+	{
+		// Tracked from the start of the map, the bot's recap finishes when the last human leaves at 7 kills.
+		RecapTracker first = new(Start);
+		first.Add(Result(5));
+		Assert.AreEqual(7, first.Finish(1, "bot", "m", 7, 4, Start.AddMinutes(10)).Kills);
+
+		// It plays on untracked to 12 kills, then a human returns and a new session starts from that reading.
+		RecapTracker second = new(Start.AddMinutes(20));
+		second.StartScoreboard(new Scoreboard(12, 6));
+		second.Add(Result(5));
+		MapRecap recap = second.Finish(1, "bot", "m", 15, 7, Start.AddMinutes(30));
+
+		Assert.AreEqual(3, recap.Kills);
+		Assert.AreEqual(1, recap.Deaths);
+	}
+
+	[TestMethod]
+	public void Tracker_Finish_AfterAMapStart_CountsTheNewMapsScoreboardFromZero()
+	{
+		RecapTracker tracker = new(Start);
+		tracker.Add(Result(5));
+		tracker.Finish(1, "a", "m", 10, 4, Start.AddMinutes(30));
+
+		tracker.Restart(Start.AddMinutes(31));
+		tracker.StartScoreboard(default);
+		tracker.Add(Result(5));
+		MapRecap recap = tracker.Finish(1, "a", "m2", 15, 6, Start.AddMinutes(60));
+
+		Assert.AreEqual(15, recap.Kills);
+		Assert.AreEqual(6, recap.Deaths);
+	}
+
+	[TestMethod]
+	public void Scoreboard_Since_CountsAResetScoreboardFromZero()
+	{
+		Scoreboard since = new Scoreboard(3, 1).Since(new Scoreboard(10, 4));
+
+		Assert.AreEqual(new Scoreboard(3, 1), since);
+	}
+
+	[TestMethod]
+	public void Scoreboard_Since_NeverGoesBelowZero()
+	{
+		Scoreboard since = new Scoreboard(-2, 0).Since(new Scoreboard(5, 0));
+
+		Assert.AreEqual(new Scoreboard(0, 0), since);
+	}
+
+	[TestMethod]
 	public void LiveState_KeepsRecapsForTheNewestPlayersOnly()
 	{
 		LiveState state = new(new SiteOptions { PlayerFeedPlayers = 2 }, new FeedStore(Path.Combine(directory, "feed.json")), new ManualTime(), NullLogger<LiveState>.Instance);

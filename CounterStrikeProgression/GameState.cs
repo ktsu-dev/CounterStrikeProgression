@@ -8,6 +8,7 @@ using CounterStrikeSharp.API.Modules.Cvars;
 using CounterStrikeSharp.API.Modules.Utils;
 using ktsu.CounterStrikeProgression.Core.Events;
 using ktsu.CounterStrikeProgression.Core.Players;
+using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
 /// <summary>
@@ -115,6 +116,17 @@ internal static class GameState
 	/// <returns>The id, or 0 when there is no player or no usable id.</returns>
 	public static ulong PlayerIdOf(CCSPlayerController? player) =>
 		player is null ? 0 : PlayerIds.Of(player.IsBot, player.SteamID, player.PlayerName);
+
+	/// <summary>
+	/// Reads a player's kills and deaths off the scoreboard, which add up over the whole map.
+	/// </summary>
+	/// <param name="player">The controller.</param>
+	/// <returns>The reading, or an empty one when the controller is gone or has no stats.</returns>
+	public static Scoreboard ScoreboardOf(CCSPlayerController? player)
+	{
+		CSMatchStats_t? stats = player is { IsValid: true } ? player.ActionTrackingServices?.MatchStats : null;
+		return new Scoreboard(stats?.Kills ?? 0, stats?.Deaths ?? 0);
+	}
 
 	/// <summary>
 	/// Gets a player's live pawn.

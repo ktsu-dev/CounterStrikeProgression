@@ -9,6 +9,10 @@ using ktsu.CounterStrikeProgression.Core.SkillShots;
 /// <summary>
 /// Adds up what a player earns over one map, for the recap at map end or when they leave.
 /// </summary>
+/// <remarks>
+/// The game's scoreboard adds up over the whole map, and a bot stays on it while it isn't tracked, so the tracker
+/// keeps the reading its recap started from and counts only the kills and deaths since.
+/// </remarks>
 /// <param name="startedAt">When the session started, in UTC.</param>
 internal sealed class RecapTracker(DateTime startedAt)
 {
@@ -18,6 +22,7 @@ internal sealed class RecapTracker(DateTime startedAt)
 	private int rankUps;
 	private int feats;
 	private ProgressionNotice? best;
+	private Scoreboard scoreboardAtStart;
 
 	/// <summary>Gets when the session started, in UTC.</summary>
 	public DateTime StartedAt { get; private set; } = startedAt;
@@ -87,8 +92,8 @@ internal sealed class RecapTracker(DateTime startedAt)
 	/// <param name="steamId">The player's 64-bit Steam ID.</param>
 	/// <param name="playerName">The player's name.</param>
 	/// <param name="map">The map played.</param>
-	/// <param name="kills">Kills on the scoreboard.</param>
-	/// <param name="deaths">Deaths on the scoreboard.</param>
+	/// <param name="kills">Kills on the scoreboard now, of which only those since the recap started are counted.</param>
+	/// <param name="deaths">Deaths on the scoreboard now, of which only those since the recap started are counted.</param>
 	/// <param name="at">When the session ended, in UTC, which is also when the next one starts.</param>
 	/// <returns>The recap.</returns>
 	public MapRecap Finish(ulong steamId, string playerName, string map, int kills, int deaths, DateTime at)
@@ -96,6 +101,9 @@ internal sealed class RecapTracker(DateTime startedAt)
 		Ensure.NotNull(playerName);
 		Ensure.NotNull(map);
 
+		Scoreboard now = new(kills, deaths);
+		Scoreboard counted = now.Since(scoreboardAtStart);
+		scoreboardAtStart = now;
 		MapRecap recap = new(
 			steamId,
 			playerName,
@@ -103,8 +111,8 @@ internal sealed class RecapTracker(DateTime startedAt)
 			StartedAt,
 			at,
 			(long)Math.Floor(Math.Max(0, xp)),
-			kills,
-			deaths,
+			counted.Kills,
+			counted.Deaths,
 			SkillShots,
 			levels,
 			tiers,
@@ -122,20 +130,28 @@ internal sealed class RecapTracker(DateTime startedAt)
 	/// <param name="steamId">The player's 64-bit Steam ID.</param>
 	/// <param name="playerName">The player's name.</param>
 	/// <param name="map">The map played.</param>
-	/// <param name="kills">Kills on the scoreboard.</param>
-	/// <param name="deaths">Deaths on the scoreboard.</param>
+	/// <param name="kills">Kills on the scoreboard now, of which only those since the recap started are counted.</param>
+	/// <param name="deaths">Deaths on the scoreboard now, of which only those since the recap started are counted.</param>
 	/// <param name="at">When the session ended, in UTC, which is also when the next one starts.</param>
 	/// <returns>The recap, or <see langword="null"/> when nothing was earned.</returns>
 	public MapRecap? TryFinish(ulong steamId, string playerName, string map, int kills, int deaths, DateTime at)
 	{
 		if (IsEmpty)
 		{
+			scoreboardAtStart = new(kills, deaths);
 			Restart(at);
 			return null;
 		}
 
 		return Finish(steamId, playerName, map, kills, deaths, at);
 	}
+
+	/// <summary>
+	/// Sets the scoreboard reading the recap counts kills and deaths from: the player's own when their session starts,
+	/// and an empty one when a new map starts.
+	/// </summary>
+	/// <param name="scoreboard">The reading.</param>
+	public void StartScoreboard(Scoreboard scoreboard) => scoreboardAtStart = scoreboard;
 
 	/// <summary>
 	/// Forgets what was earned and starts a new session.

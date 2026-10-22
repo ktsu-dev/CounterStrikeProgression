@@ -10,6 +10,7 @@ using ktsu.CounterStrikeProgression.Core.Floaties;
 using ktsu.CounterStrikeProgression.Core.Maps;
 using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.Tracking;
 using ktsu.CounterStrikeProgression.Panel;
 using ktsu.CounterStrikeProgression.Site;
@@ -166,7 +167,6 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	{
 		Ensure.NotNull(session);
 		CCSPlayerController? valid = player is { IsValid: true } ? player : null;
-		CSMatchStats_t? stats = valid?.ActionTrackingServices?.MatchStats;
 		string name = valid?.PlayerName ?? session.Progress?.Name ?? string.Empty;
 		if ((valid is not null) && (session.Progress is PlayerProgress progress))
 		{
@@ -174,7 +174,8 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 			Apply(valid, session, Engine.ApplyMapRecords(progress, session.Recap.SkillShots, session.Recap.HumanSkillShots));
 		}
 
-		if (session.Recap.TryFinish(session.SteamId, name, map, stats?.Kills ?? 0, stats?.Deaths ?? 0, DateTime.UtcNow) is not { } recap)
+		Scoreboard scoreboard = GameState.ScoreboardOf(valid);
+		if (session.Recap.TryFinish(session.SteamId, name, map, scoreboard.Kills, scoreboard.Deaths, DateTime.UtcNow) is not { } recap)
 		{
 			return;
 		}
