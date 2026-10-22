@@ -54,6 +54,19 @@ internal sealed class HeatmapReader(IKillMapStore store, TimeProvider? time = nu
 		return (IReadOnlyList<HeatPoint>)await Cached((map, kind, steamId), async () => await store.PointsAsync(map, kind, steamId, limit, CancellationToken.None).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
 	}
 
+	/// <summary>
+	/// Gets the latest kills on a map with both ends, for the server or the fights one player was in.
+	/// </summary>
+	/// <param name="map">The map.</param>
+	/// <param name="steamId">The player who was the killer or the victim, or <see langword="null"/> for every kill.</param>
+	/// <param name="cancellationToken">Stops this caller waiting. A query other callers share runs on.</param>
+	/// <returns>The kills, newest first.</returns>
+	public async Task<IReadOnlyList<KillPoint>> FightsAsync(string map, ulong? steamId, CancellationToken cancellationToken = default)
+	{
+		int limit = steamId is null ? ServerLimit : PlayerLimit;
+		return (IReadOnlyList<KillPoint>)await Cached(("fights", map, steamId), async () => await store.FightsAsync(map, steamId, null, limit, CancellationToken.None).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+	}
+
 	/// <inheritdoc/>
 	public void Dispose() => slots.Dispose();
 

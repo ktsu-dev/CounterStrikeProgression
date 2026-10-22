@@ -1459,3 +1459,15 @@ td.win {
 	width: 120px;
 	height: 8px;
 }
+
+.heat-key {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.heat-swatch {
+	display: inline-block;
+	width: 24px;
+	height: 3px;
+}

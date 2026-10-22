@@ -1,7 +1,8 @@
 "use strict";
 
 // The heatmap page: kill or death positions counted into cells over the map's radar, for the server or one
-// player. The site sends cell counts, not positions, and this draws them as a heatmap.
+// player, or lines from each killer to their victim. The site sends cell counts and lines between cell centres,
+// not positions, and this draws them as a heatmap or as additive strokes.
 (() => {
 	const SERVER_NAME = "ktsu.dev CS2";
 	const STEAM_ID = /^\d{17}$/;
@@ -60,12 +61,22 @@
 
 	const COLORS = palette();
 
+	// The Lines tab's colors: the site's orange server-wide, and its green and red for a player's kills and deaths.
+	const LINE_COLORS = {
+		server: [242, 163, 58],
+		kill: [76, 209, 122],
+		death: [229, 83, 75],
+	};
+	// One kill's stroke alpha. Strokes add up under "lighter", so a line with Count kills is drawn at Count times this.
+	const LINE_ALPHA = 0.14;
+	const KINDS = ["kills", "deaths", "lines"];
+
 	function readQuery() {
 		const query = new URLSearchParams(location.search);
 		const player = query.get("player");
 		return {
 			map: query.get("map") || "",
-			kind: query.get("kind") === "deaths" ? "deaths" : "kills",
+			kind: KINDS.includes(query.get("kind")) ? query.get("kind") : "kills",
 			player: STEAM_ID.test(player ?? "") ? player : "",
 		};
 	}
@@ -75,8 +86,8 @@
 		if (state.map) {
 			query.set("map", state.map);
 		}
-		if (state.kind === "deaths") {
-			query.set("kind", "deaths");
+		if (state.kind !== "kills") {
+			query.set("kind", state.kind);
 		}
 		if (state.player) {
 			query.set("player", state.player);
@@ -142,6 +153,27 @@
 		context.drawImage(heat, 0, 0);
 	}
 
+	function drawLines(context, view) {
+		if (!view.lines?.length) {
+			return;
+		}
+
+		const size = view.cellPixels;
+		context.save();
+		context.globalCompositeOperation = "lighter";
+		context.lineWidth = 1.5;
+		context.lineCap = "round";
+		for (const [x1, y1, x2, y2, death, count] of view.lines) {
+			const rgb = !view.player ? LINE_COLORS.server : death ? LINE_COLORS.death : LINE_COLORS.kill;
+			context.strokeStyle = `rgba(${rgb.join(",")},${Math.min(1, LINE_ALPHA * count).toFixed(3)})`;
+			context.beginPath();
+			context.moveTo((x1 + 0.5) * size, (y1 + 0.5) * size);
+			context.lineTo((x2 + 0.5) * size, (y2 + 0.5) * size);
+			context.stroke();
+		}
+		context.restore();
+	}
+
 	async function draw(canvas, view) {
 		canvas.width = view.size;
 		canvas.height = view.size;
@@ -155,11 +187,35 @@
 		} else {
 			drawOutline(context, view);
 		}
-		drawHeat(context, view);
+		if (view.kind === "Lines") {
+			drawLines(context, view);
+		} else {
+			drawHeat(context, view);
+		}
 	}
 
-	function legend() {
+	function swatch(rgb, label) {
+		const item = el("span", "heat-key");
+		const line = el("span", "heat-swatch");
+		line.style.background = `rgb(${rgb.join(",")})`;
+		item.append(line, el("span", null, label));
+		return item;
+	}
+
+	function legend(view) {
 		const wrap = el("div", "heat-legend muted");
+		if (view.kind === "Lines") {
+			if (view.player) {
+				wrap.append(swatch(LINE_COLORS.kill, "their kills"), swatch(LINE_COLORS.death, "their deaths"));
+			} else {
+				const ramp = el("span", "heat-ramp");
+				const [r, g, b] = LINE_COLORS.server;
+				ramp.style.background = `linear-gradient(90deg, rgba(${r},${g},${b},0.25), rgb(${r},${g},${b}) 70%, rgb(255,240,220))`;
+				wrap.append(el("span", null, "one kill"), ramp, el("span", null, "a lane used over and over"));
+			}
+			return wrap;
+		}
+
 		const ramp = el("span", "heat-ramp");
 		ramp.style.background = `linear-gradient(90deg, ${RAMP.map(([t, c]) => `rgb(${c.join(",")}) ${t * 100}%`).join(", ")})`;
 		wrap.append(el("span", null, "fewer"), ramp, el("span", null, "more"));
@@ -173,7 +229,7 @@
 		function tabs() {
 			const bar = el("div", "tabs");
 			bar.setAttribute("role", "tablist");
-			for (const [kind, label] of [["kills", "Kills"], ["deaths", "Deaths"]]) {
+			for (const [kind, label] of [["kills", "Kills"], ["deaths", "Deaths"], ["lines", "Lines"]]) {
 				const button = el("button", "tab", label);
 				button.type = "button";
 				button.setAttribute("role", "tab");
@@ -209,7 +265,9 @@
 
 		function describe(view) {
 			const who = view.player ? (view.player.name || "This player") : "Everyone";
-			const what = view.kind === "Deaths" ? "where they died" : "where they got their kills";
+			const what = view.kind === "Lines"
+				? (view.player ? "lines to the players they killed, and from the players who killed them," : "lines from each killer to their victim")
+				: view.kind === "Deaths" ? "where they died" : "where they got their kills";
 			const count = view.points > 0 ? `, from the latest ${formatCount(view.points)}` : "";
 			const lines = [`${who}: ${what} on ${mapLabel(view.map)}${count}.`];
 			if (!view.calibrated) {
@@ -261,11 +319,16 @@
 			const canvas = el("canvas", "heat-canvas");
 			canvas.setAttribute("role", "img");
 			canvas.setAttribute("aria-label", describe(view)[0]);
-			body.append(canvas, legend());
+			// Lines need the game's radar layout, so an uncalibrated map's Lines tab shows only its outline and why.
+			const noLines = view.kind === "Lines" && !view.calibrated;
+			body.append(canvas);
+			if (!noLines) {
+				body.append(legend(view));
+			}
 			for (const line of describe(view)) {
 				body.append(el("div", "muted", line));
 			}
-			if (view.points === 0) {
+			if (view.points === 0 && !noLines) {
 				body.append(el("div", "muted", view.player ? "Nothing is recorded for this player on this map yet." : "Nothing is recorded here yet."));
 			}
 			panel.append(body);

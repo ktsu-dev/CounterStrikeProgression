@@ -18,6 +18,10 @@ public sealed class HeatmapTests
 
 	private static readonly DateTime At = new(2026, 10, 18, 12, 0, 0, DateTimeKind.Utc);
 
+	// Lines on de_dust2 between cells (13, 25) and (38, 50): [killer column, killer row, victim column, victim row, death, count].
+	private static readonly int[] RepeatedKillLine = [13, 25, 38, 50, 0, 2];
+	private static readonly int[] DeathLine = [38, 50, 13, 25, 1, 1];
+
 	public TestContext TestContext { get; set; } = null!;
 
 	private static KillPoint Kill(string map = "de_dust2", ulong killer = TestHelpers.SteamId, ulong victim = Other, short x = 0, short y = 0, short victimX = 10, short victimY = 10) =>
@@ -220,12 +224,12 @@ public sealed class HeatmapTests
 	public void ViewFitsUnknownMapsAndHidesTheRadarForThem()
 	{
 		HeatPoint[] points = [new(0, 0), new(100, 100)];
-		HeatmapView known = HeatmapViewBuilder.Build([new MapPointCount("de_dust2", 2)], "de_dust2", HeatmapKind.Kills, null, points, points, "/radar/de_dust2.png");
+		HeatmapView known = HeatmapViewBuilder.Build([new MapPointCount("de_dust2", 2)], "de_dust2", HeatmapTab.Kills, null, points, points, "/radar/de_dust2.png");
 		Assert.IsTrue(known.Calibrated);
 		Assert.AreEqual("/radar/de_dust2.png", known.Radar);
 		Assert.AreEqual(2, known.Points);
 
-		HeatmapView unknown = HeatmapViewBuilder.Build([new MapPointCount("de_custom", 2)], "de_custom", HeatmapKind.Deaths, null, points, points, "/radar/de_custom.png");
+		HeatmapView unknown = HeatmapViewBuilder.Build([new MapPointCount("de_custom", 2)], "de_custom", HeatmapTab.Deaths, null, points, points, "/radar/de_custom.png");
 		Assert.IsFalse(unknown.Calibrated);
 		Assert.IsNull(unknown.Radar);
 		Assert.AreEqual(2, unknown.Points);
@@ -256,7 +260,7 @@ public sealed class HeatmapTests
 
 			IResult player = await HeatmapEndpoints.HeatmapsAsync("de_dust2", "deaths", Other.ToString(System.Globalization.CultureInfo.InvariantCulture), heatmaps, reader, radars, token).ConfigureAwait(false);
 			HeatmapView deaths = ((Ok<HeatmapView>)player).Value!;
-			Assert.AreEqual(HeatmapKind.Deaths, deaths.Kind);
+			Assert.AreEqual(HeatmapTab.Deaths, deaths.Kind);
 			Assert.AreEqual(Other, deaths.Player!.SteamId);
 			Assert.AreEqual(1, deaths.Points);
 			Assert.IsNull(deaths.Radar);
@@ -271,6 +275,46 @@ public sealed class HeatmapTests
 		{
 			Directory.Delete(directory, recursive: true);
 		}
+	}
+
+	[TestMethod]
+	public async Task Endpoint_LinesForAStoredMapAndNoneForAnUncalibratedOne()
+	{
+		InMemoryKillMapStore store = new();
+		CancellationToken token = TestContext.CancellationToken;
+
+		// On de_dust2 these world positions are radar pixels just past (104, 204) and (304, 404), so cells (13, 25) and (38, 50).
+		await store.AddAsync(
+		[
+			Kill(x: -2018, y: 2341, victimX: -1138, victimY: 1461),
+			Kill(x: -2018, y: 2341, victimX: -1138, victimY: 1461),
+			Kill(killer: Other, victim: TestHelpers.SteamId, x: -1138, y: 1461, victimX: -2018, victimY: 2341),
+			Kill("de_custom"),
+		], 100, 100, token).ConfigureAwait(false);
+		using HeatmapReader heatmaps = new(store);
+		using ProgressReader reader = new(new InMemoryProgressionStore());
+		RadarImages radars = new(new SiteOptions { DataPath = Path.Combine(Path.GetTempPath(), "csp-lines-" + Guid.NewGuid().ToString("N")) });
+
+		HeatmapView server = ((Ok<HeatmapView>)await HeatmapEndpoints.HeatmapsAsync("de_dust2", "lines", null, heatmaps, reader, radars, token).ConfigureAwait(false)).Value!;
+		Assert.AreEqual(HeatmapTab.Lines, server.Kind);
+		Assert.HasCount(2, server.Lines);
+		Assert.IsEmpty(server.Cells);
+		Assert.AreEqual(3, server.Points);
+		Assert.AreEqual(2, server.Max);
+		Assert.IsTrue(server.Lines.All(l => l[4] == 0));
+		CollectionAssert.AreEqual(RepeatedKillLine, server.Lines.Single(l => l[5] == 2));
+
+		HeatmapView player = ((Ok<HeatmapView>)await HeatmapEndpoints.HeatmapsAsync("de_dust2", "lines", TestHelpers.SteamId.ToString(System.Globalization.CultureInfo.InvariantCulture), heatmaps, reader, radars, token).ConfigureAwait(false)).Value!;
+		Assert.HasCount(2, player.Lines);
+		CollectionAssert.AreEqual(DeathLine, player.Lines.Single(l => l[4] == 1));
+
+		HeatmapView custom = ((Ok<HeatmapView>)await HeatmapEndpoints.HeatmapsAsync("de_custom", "lines", null, heatmaps, reader, radars, token).ConfigureAwait(false)).Value!;
+		Assert.IsFalse(custom.Calibrated);
+		Assert.IsEmpty(custom.Lines);
+
+		HeatmapView kills = ((Ok<HeatmapView>)await HeatmapEndpoints.HeatmapsAsync("de_dust2", null, null, heatmaps, reader, radars, token).ConfigureAwait(false)).Value!;
+		Assert.AreEqual(HeatmapTab.Kills, kills.Kind);
+		Assert.IsEmpty(kills.Lines);
 	}
 
 	[TestMethod]
