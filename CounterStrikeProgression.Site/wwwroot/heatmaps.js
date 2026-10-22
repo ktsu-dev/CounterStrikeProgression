@@ -164,11 +164,19 @@
 		context.lineWidth = 1.5;
 		context.lineCap = "round";
 		for (const [x1, y1, x2, y2, death, count] of view.lines) {
-			const rgb = !view.player ? LINE_COLORS.server : death ? LINE_COLORS.death : LINE_COLORS.kill;
-			context.strokeStyle = `rgba(${rgb.join(",")},${Math.min(1, LINE_ALPHA * count).toFixed(3)})`;
+			const rgb = (!view.player ? LINE_COLORS.server : death ? LINE_COLORS.death : LINE_COLORS.kill).join(",");
+			const fromX = (x1 + 0.5) * size;
+			const fromY = (y1 + 0.5) * size;
+			const toX = (x2 + 0.5) * size;
+			const toY = (y2 + 0.5) * size;
+			// Each line fades in from nothing at the shooter, so its bright end marks where the victim fell.
+			const fade = context.createLinearGradient(fromX, fromY, toX, toY);
+			fade.addColorStop(0, `rgba(${rgb},0)`);
+			fade.addColorStop(1, `rgba(${rgb},${Math.min(1, LINE_ALPHA * count).toFixed(3)})`);
+			context.strokeStyle = fade;
 			context.beginPath();
-			context.moveTo((x1 + 0.5) * size, (y1 + 0.5) * size);
-			context.lineTo((x2 + 0.5) * size, (y2 + 0.5) * size);
+			context.moveTo(fromX, fromY);
+			context.lineTo(toX, toY);
 			context.stroke();
 		}
 		context.restore();
