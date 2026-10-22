@@ -37,7 +37,7 @@ internal sealed class ContractProgress
 }
 
 /// <summary>
-/// How many times a player has killed one other human.
+/// How many times a player has killed one other player.
 /// </summary>
 internal sealed class RivalProgress
 {
@@ -146,11 +146,11 @@ internal sealed class PlayerProgress(ulong steamId)
 	/// <summary>Gets the player's totals on each map they've played, keyed by the map's stored name.</summary>
 	public Dictionary<string, MapProgress> Maps { get; } = new(StringComparer.Ordinal);
 
-	/// <summary>Gets the humans the player has killed, keyed by their Steam ID. Saved to <c>csp_rivals</c>.</summary>
+	/// <summary>Gets the players the player has killed, keyed by their Steam ID. Saved to <c>csp_rivals</c>.</summary>
 	public Dictionary<ulong, RivalProgress> Victims { get; } = [];
 
 	/// <summary>
-	/// Gets how many times each human has killed the player, keyed by their Steam ID. Not saved, because each count is
+	/// Gets how many times each player has killed the player, keyed by their Steam ID. Not saved, because each count is
 	/// the other player's own row.
 	/// </summary>
 	public Dictionary<ulong, long> KilledBy { get; } = [];

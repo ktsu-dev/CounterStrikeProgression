@@ -156,7 +156,7 @@ internal interface IProgressionStore
 	public Task<IReadOnlyList<SeasonStanding>> SeasonStandingsAsync(DateOnly start, int count, CancellationToken cancellationToken);
 
 	/// <summary>
-	/// Gets a player's record against the humans they've killed or been killed by.
+	/// Gets a player's record against the players they've killed or been killed by.
 	/// </summary>
 	/// <param name="steamId">The 64-bit Steam ID.</param>
 	/// <param name="count">How many to return.</param>

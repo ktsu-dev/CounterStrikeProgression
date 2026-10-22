@@ -7,6 +7,7 @@ using ktsu.CounterStrikeProgression.Core.Discord;
 using ktsu.CounterStrikeProgression.Core.Events;
 using ktsu.CounterStrikeProgression.Core.Floaties;
 using ktsu.CounterStrikeProgression.Core.Live;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.Records;
@@ -90,6 +91,36 @@ public sealed class RecordTests
 		CombatEvent botKill = RifleKill(1500) with { VictimIsBot = true };
 
 		Assert.IsEmpty(Records(LoadedEngine().ApplyCombat(TestHelpers.Player(), botKill)));
+		Assert.HasCount(1, Records(LoadedEngine(s => s.RecordsCountBots = true).ApplyCombat(TestHelpers.Player(), botKill)));
+	}
+
+	[TestMethod]
+	public void BotNeverSetsAKillRecord()
+	{
+		ProgressionEngine engine = LoadedEngine(s => s.RecordsCountBots = true);
+		PlayerProgress bot = new(BotIds.For("Muhlik")) { Name = "Muhlik" };
+		CombatEvent kill = TestHelpers.Kill("awp") with { Distance = 60 / 0.0254 };
+
+		Assert.IsEmpty(Records(engine.ApplyCombat(bot, kill)));
+		Assert.IsNull(engine.Records.Holder(RecordCatalog.LongestKillId(WeaponClass.Sniper)));
+		Assert.HasCount(1, Records(engine.ApplyCombat(TestHelpers.Player(), kill)));
+	}
+
+	[TestMethod]
+	public void BotNeverSetsALifeOrMapRecord()
+	{
+		ProgressionEngine engine = LoadedEngine(s => s.RecordsCountBots = true);
+		PlayerProgress bot = new(BotIds.For("Muhlik")) { Name = "Muhlik" };
+
+		Assert.IsEmpty(Records(engine.ApplyLifeRecords(bot, new LifeTotals(10, 0, 40, 30, 0))));
+		Assert.IsEmpty(Records(engine.ApplyMapRecords(bot, 20, 20)));
+	}
+
+	[TestMethod]
+	public void HumanStillSetsARecordAgainstBotsWhenTheyCount()
+	{
+		CombatEvent botKill = TestHelpers.Kill("awp") with { Distance = 60 / 0.0254, VictimIsBot = true };
+
 		Assert.HasCount(1, Records(LoadedEngine(s => s.RecordsCountBots = true).ApplyCombat(TestHelpers.Player(), botKill)));
 	}
 

@@ -5,7 +5,7 @@ namespace ktsu.CounterStrikeProgression.Core.Rivals;
 using ktsu.CounterStrikeProgression.Core.Progression;
 
 /// <summary>
-/// A player's record against one other human.
+/// A player's record against one other player.
 /// </summary>
 /// <param name="SteamId">The other player's 64-bit Steam ID.</param>
 /// <param name="Name">The other player's last known name.</param>
@@ -14,7 +14,7 @@ using ktsu.CounterStrikeProgression.Core.Progression;
 internal sealed record HeadToHead(ulong SteamId, string Name, long Kills, long Deaths);
 
 /// <summary>
-/// Kills between pairs of human players: who each player kills most, and who kills them most. Each player's kills
+/// Kills between pairs of players, bots with a persona included: who each player kills most, and who kills them most. Each player's kills
 /// are saved on their own <c>csp_rivals</c> rows, and the deaths are the other side of someone else's rows, kept in
 /// memory so a nemesis can be found without a query. Counts only go up.
 /// </summary>

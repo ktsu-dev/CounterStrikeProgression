@@ -6,6 +6,7 @@ using System.Data.Common;
 using System.Globalization;
 using ktsu.CounterStrikeProgression.Core.Admin;
 using ktsu.CounterStrikeProgression.Core.Floaties;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Records;
@@ -83,6 +84,22 @@ public sealed class RivalTests
 		Assert.AreEqual(engine.Settings.NemesisKillXp, result.XpGained);
 		Assert.AreEqual(engine.Settings.NemesisKillXp, me.RankXp);
 		Assert.Contains("Nemesis down", FloatieMerger.Labels(result).ToList());
+	}
+
+	[TestMethod]
+	public void BotNemesisPaysTheNemesisBonus()
+	{
+		ProgressionEngine engine = TestHelpers.Engine();
+		PlayerProgress me = new(76561197960265729) { Name = "Human" };
+		PlayerProgress bot = new(BotIds.For("Muhlik")) { Name = "Muhlik" };
+		Kills(engine, bot, me, engine.Settings.NemesisMinimumKills);
+
+		ProgressionResult result = engine.ApplyRivalKill(me, bot);
+
+		ProgressionNotice notice = Assert.ContainsSingle(result.Notices);
+		Assert.AreEqual(NoticeKind.NemesisKilled, notice.Kind);
+		Assert.AreEqual("Muhlik", notice.PlayerName);
+		Assert.AreEqual(engine.Settings.NemesisKillXp, notice.Xp);
 	}
 
 	[TestMethod]

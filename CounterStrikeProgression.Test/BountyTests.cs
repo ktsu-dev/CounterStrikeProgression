@@ -23,7 +23,7 @@ public sealed class BountyTests
 		List<BountyChange> changes = [];
 		for (int i = 0; i < kills; i++)
 		{
-			changes.AddRange(board.Kill(slot, Victim, killerIsBot: false, teamkill: false, killerLoaded: true));
+			changes.AddRange(board.Kill(slot, Victim, killerUntracked: false, teamkill: false, killerLoaded: true));
 		}
 
 		return changes;
@@ -63,7 +63,7 @@ public sealed class BountyTests
 		BountyBoard board = Board();
 		Streak(board, Leader, 7);
 
-		IReadOnlyList<BountyChange> changes = board.Kill(Hunter, Leader, killerIsBot: false, teamkill: false, killerLoaded: true);
+		IReadOnlyList<BountyChange> changes = board.Kill(Hunter, Leader, killerUntracked: false, teamkill: false, killerLoaded: true);
 
 		Assert.HasCount(1, changes);
 		Assert.AreEqual(new BountyChange(BountyChangeKind.Collected, Leader, 7, 350, Hunter), changes[0]);
@@ -73,12 +73,12 @@ public sealed class BountyTests
 	}
 
 	[TestMethod]
-	public void AKillerWhoCantCollectLeavesTheBountyUnclaimed()
+	public void AnUntrackedKillerLeavesTheBountyUnclaimed()
 	{
 		BountyBoard board = Board();
 		Streak(board, Leader, 5);
 
-		IReadOnlyList<BountyChange> changes = board.Kill(Hunter, Leader, killerIsBot: true, teamkill: false, killerLoaded: false);
+		IReadOnlyList<BountyChange> changes = board.Kill(Hunter, Leader, killerUntracked: true, teamkill: false, killerLoaded: false);
 
 		Assert.HasCount(1, changes);
 		Assert.AreEqual(BountyChangeKind.Lost, changes[0].Kind);
@@ -121,7 +121,7 @@ public sealed class BountyTests
 		Streak(board, Leader, 8);
 		Streak(board, Hunter, 6);
 
-		IReadOnlyList<BountyChange> changes = board.Kill(third, Leader, killerIsBot: false, teamkill: false, killerLoaded: true);
+		IReadOnlyList<BountyChange> changes = board.Kill(third, Leader, killerUntracked: false, teamkill: false, killerLoaded: true);
 
 		Assert.HasCount(2, changes);
 		Assert.AreEqual(BountyChangeKind.Collected, changes[0].Kind);
@@ -130,13 +130,30 @@ public sealed class BountyTests
 	}
 
 	[TestMethod]
-	public void ABotNeverCarriesABounty()
+	public void TrackedBotCarriesAndLosesTheBounty()
+	{
+		BountyBoard board = Board();
+
+		List<BountyChange> placed = Streak(board, Leader, 5);
+		Assert.AreEqual(BountyChangeKind.Placed, placed.Single().Kind);
+		Assert.AreEqual(Leader, placed.Single().HolderSlot);
+
+		IReadOnlyList<BountyChange> changes = board.Kill(Hunter, Leader, killerUntracked: false, teamkill: false, killerLoaded: true);
+
+		BountyChange collected = Assert.ContainsSingle(changes);
+		Assert.AreEqual(BountyChangeKind.Collected, collected.Kind);
+		Assert.AreEqual(Hunter, collected.CollectorSlot);
+		Assert.AreEqual(board.Value(5), collected.Xp);
+	}
+
+	[TestMethod]
+	public void UntrackedKillerNeitherScoresNorCollects()
 	{
 		BountyBoard board = Board();
 
 		for (int i = 0; i < 10; i++)
 		{
-			Assert.IsEmpty(board.Kill(Leader, Victim, killerIsBot: true, teamkill: false, killerLoaded: false));
+			Assert.IsEmpty(board.Kill(Leader, Victim, killerUntracked: true, teamkill: false, killerLoaded: false));
 		}
 
 		Assert.IsNull(board.HolderSlot);
@@ -242,7 +259,7 @@ public sealed class BountyTests
 		BountyBoard board = Board();
 		Streak(board, Leader, 5);
 
-		IReadOnlyList<BountyChange> changes = board.Kill(Hunter, Leader, killerIsBot: false, teamkill: true, killerLoaded: true);
+		IReadOnlyList<BountyChange> changes = board.Kill(Hunter, Leader, killerUntracked: false, teamkill: true, killerLoaded: true);
 
 		Assert.AreEqual(BountyChangeKind.Lost, changes.Single().Kind);
 		Assert.AreEqual(0, board.StreakOf(Hunter));
@@ -254,7 +271,7 @@ public sealed class BountyTests
 		BountyBoard board = Board();
 		Streak(board, Leader, 5);
 
-		IReadOnlyList<BountyChange> changes = board.Kill(Hunter, Leader, killerIsBot: false, teamkill: false, killerLoaded: false);
+		IReadOnlyList<BountyChange> changes = board.Kill(Hunter, Leader, killerUntracked: false, teamkill: false, killerLoaded: false);
 
 		Assert.AreEqual(BountyChangeKind.Lost, changes.Single().Kind);
 		Assert.AreEqual(1, board.StreakOf(Hunter));

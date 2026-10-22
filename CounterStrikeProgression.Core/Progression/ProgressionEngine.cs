@@ -6,6 +6,7 @@ using ktsu.CounterStrikeProgression.Core.Challenges;
 using ktsu.CounterStrikeProgression.Core.Contracts;
 using ktsu.CounterStrikeProgression.Core.Events;
 using ktsu.CounterStrikeProgression.Core.Feats;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.Rivals;
 using ktsu.CounterStrikeProgression.Core.Rotation;
@@ -244,9 +245,9 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 	}
 
 	/// <summary>
-	/// Counts a kill of one human by another toward their head-to-head, and pays
+	/// Counts a kill of one player by another toward their head-to-head, and pays
 	/// <see cref="ProgressionSettings.NemesisKillXp"/> when the victim was the killer's nemesis. Call it alongside
-	/// <see cref="ApplyCombat"/> for kills between humans who aren't teammates. Bots never count.
+	/// <see cref="ApplyCombat"/> for kills between players who aren't teammates, bots included.
 	/// </summary>
 	/// <param name="killer">The killer's progress.</param>
 	/// <param name="victim">The victim's progress.</param>
@@ -467,7 +468,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 	}
 
 	/// <summary>
-	/// Pays a bounty to the player who ended its holder's streak. It's paid in full, because the holder is always human.
+	/// Pays a bounty to the player who ended its holder's streak. It's paid in full, whoever held it.
 	/// </summary>
 	/// <param name="player">The collector's progress.</param>
 	/// <param name="holderName">The name of the player whose streak ended.</param>
@@ -558,6 +559,12 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 
 	private void TryRecord(PlayerProgress player, string id, double value, ProgressionResult result, WeaponInfo? weapon = null)
 	{
+		// Records are human-only, even when RecordsCountBots lets a human's kills on bots count.
+		if (BotIds.IsBot(player.SteamId))
+		{
+			return;
+		}
+
 		if (Settings.RecordsEnabled
 			&& (Records.TryBreak(RecordCatalog.Get(id), player.SteamId, player.Name, value, Time.GetUtcNow().UtcDateTime) is { } broken))
 		{

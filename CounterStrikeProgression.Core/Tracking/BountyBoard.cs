@@ -18,7 +18,7 @@ internal enum BountyChangeKind
 	/// <summary>Another player ended the holder's streak and collects the bounty.</summary>
 	Collected,
 
-	/// <summary>The holder's streak ended with no one to pay, such as a suicide, a bot, or leaving.</summary>
+	/// <summary>The holder's streak ended with no one to pay, such as a suicide, an untracked bot, or leaving.</summary>
 	Lost,
 }
 
@@ -33,14 +33,14 @@ internal enum BountyChangeKind
 internal sealed record BountyChange(BountyChangeKind Kind, int HolderSlot, int Kills, long Xp, int? CollectorSlot = null);
 
 /// <summary>
-/// Puts a bounty on the human player with the longest current life streak, once it reaches
+/// Puts a bounty on the player with the longest current life streak, once it reaches
 /// <see cref="ProgressionSettings.BountyStartKills"/>, and pays it to whoever ends that streak.
 /// </summary>
 /// <remarks>
 /// The bounty is worth <see cref="ProgressionSettings.BountyXpPerKill"/> for every kill in the streak, so it grows
 /// with each kill. When another player's streak passes the holder's, the bounty moves to them. When the holder's
-/// streak ends, the next longest streak still over the threshold takes it. Bots never carry a bounty. Ties keep the
-/// current holder, and otherwise go to the lowest slot.
+/// streak ends, the next longest streak still over the threshold takes it. A bot with a persona carries and collects a bounty like a human, and a bot
+/// without one never does. Ties keep the current holder, and otherwise go to the lowest slot.
 /// </remarks>
 /// <param name="settings">The bounty settings.</param>
 internal sealed class BountyBoard(ProgressionSettings settings)
@@ -57,7 +57,7 @@ internal sealed class BountyBoard(ProgressionSettings settings)
 	/// Gets a player's current life streak.
 	/// </summary>
 	/// <param name="slot">The player's slot.</param>
-	/// <returns>Their kills since they last died, or 0 for a bot.</returns>
+	/// <returns>Their kills since they last died, or 0 for an untracked bot.</returns>
 	public int StreakOf(int slot) => streaks.GetValueOrDefault(slot);
 
 	/// <summary>
@@ -72,11 +72,11 @@ internal sealed class BountyBoard(ProgressionSettings settings)
 	/// </summary>
 	/// <param name="killerSlot">The killer's slot.</param>
 	/// <param name="victimSlot">The victim's slot.</param>
-	/// <param name="killerIsBot">Whether the killer is a bot, which neither carries nor collects a bounty.</param>
+	/// <param name="killerUntracked">Whether the killer is a bot with no persona, which neither carries nor collects a bounty.</param>
 	/// <param name="teamkill">Whether the victim was the killer's teammate, which neither adds to a streak nor pays.</param>
 	/// <param name="killerLoaded">Whether the killer's progress has loaded, without which a bounty can't be paid.</param>
 	/// <returns>What happened to the bounty, in order.</returns>
-	public IReadOnlyList<BountyChange> Kill(int killerSlot, int victimSlot, bool killerIsBot, bool teamkill, bool killerLoaded)
+	public IReadOnlyList<BountyChange> Kill(int killerSlot, int victimSlot, bool killerUntracked, bool teamkill, bool killerLoaded)
 	{
 		List<BountyChange> changes = [];
 		if (!Enabled)
@@ -84,7 +84,7 @@ internal sealed class BountyBoard(ProgressionSettings settings)
 			return changes;
 		}
 
-		bool scores = !killerIsBot && !teamkill && (killerSlot != victimSlot);
+		bool scores = !killerUntracked && !teamkill && (killerSlot != victimSlot);
 		EndStreak(victimSlot, scores && killerLoaded ? killerSlot : null, changes);
 		if (scores)
 		{
