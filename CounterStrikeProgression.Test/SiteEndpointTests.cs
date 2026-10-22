@@ -6,6 +6,7 @@ using System.Threading.Channels;
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Maps;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.Rivals;
@@ -149,6 +150,15 @@ public sealed class SiteEndpointTests
 	}
 
 	[TestMethod]
+	public void TryParseSteamId_TakesABotId()
+	{
+		Assert.IsTrue(ProgressReader.TryParseSteamId("10000000062568863", out ulong botId));
+		Assert.AreEqual(10000000062568863UL, botId);
+		Assert.IsFalse(ProgressReader.TryParseSteamId("10000000100000000", out _));
+		Assert.IsFalse(ProgressReader.TryParseSteamId("10000000062568863 ", out _));
+	}
+
+	[TestMethod]
 	[DataRow(null)]
 	[DataRow("")]
 	[DataRow("abc")]
@@ -197,6 +207,19 @@ public sealed class SiteEndpointTests
 
 		Ok<PlayerView> ok = Assert.IsInstanceOfType<Ok<PlayerView>>(result);
 		Assert.AreEqual("Tester", ok.Value?.Name);
+	}
+
+	[TestMethod]
+	public async Task PlayerPage_ServesABotPersona()
+	{
+		InMemoryProgressionStore store = new();
+		await store.SaveAsync(ProgressSnapshot.CaptureAll(new PlayerProgress(BotIds.For("Muhlik")) { Name = "Muhlik" }), CancellationToken.None).ConfigureAwait(false);
+		using ProgressReader reader = new(store);
+
+		IResult result = await Endpoints.PlayerAsync("10000000062568863", null, reader, NewState(), new FeatIndex(), CancellationToken.None).ConfigureAwait(false);
+
+		Ok<PlayerView> ok = Assert.IsInstanceOfType<Ok<PlayerView>>(result);
+		Assert.AreEqual("Muhlik", ok.Value?.Name);
 	}
 
 	[TestMethod]

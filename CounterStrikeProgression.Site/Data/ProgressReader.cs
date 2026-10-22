@@ -3,6 +3,7 @@
 namespace ktsu.CounterStrikeProgression.Site.Data;
 
 using System.Globalization;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Storage;
 
@@ -49,11 +50,13 @@ internal sealed partial class ProgressReader(IProgressionStore store, TimeProvid
 	private readonly Dictionary<ulong, Lazy<Task<IReadOnlyList<SeasonResult>>>> loadingResults = [];
 
 	/// <summary>
-	/// Parses a SteamID64 from a URL.
+	/// Parses a player id from a URL: a human's SteamID64 or a bot persona's id.
 	/// </summary>
 	/// <param name="text">The text.</param>
-	/// <param name="steamId">The Steam ID, or 0 when the text isn't one.</param>
-	/// <returns><see langword="true"/> when the text is only ASCII digits and names an individual account.</returns>
+	/// <param name="steamId">The id, or 0 when the text isn't one.</param>
+	/// <returns>
+	/// <see langword="true"/> when the text is 17 ASCII digits naming an individual account or a bot id from <see cref="BotIds"/>.
+	/// </returns>
 	public static bool TryParseSteamId(string? text, out ulong steamId)
 	{
 		steamId = 0;
@@ -62,7 +65,7 @@ internal sealed partial class ProgressReader(IProgressionStore store, TimeProvid
 			return false;
 		}
 
-		if (!ulong.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out ulong parsed) || parsed is < MinSteamId or > MaxSteamId)
+		if (!ulong.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out ulong parsed) || ((parsed is < MinSteamId or > MaxSteamId) && !BotIds.IsBot(parsed)))
 		{
 			return false;
 		}

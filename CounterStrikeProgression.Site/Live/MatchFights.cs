@@ -33,7 +33,8 @@ internal sealed partial class MatchFights(IKillMapStore store, ILogger<MatchFigh
 
 	/// <summary>
 	/// Takes a batch's kills. A snapshot on a new map, or with a later <see cref="ServerSnapshot.MapStartedAt"/>,
-	/// starts a new match first. Kills on another map, from before the match started, or already held are left out.
+	/// starts a new match first. Kills on another map, from before the match started, or already held are left out, and so
+	/// are kills with no id on either end, between two bots that have no persona. A bot persona's kills are kept like a human's.
 	/// </summary>
 	/// <param name="snapshot">The batch's server snapshot.</param>
 	/// <param name="kills">The batch's kills, or <see langword="null"/> when it carried none.</param>

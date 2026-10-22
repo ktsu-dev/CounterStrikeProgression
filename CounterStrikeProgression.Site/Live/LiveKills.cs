@@ -3,14 +3,15 @@
 namespace ktsu.CounterStrikeProgression.Site.Live;
 
 using ktsu.CounterStrikeProgression.Core.Heatmaps;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
 /// <summary>One kill as the live map draws it, with both ends in radar pixels.</summary>
 /// <param name="Map">The map.</param>
 /// <param name="KillerName">The killer's name, or <see langword="null"/> when the plugin sent none.</param>
 /// <param name="VictimName">The victim's name, or <see langword="null"/> when the plugin sent none.</param>
-/// <param name="KillerIsBot">Whether the killer is a bot.</param>
-/// <param name="VictimIsBot">Whether the victim is a bot.</param>
+/// <param name="KillerIsBot">Whether the killer is a bot: a bot persona, or a bot with no id.</param>
+/// <param name="VictimIsBot">Whether the victim is a bot: a bot persona, or a bot with no id.</param>
 /// <param name="KillerX">The killer's radar pixel column, or <see langword="null"/> when the killer stood off the radar.</param>
 /// <param name="KillerY">The killer's radar pixel row, or <see langword="null"/> when the killer stood off the radar.</param>
 /// <param name="VictimX">The victim's radar pixel column, from 0 at the left to <see cref="MapOverview.Size"/>.</param>
@@ -69,8 +70,8 @@ internal static class LiveKills
 				kill.Map,
 				kill.KillerName,
 				kill.VictimName,
-				KillerIsBot: kill.KillerId == 0,
-				VictimIsBot: kill.VictimId == 0,
+				KillerIsBot: IsBot(kill.KillerId),
+				VictimIsBot: IsBot(kill.VictimId),
 				killerOnRadar ? killerX : null,
 				killerOnRadar ? killerY : null,
 				victimX,
@@ -85,4 +86,6 @@ internal static class LiveKills
 
 	private static bool IsOnRadar(double x, double y) =>
 		(x >= 0) && (x <= MapOverview.Size) && (y >= 0) && (y <= MapOverview.Size);
+
+	private static bool IsBot(ulong id) => (id == 0) || BotIds.IsBot(id);
 }

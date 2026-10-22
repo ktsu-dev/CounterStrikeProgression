@@ -8,7 +8,7 @@ using ktsu.CounterStrikeProgression.Core.Live;
 
 /// <summary>Where one player is on the radar right now.</summary>
 /// <param name="Slot">The player's slot.</param>
-/// <param name="SteamId">The 64-bit Steam ID as a decimal string, or <see langword="null"/> for a bot.</param>
+/// <param name="SteamId">The 64-bit Steam ID or bot persona id as a decimal string, or <see langword="null"/> for a bot with no id.</param>
 /// <param name="Name">The player's name.</param>
 /// <param name="IsBot">Whether the player is a bot.</param>
 /// <param name="Alive">Whether the player is alive.</param>
@@ -86,7 +86,7 @@ internal static class LivePositions
 			return null;
 		}
 
-		string? steamId = player.IsBot ? null : player.SteamId.ToString(CultureInfo.InvariantCulture);
+		string? steamId = player.SteamId == 0 ? null : player.SteamId.ToString(CultureInfo.InvariantCulture);
 		return new PlayerPosition(player.Slot, steamId, player.Name, player.IsBot, player.Alive ?? true, x, y, FacingOf(player.Yaw ?? 0));
 	}
 }

@@ -95,7 +95,7 @@ internal static class Endpoints
 		Dictionary<string, IReadOnlyList<string>> earned = [];
 		foreach (LivePlayer player in snapshot?.Players ?? [])
 		{
-			if (!player.IsBot && (feats.For(player.SteamId) is { Count: > 0 } ids))
+			if ((player.SteamId != 0) && (feats.For(player.SteamId) is { Count: > 0 } ids))
 			{
 				earned[player.SteamId.ToString(CultureInfo.InvariantCulture)] = ids;
 			}

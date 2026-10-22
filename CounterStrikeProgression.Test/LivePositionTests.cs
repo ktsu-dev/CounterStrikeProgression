@@ -7,6 +7,7 @@ using System.Threading.Channels;
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Heatmaps;
 using ktsu.CounterStrikeProgression.Core.Live;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Site;
 using ktsu.CounterStrikeProgression.Site.Data;
 using ktsu.CounterStrikeProgression.Site.Live;
@@ -92,6 +93,16 @@ public sealed class LivePositionTests
 		PlayerPosition bot = Assert.ContainsSingle(view.Players);
 		Assert.IsTrue(bot.IsBot);
 		Assert.IsNull(bot.SteamId);
+	}
+
+	[TestMethod]
+	public void BotPersonaKeepsItsId()
+	{
+		LivePlayer persona = new(5, BotIds.For("Muhlik"), "Muhlik", true, 0, 0, 0, 0, 0, 0, 0, true);
+		PositionsView view = LivePositions.From(Server(Dust, persona, Player(6, 0, 0, isBot: true)), null);
+
+		Assert.AreEqual("10000000062568863", view.Players.Single(p => p.Slot == 5).SteamId);
+		Assert.IsNull(view.Players.Single(p => p.Slot == 6).SteamId);
 	}
 
 	[TestMethod]

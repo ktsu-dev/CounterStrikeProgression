@@ -7,7 +7,9 @@ using System.Threading.Channels;
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Heatmaps;
 using ktsu.CounterStrikeProgression.Core.Live;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Progression;
+using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 using ktsu.CounterStrikeProgression.Site;
@@ -102,18 +104,57 @@ public sealed class SiteLiveTests
 	}
 
 	[TestMethod]
-	public void IsPlaying_NeedsAnOnlineNonBotPlayer()
+	public void IsPlaying_NeedsAnOnlinePlayerWithAnId()
 	{
 		ManualTime time = new();
 		LiveState state = NewState(time);
-		state.Apply(Batch(Server(Start, "de_dust2", Human(1), new LivePlayer(1, 2, "Bot", true, 0, 0, 0, 0))));
+		state.Apply(Batch(Server(Start, "de_dust2", Human(1), new LivePlayer(1, 0, "Bot", true, 0, 0, 0, 0))));
 
 		Assert.IsTrue(state.IsPlaying(1));
-		Assert.IsFalse(state.IsPlaying(2));
+		Assert.IsFalse(state.IsPlaying(0));
 		Assert.IsFalse(state.IsPlaying(3));
 
 		time.Advance(TimeSpan.FromSeconds(30));
 		Assert.IsFalse(state.IsPlaying(1));
+	}
+
+	[TestMethod]
+	public void IsPlaying_CountsABotPersona()
+	{
+		LiveState state = NewState(new ManualTime());
+		state.Apply(Batch(Server(Start, "de_dust2", new LivePlayer(3, BotIds.For("Muhlik"), "Muhlik", IsBot: true, 0, 0, 0, 0))));
+
+		Assert.IsTrue(state.IsPlaying(BotIds.For("Muhlik")));
+		Assert.IsFalse(state.IsPlaying(0));
+	}
+
+	private static FeedEntry RankUp(ulong steamId, string name) =>
+		new(Start, steamId, name, FeedKind.RankUp, "Rank up: Silver II", null, 5);
+
+	private static LiveBatch HumanAndBotRankUps() =>
+		Batch(Server(Start), [RankUp(BotIds.For("Muhlik"), "Muhlik"), RankUp(76561197960265729, "Tester")]);
+
+	[TestMethod]
+	public void BotMomentsStayOffTheGlobalFeed()
+	{
+		LiveState state = NewState(new ManualTime());
+
+		LiveChanges changes = state.Apply(HumanAndBotRankUps());
+
+		Assert.AreEqual(76561197960265729UL, Assert.ContainsSingle(state.Feed).SteamId);
+		Assert.AreEqual(76561197960265729UL, Assert.ContainsSingle(changes.NewFeed).SteamId);
+		Assert.AreEqual("Muhlik", Assert.ContainsSingle(state.PlayerFeed(BotIds.For("Muhlik"))).PlayerName);
+	}
+
+	[TestMethod]
+	public void FeedStore_KeepsABotsEntriesInItsOwnFileOnly()
+	{
+		NewState(new ManualTime()).Apply(HumanAndBotRankUps());
+
+		LiveState second = NewState(new ManualTime());
+
+		Assert.AreEqual(76561197960265729UL, Assert.ContainsSingle(second.Feed).SteamId);
+		Assert.HasCount(1, second.PlayerFeed(BotIds.For("Muhlik")));
 	}
 
 	[TestMethod]
@@ -216,6 +257,50 @@ public sealed class SiteLiveTests
 		string[] files = [.. Directory.GetFiles(Path.Combine(directory, "players")).Select(f => Path.GetFileName(f)).Order(StringComparer.Ordinal)];
 		string[] expectedFiles = ["1.json", "3.json"];
 		CollectionAssert.AreEqual(expectedFiles, files);
+	}
+
+	private static MapRecap RecapFor(ulong steamId, DateTime endedAt) =>
+		new(steamId, "Player", "de_dust2", Start, endedAt, 100, 1, 1, 0, 0, 0, 0, 0, null);
+
+	[TestMethod]
+	public void PlayerFeed_PastTheLimit_DropsBotsBeforeAHuman()
+	{
+		SiteOptions options = new() { PlayerFeedPlayers = 2 };
+		LiveState state = NewState(new ManualTime(), options);
+		state.Apply(Batch(Server(Start), [EntryFor(TestHelpers.SteamId, 1)]) with { Recaps = [RecapFor(TestHelpers.SteamId, Start.AddSeconds(1))] });
+		ulong[] bots = [BotIds.For("Muhlik"), BotIds.For("Rock"), BotIds.For("Vinny")];
+
+		state.Apply(Batch(Server(Start.AddSeconds(2)), [.. bots.Select((id, i) => EntryFor(id, 10 + i))]) with
+		{
+			Recaps = [.. bots.Select((id, i) => RecapFor(id, Start.AddSeconds(10 + i)))],
+		});
+
+		Assert.HasCount(1, state.PlayerFeed(TestHelpers.SteamId));
+		Assert.IsNotNull(state.LastSession(TestHelpers.SteamId));
+		Assert.HasCount(1, state.PlayerFeed(BotIds.For("Vinny")));
+		Assert.IsNotNull(state.LastSession(BotIds.For("Vinny")));
+		Assert.IsEmpty(state.PlayerFeed(BotIds.For("Muhlik")));
+		Assert.IsNull(state.LastSession(BotIds.For("Rock")));
+
+		LiveState second = NewState(new ManualTime(), options);
+		Assert.HasCount(1, second.PlayerFeed(TestHelpers.SteamId));
+		Assert.IsNotNull(second.LastSession(TestHelpers.SteamId));
+	}
+
+	[TestMethod]
+	public void PlayerFeed_OnLoadPastTheLimit_KeepsHumansBeforeBots()
+	{
+		NewState(new ManualTime()).Apply(Batch(Server(Start), [EntryFor(TestHelpers.SteamId, 1), EntryFor(BotIds.For("Muhlik"), 2), EntryFor(BotIds.For("Rock"), 3)]) with
+		{
+			Recaps = [RecapFor(TestHelpers.SteamId, Start.AddSeconds(1)), RecapFor(BotIds.For("Muhlik"), Start.AddSeconds(2)), RecapFor(BotIds.For("Rock"), Start.AddSeconds(3))],
+		});
+
+		LiveState second = NewState(new ManualTime(), new SiteOptions { PlayerFeedPlayers = 1 });
+
+		Assert.HasCount(1, second.PlayerFeed(TestHelpers.SteamId));
+		Assert.IsNotNull(second.LastSession(TestHelpers.SteamId));
+		Assert.IsEmpty(second.PlayerFeed(BotIds.For("Rock")));
+		Assert.IsNull(second.LastSession(BotIds.For("Rock")));
 	}
 
 	[TestMethod]

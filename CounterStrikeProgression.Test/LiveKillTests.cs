@@ -7,6 +7,7 @@ using System.Threading.Channels;
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Heatmaps;
 using ktsu.CounterStrikeProgression.Core.Live;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 using ktsu.CounterStrikeProgression.Site.Live;
 
@@ -102,6 +103,15 @@ public sealed class LiveKillTests
 		Assert.IsTrue(kill.VictimIsBot);
 		Assert.AreEqual("Bot Ringo", kill.KillerName);
 		Assert.AreEqual("Bot Vinny", kill.VictimName);
+	}
+
+	[TestMethod]
+	public void MarksBotPersonasAsBots()
+	{
+		LiveKill kill = Assert.ContainsSingle(LiveKills.From([Kill(killer: BotIds.For("Rock"), victim: 76561197960265729, killerName: "Rock")]));
+
+		Assert.IsTrue(kill.KillerIsBot);
+		Assert.IsFalse(kill.VictimIsBot);
 	}
 
 	[TestMethod]

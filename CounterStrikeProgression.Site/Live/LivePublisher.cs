@@ -21,8 +21,8 @@ internal sealed record FightEvent(string Map, string SteamId, int X, int Y, bool
 internal static class LivePublisher
 {
 	/// <summary>
-	/// Publishes <c>snapshot</c> and <c>positions</c> events when the snapshot changed, a <c>feed</c> event per new entry, oldest
-	/// first, a <c>progress</c> event naming the players whose progress changed, a <c>fights</c> event for
+	/// Publishes <c>snapshot</c> and <c>positions</c> events when the snapshot changed, a <c>feed</c> event per new global feed
+	/// entry (humans' only), oldest first, a <c>progress</c> event naming the players whose progress changed, a <c>fights</c> event for
 	/// the new kills, and a <c>kills</c> event for the batch's kills on the radar, bots' included.
 	/// </summary>
 	/// <param name="broadcaster">Where the events go.</param>
@@ -68,7 +68,7 @@ internal static class LivePublisher
 	}
 
 	/// <summary>
-	/// Gets one kill's fight for each human in it whose cell is on the radar. A map without a calibrated
+	/// Gets one kill's fight for each player in it with an id, human or bot persona, whose cell is on the radar. A map without a calibrated
 	/// overview has no fixed grid, so its kills give none.
 	/// </summary>
 	private static IEnumerable<FightEvent> EventsOf(KillPoint kill)

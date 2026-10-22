@@ -4,20 +4,22 @@ namespace ktsu.CounterStrikeProgression.Site.Live;
 
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Live;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using Microsoft.Extensions.Logging;
 
 /// <summary>What one applied batch changed.</summary>
 /// <param name="SnapshotChanged">Whether the server snapshot was replaced.</param>
-/// <param name="NewFeed">The feed entries the batch added.</param>
+/// <param name="NewFeed">The global feed entries the batch added, which leave out bot personas' entries.</param>
 /// <param name="ChangedPlayers">The Steam IDs whose progress rows or map recaps the batch carried, or whose rows it cleared.</param>
 internal sealed record LiveChanges(bool SnapshotChanged, IReadOnlyList<FeedEntry> NewFeed, IReadOnlyList<ulong> ChangedPlayers);
 
 /// <summary>
 /// The site's picture of the server right now: the latest snapshot, the feed history, and the progress
 /// rows that arrived since the site started. Ingest and page requests run on different threads, so one
-/// lock guards all of it.
+/// lock guards all of it. A bot persona's entries go to its own player feed but never to the global feed,
+/// and when the player feeds or recaps are full, bots are dropped before any human.
 /// </summary>
 /// <param name="options">The site settings.</param>
 /// <param name="feed">Where the feed history is saved.</param>
@@ -83,7 +85,7 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 		}
 	}
 
-	/// <summary>Gets the feed, newest first.</summary>
+	/// <summary>Gets the global feed, newest first. It holds humans' entries only.</summary>
 	public IReadOnlyList<FeedEntry> Feed
 	{
 		get
@@ -157,9 +159,10 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 				snapshot = batch.Snapshot;
 			}
 
+			List<FeedEntry> humanFeed = [.. batch.Feed.Where(e => !BotIds.IsBot(e.SteamId))];
 			if (batch.Feed.Count > 0)
 			{
-				IEnumerable<FeedEntry> added = batch.Feed.OrderByDescending(e => e.At);
+				IEnumerable<FeedEntry> added = humanFeed.OrderByDescending(e => e.At);
 				entries = [.. added.Concat(entries).Take(options.FeedLength)];
 				SaveFeed(AddToPlayerFeeds(batch.Feed));
 			}
@@ -173,7 +176,7 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 				}
 			}
 
-			return new(snapshotChanged, batch.Feed, changed);
+			return new(snapshotChanged, humanFeed, changed);
 		}
 	}
 
@@ -193,13 +196,13 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 	/// <summary>
 	/// Checks whether a player is on the server now.
 	/// </summary>
-	/// <param name="steamId">The 64-bit Steam ID.</param>
-	/// <returns><see langword="true"/> when the server is online and lists the player as a non-bot.</returns>
+	/// <param name="steamId">The 64-bit Steam ID, or a bot persona's id.</param>
+	/// <returns><see langword="true"/> when the server is online and lists a player with that id, which is never 0.</returns>
 	public bool IsPlaying(ulong steamId)
 	{
 		lock (gate)
 		{
-			return IsOnlineLocked() && snapshot!.Players.Any(p => !p.IsBot && (p.SteamId == steamId));
+			return (steamId != 0) && IsOnlineLocked() && snapshot!.Players.Any(p => p.SteamId == steamId);
 		}
 	}
 
@@ -237,12 +240,14 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 			.Where(r => r is not null && (r.SteamId != 0))
 			.GroupBy(r => r.SteamId)
 			.Select(g => g.MaxBy(r => r.EndedAt)!)
-			.OrderByDescending(r => r.EndedAt)
+			.OrderBy(r => BotIds.IsBot(r.SteamId))
+			.ThenByDescending(r => r.EndedAt)
 			.Take(options.PlayerFeedPlayers)
 			.ToDictionary(r => r.SteamId);
 
 	/// <summary>
 	/// Keeps each player's newest recap, and drops the oldest once more than <see cref="SiteOptions.PlayerFeedPlayers"/> have one.
+	/// Bots' recaps go before any human's, so a human's recap only ever makes way for another human's.
 	/// </summary>
 	/// <returns>The players whose last session changed.</returns>
 	private List<ulong> AddRecaps(IReadOnlyList<MapRecap> added)
@@ -270,7 +275,7 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 
 		if (recaps.Count > options.PlayerFeedPlayers)
 		{
-			foreach (MapRecap oldest in recaps.Values.OrderBy(r => r.EndedAt).Take(recaps.Count - options.PlayerFeedPlayers).ToList())
+			foreach (MapRecap oldest in recaps.Values.OrderByDescending(r => BotIds.IsBot(r.SteamId)).ThenBy(r => r.EndedAt).Take(recaps.Count - options.PlayerFeedPlayers).ToList())
 			{
 				recaps.Remove(oldest.SteamId);
 				changed.Remove(oldest.SteamId);
@@ -300,13 +305,15 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 
 	private static Dictionary<ulong, List<FeedEntry>> LoadPlayerFeeds(FeedStore feed, SiteOptions options) =>
 		feed.LoadPlayers()
-			.OrderByDescending(p => p.Value.Max(e => e.At))
+			.OrderBy(p => BotIds.IsBot(p.Key))
+			.ThenByDescending(p => p.Value.Max(e => e.At))
 			.Take(options.PlayerFeedPlayers)
 			.ToDictionary(p => p.Key, p => p.Value.OrderByDescending(e => e.At).Take(options.PlayerFeedLength).ToList());
 
 	/// <summary>
 	/// Adds a batch's entries to each player's feed, and drops the players whose newest entry is oldest once
-	/// more than <see cref="SiteOptions.PlayerFeedPlayers"/> have one.
+	/// more than <see cref="SiteOptions.PlayerFeedPlayers"/> have one. Bots go before any human, so a human's feed only
+	/// ever makes way for another human's.
 	/// </summary>
 	/// <returns>The players whose feed changed, and the players dropped.</returns>
 	private (List<ulong> Changed, List<ulong> Dropped) AddToPlayerFeeds(IReadOnlyList<FeedEntry> added)
@@ -329,7 +336,11 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 		List<ulong> dropped = [];
 		if (playerFeeds.Count > options.PlayerFeedPlayers)
 		{
-			dropped = [.. playerFeeds.OrderBy(p => p.Value[0].At).Take(playerFeeds.Count - options.PlayerFeedPlayers).Select(p => p.Key)];
+			dropped = [.. playerFeeds
+				.OrderByDescending(p => BotIds.IsBot(p.Key))
+				.ThenBy(p => p.Value[0].At)
+				.Take(playerFeeds.Count - options.PlayerFeedPlayers)
+				.Select(p => p.Key)];
 			foreach (ulong steamId in dropped)
 			{
 				playerFeeds.Remove(steamId);
