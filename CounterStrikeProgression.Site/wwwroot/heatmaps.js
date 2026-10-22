@@ -271,7 +271,9 @@
 			const count = view.points > 0 ? `, from the latest ${formatCount(view.points)}` : "";
 			const lines = [`${who}: ${what} on ${mapLabel(view.map)}${count}.`];
 			if (!view.calibrated) {
-				lines.push("This map has no known radar layout, so the kills are drawn on their own outline.");
+				lines.push(view.kind === "Lines"
+					? "This map has no known radar layout, so no lines are drawn."
+					: "This map has no known radar layout, so the kills are drawn on their own outline.");
 			} else if (!view.radar) {
 				lines.push("No radar image is on the site for this map yet, so the outline is drawn from where people fight.");
 			}

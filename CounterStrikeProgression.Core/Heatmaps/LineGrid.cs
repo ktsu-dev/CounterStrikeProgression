@@ -21,7 +21,14 @@ internal readonly record struct HeatLine(int X1, int Y1, int X2, int Y2, bool De
 internal static class LineGrid
 {
 	/// <summary>
-	/// Builds the lines for the server or one player. Suicides, and kills with either end off the radar image, are left out.
+	/// The most lines built for one view. It bounds the payload and the page's canvas pass for a full map, where most of
+	/// the server's kills are distinct segments, and the lines past it are the least used.
+	/// </summary>
+	public const int MaxLines = 20_000;
+
+	/// <summary>
+	/// Builds the lines for the server or one player, keeping the busiest <see cref="MaxLines"/>. Suicides, and kills with
+	/// either end off the radar image, are left out.
 	/// </summary>
 	/// <param name="kills">The kills.</param>
 	/// <param name="steamId">
@@ -30,7 +37,22 @@ internal static class LineGrid
 	/// </param>
 	/// <param name="overview">How the radar lines up with the world.</param>
 	/// <returns>The lines, most kills first.</returns>
-	public static IReadOnlyList<HeatLine> Build(IEnumerable<KillPoint> kills, ulong? steamId, MapOverview overview)
+	public static IReadOnlyList<HeatLine> Build(IEnumerable<KillPoint> kills, ulong? steamId, MapOverview overview) =>
+		Build(kills, steamId, overview, MaxLines);
+
+	/// <summary>
+	/// Builds the lines for the server or one player, keeping the busiest <paramref name="maxLines"/>. Suicides, and kills
+	/// with either end off the radar image, are left out.
+	/// </summary>
+	/// <param name="kills">The kills.</param>
+	/// <param name="steamId">
+	/// The player whose kills and deaths to draw, or <see langword="null"/> for every kill. With a player, kills they're
+	/// not in are left out, and the kills of them are marked <see cref="HeatLine.Death"/>.
+	/// </param>
+	/// <param name="overview">How the radar lines up with the world.</param>
+	/// <param name="maxLines">The most lines to keep.</param>
+	/// <returns>The lines, most kills first.</returns>
+	public static IReadOnlyList<HeatLine> Build(IEnumerable<KillPoint> kills, ulong? steamId, MapOverview overview, int maxLines)
 	{
 		Ensure.NotNull(kills);
 		Ensure.NotNull(overview);
@@ -72,7 +94,8 @@ internal static class LineGrid
 			.ThenBy(l => l.X1)
 			.ThenBy(l => l.Y2)
 			.ThenBy(l => l.X2)
-			.ThenBy(l => l.Death)];
+			.ThenBy(l => l.Death)
+			.Take(maxLines)];
 	}
 
 	private static (int X, int Y)? CellOf(MapOverview overview, int x, int y)

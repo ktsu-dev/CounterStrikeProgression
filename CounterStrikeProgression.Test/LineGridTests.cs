@@ -13,11 +13,18 @@ public sealed class LineGridTests
 
 	private static readonly DateTime At = new(2026, 10, 22, 12, 0, 0, DateTimeKind.Utc);
 
+	private static readonly int[] BusiestThree = [5, 4, 3];
+
 	private static MapOverview Overview => MapOverview.For("de_dust2")!;
 
 	// On de_dust2 these world positions are just past radar pixels (104, 204) and (304, 404), away from any cell edge.
 	private static KillPoint Kill(ulong killer, ulong victim, short killerX = -2018, short killerY = 2341, short victimX = -1138, short victimY = 1461) =>
 		new("de_dust2", killer, victim, "ak47", false, killerX, killerY, 0, victimX, victimY, 0, At);
+
+	// The world position at the centre of a de_dust2 cell's column or row.
+	private static short WorldX(int column) => (short)Math.Round(-2476 + (((column * HeatmapGrid.CellPixels) + 4) * 4.4));
+
+	private static short WorldY(int row) => (short)Math.Round(3239 - (((row * HeatmapGrid.CellPixels) + 4) * 4.4));
 
 	[TestMethod]
 	public void Build_SnapsBothEndsToCells()
@@ -81,5 +88,45 @@ public sealed class LineGridTests
 
 		Assert.IsEmpty(LineGrid.Build(kills, null, Overview));
 		Assert.IsEmpty(LineGrid.Build(kills, Player, Overview));
+	}
+
+	[TestMethod]
+	public void Build_KeepsOnlyTheBusiestLinesPastTheCap()
+	{
+		// Five distinct segments, each 50 world units (over one cell) further along, used 1 to 5 times.
+		List<KillPoint> kills = [];
+		for (int segment = 0; segment < 5; segment++)
+		{
+			for (int use = 0; use <= segment; use++)
+			{
+				kills.Add(Kill(Rival, Bystander, victimX: (short)(-1138 + (segment * 50))));
+			}
+		}
+
+		IReadOnlyList<HeatLine> lines = LineGrid.Build(kills, null, Overview, maxLines: 3);
+
+		Assert.HasCount(3, lines);
+		CollectionAssert.AreEqual(BusiestThree, lines.Select(l => l.Count).ToArray());
+	}
+
+	[TestMethod]
+	public void Build_CapsAFullMapAtMaxLines()
+	{
+		// One distinct segment per kill: every victim cell on the grid from one killer cell, then from the next.
+		List<KillPoint> kills = [];
+		for (int i = 0; i < LineGrid.MaxLines + 100; i++)
+		{
+			int victim = i % (HeatmapGrid.Cells * HeatmapGrid.Cells);
+			int killer = i / (HeatmapGrid.Cells * HeatmapGrid.Cells);
+			kills.Add(Kill(
+				Rival,
+				Bystander,
+				killerX: WorldX(killer),
+				killerY: WorldY(0),
+				victimX: WorldX(victim % HeatmapGrid.Cells),
+				victimY: WorldY(victim / HeatmapGrid.Cells)));
+		}
+
+		Assert.HasCount(LineGrid.MaxLines, LineGrid.Build(kills, null, Overview));
 	}
 }
