@@ -4,7 +4,7 @@ namespace ktsu.CounterStrikeProgression.Site.Data;
 
 using ktsu.CounterStrikeProgression.Core.Heatmaps;
 using SkiaSharp;
-using SteamDatabase.ValvePak;
+using ValvePak;
 using ValveResourceFormat;
 using ValveResourceFormat.ResourceTypes;
 

@@ -6,7 +6,7 @@ using ktsu.CounterStrikeProgression.Core.Heatmaps;
 using ktsu.CounterStrikeProgression.Site;
 using ktsu.CounterStrikeProgression.Site.Data;
 using SkiaSharp;
-using SteamDatabase.ValvePak;
+using ValvePak;
 
 [TestClass]
 public sealed class RadarTests
