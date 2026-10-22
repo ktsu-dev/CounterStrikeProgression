@@ -287,6 +287,19 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		LIMIT @count
 		""";
 
+	/// <summary>
+	/// The leaderboard. Dapper fills a positional record's constructor from the columns in order, so the columns
+	/// follow <see cref="LeaderboardEntry"/>'s parameters.
+	/// </summary>
+	internal const string SelectTop =
+		"SELECT name AS Name, rank_xp AS RankXp, rank_index AS `Rank`, steam_id AS SteamId FROM csp_players ORDER BY rank_xp DESC LIMIT @count";
+
+	/// <summary>
+	/// A weapon's leaderboard, with the columns in the order of <see cref="WeaponLeaderboardEntry"/>'s parameters.
+	/// </summary>
+	internal const string SelectTopByWeapon =
+		"SELECT p.name AS Name, w.xp AS Xp, w.level AS Level, w.steam_id AS SteamId FROM csp_weapons w JOIN csp_players p ON p.steam_id = w.steam_id WHERE w.weapon = @weapon AND w.xp > 0 ORDER BY w.xp DESC, w.steam_id ASC LIMIT @count";
+
 	private const string SelectLatestSeason =
 		"SELECT steam_id AS SteamId, season_start AS Start, xp AS Xp FROM csp_seasons WHERE steam_id = @steamId ORDER BY season_start DESC LIMIT 1";
 
@@ -524,7 +537,7 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
 		IEnumerable<LeaderboardEntry> top = await connection.QueryAsync<LeaderboardEntry>(new CommandDefinition(
-			"SELECT steam_id AS SteamId, name AS Name, rank_xp AS RankXp, rank_index AS `Rank` FROM csp_players ORDER BY rank_xp DESC LIMIT @count",
+			SelectTop,
 			new { count },
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 		return [.. top];
@@ -537,7 +550,7 @@ internal sealed class MySqlProgressionStore(DatabaseSettings settings) : IProgre
 		MySqlConnection connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 		await using ConfiguredAsyncDisposable connectionScope = connection.ConfigureAwait(false);
 		IEnumerable<WeaponLeaderboardEntry> top = await connection.QueryAsync<WeaponLeaderboardEntry>(new CommandDefinition(
-			"SELECT w.steam_id AS SteamId, p.name AS Name, w.xp AS Xp, w.level AS Level FROM csp_weapons w JOIN csp_players p ON p.steam_id = w.steam_id WHERE w.weapon = @weapon AND w.xp > 0 ORDER BY w.xp DESC, w.steam_id ASC LIMIT @count",
+			SelectTopByWeapon,
 			new { weapon = weapon.WeakString, count },
 			cancellationToken: cancellationToken)).ConfigureAwait(false);
 		return [.. top];
