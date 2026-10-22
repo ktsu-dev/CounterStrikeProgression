@@ -1,7 +1,6 @@
-## v1.27.0 (minor)
+## v1.27.1 (patch)
 
-Changes since v1.26.0:
+Changes since v1.27.0:
 
-- [patch] Cap the Lines tab and fix its uncalibrated message (matt-edmondson)
-- [minor] Add a Lines tab to the heatmaps page (matt-edmondson)
+- [patch] Fade each heatmap line in from the shooter (matt-edmondson)
 
