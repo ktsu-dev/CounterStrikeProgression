@@ -3,6 +3,7 @@
 namespace ktsu.CounterStrikeProgression.Test;
 
 using ktsu.CounterStrikeProgression.Core.Challenges;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Core.Weapons;
@@ -137,5 +138,24 @@ public sealed class StorageTests
 		MySqlConnectionStringBuilder builder = new(MySqlProgressionStore.ConnectionStringFor(new DatabaseSettings()));
 
 		Assert.AreEqual(MySqlDateTimeKind.Utc, builder.DateTimeKind);
+	}
+
+	[TestMethod]
+	public async Task TopCarriesEachPlayersId()
+	{
+		InMemoryProgressionStore store = new();
+		ulong bot = BotIds.For("Muhlik");
+		DateTime now = DateTime.UtcNow;
+		WeaponKey ak47 = WeaponKey.Create("ak47");
+		await store.SaveAsync(new ProgressSnapshot(new PlayerRow(1, "Human", 10, 0, now, now), [new WeaponRow(1, ak47.WeakString, 5, 1, 0, 0, 0, 0)], []), TestContext.CancellationToken).ConfigureAwait(false);
+		await store.SaveAsync(new ProgressSnapshot(new PlayerRow(bot, "Muhlik", 5000, 3, now, now), [new WeaponRow(bot, ak47.WeakString, 50, 2, 0, 0, 0, 0)], []), TestContext.CancellationToken).ConfigureAwait(false);
+
+		IReadOnlyList<LeaderboardEntry> top = await store.TopAsync(10, TestContext.CancellationToken).ConfigureAwait(false);
+		IReadOnlyList<WeaponLeaderboardEntry> byWeapon = await store.TopByWeaponAsync(ak47, 10, TestContext.CancellationToken).ConfigureAwait(false);
+
+		Assert.AreEqual(bot, top[0].SteamId);
+		Assert.AreEqual(1UL, top[1].SteamId);
+		Assert.AreEqual(bot, byWeapon[0].SteamId);
+		Assert.AreEqual(1UL, byWeapon[1].SteamId);
 	}
 }

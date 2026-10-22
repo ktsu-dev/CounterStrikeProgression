@@ -4,6 +4,7 @@ namespace ktsu.CounterStrikeProgression.Core.Panel;
 
 using System.Globalization;
 using ktsu.CounterStrikeProgression.Core.Feats;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Rivals;
 using ktsu.CounterStrikeProgression.Core.Storage;
@@ -114,7 +115,7 @@ internal sealed class ChatReports(ProgressionEngine engine)
 				return lines;
 
 			default:
-				return [$"Several players match: {string.Join(", ", matches.Take(5).Select(m => m.Name))}. Type more of the name."];
+				return [$"Several players match: {string.Join(", ", matches.Take(5).Select(m => PlayerName(m.Progress.SteamId, m.Name)))}. Type more of the name."];
 		}
 	}
 
@@ -167,7 +168,7 @@ internal sealed class ChatReports(ProgressionEngine engine)
 		}
 
 		int feats = engine.Feats.Earned(player).Count();
-		return $"{name}: {RankName(player)}, {Number(player.RankXp)} XP. {Number(kills)} kills{headshotShare}{best}. Feats {feats} of {FeatCatalog.All.Count}.{Rivals(player)}";
+		return $"{PlayerName(player.SteamId, name)}: {RankName(player)}, {Number(player.RankXp)} XP. {Number(kills)} kills{headshotShare}{best}. Feats {feats} of {FeatCatalog.All.Count}.{Rivals(player)}";
 	}
 
 	/// <summary>
@@ -203,7 +204,7 @@ internal sealed class ChatReports(ProgressionEngine engine)
 	public string WeaponLeader(int place, WeaponLeaderboardEntry entry)
 	{
 		Ensure.NotNull(entry);
-		return $"{place}. {entry.Name} level {Math.Max(entry.Level, engine.Levels.LevelFor(entry.Xp))}{StarsSuffix(entry.Xp)} ({Number(entry.Xp)} XP)";
+		return $"{place}. {PlayerName(entry.SteamId, entry.Name)} level {Math.Max(entry.Level, engine.Levels.LevelFor(entry.Xp))}{StarsSuffix(entry.Xp)} ({Number(entry.Xp)} XP)";
 	}
 
 	private string StarsSuffix(long xp)
@@ -243,7 +244,15 @@ internal sealed class ChatReports(ProgressionEngine engine)
 		return $"{host}{site.AbsolutePath.TrimEnd('/')}";
 	}
 
+	/// <summary>
+	/// Gets the name to show in chat: a bot's name is followed by <c>[BOT]</c>, so nobody mistakes one for a person.
+	/// </summary>
+	/// <param name="steamId">The player's id.</param>
+	/// <param name="name">The player's name.</param>
+	/// <returns>The name, marked when the id is a bot's.</returns>
+	public static string PlayerName(ulong steamId, string name) => BotIds.IsBot(steamId) ? $"{name} [BOT]" : name;
+
 	private static string Number(long value) => value.ToString("N0", CultureInfo.InvariantCulture);
 
-	private static string NameOf(HeadToHead rival) => string.IsNullOrWhiteSpace(rival.Name) ? "an unknown player" : rival.Name;
+	private static string NameOf(HeadToHead rival) => string.IsNullOrWhiteSpace(rival.Name) ? "an unknown player" : PlayerName(rival.SteamId, rival.Name);
 }

@@ -4,6 +4,7 @@ namespace ktsu.CounterStrikeProgression.Test;
 
 using ktsu.CounterStrikeProgression.Core.Feats;
 using ktsu.CounterStrikeProgression.Core.Panel;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Storage;
 using ktsu.CounterStrikeProgression.Core.Weapons;
@@ -186,5 +187,35 @@ public sealed class ChatReportTests
 
 		Assert.AreEqual("Several players match: Alice, Alicia. Type more of the name.", reports.StatsFor(online, "ali", "")[0]);
 		Assert.AreEqual("No connected player's name contains \"zed\".", reports.StatsFor(online, "zed", "")[0]);
+	}
+
+	[TestMethod]
+	public void PlayerName_MarksABot()
+	{
+		Assert.AreEqual("Muhlik [BOT]", ChatReports.PlayerName(BotIds.For("Muhlik"), "Muhlik"));
+		Assert.AreEqual("Muhlik", ChatReports.PlayerName(76561197960265729, "Muhlik"));
+	}
+
+	[TestMethod]
+	public void Rivals_MarksABotNemesis()
+	{
+		ProgressionEngine engine = TestHelpers.Engine();
+		PlayerProgress human = TestHelpers.Player();
+		ulong bot = BotIds.For("Muhlik");
+		human.KilledBy[bot] = 5;
+		human.RivalNames[bot] = "Muhlik";
+
+		Assert.Contains("Nemesis Muhlik [BOT] (0-5).", new ChatReports(engine).Rivals(human));
+	}
+
+	[TestMethod]
+	public void StatsFor_FindsAndMarksABot()
+	{
+		ChatReports reports = new(TestHelpers.Engine());
+		(string, PlayerProgress)[] online = [("Muhlik", new PlayerProgress(BotIds.For("Muhlik")))];
+
+		IReadOnlyList<string> lines = reports.StatsFor(online, "muh", "");
+
+		Assert.StartsWith("Muhlik [BOT]: ", lines[0]);
 	}
 }

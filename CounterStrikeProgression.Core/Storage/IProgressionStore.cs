@@ -14,7 +14,8 @@ using ktsu.CounterStrikeProgression.Core.Weapons;
 /// <param name="Name">The player's last known name.</param>
 /// <param name="RankXp">Their rank XP.</param>
 /// <param name="Rank">Their rank index.</param>
-internal sealed record LeaderboardEntry(string Name, long RankXp, int Rank);
+/// <param name="SteamId">Their player id, which tells a bot from a human.</param>
+internal sealed record LeaderboardEntry(string Name, long RankXp, int Rank, ulong SteamId = 0);
 
 /// <summary>
 /// One row of a weapon's leaderboard.
@@ -22,7 +23,8 @@ internal sealed record LeaderboardEntry(string Name, long RankXp, int Rank);
 /// <param name="Name">The player's last known name.</param>
 /// <param name="Xp">Their XP with the weapon.</param>
 /// <param name="Level">Their stored level with the weapon.</param>
-internal sealed record WeaponLeaderboardEntry(string Name, long Xp, int Level);
+/// <param name="SteamId">Their player id, which tells a bot from a human.</param>
+internal sealed record WeaponLeaderboardEntry(string Name, long Xp, int Level, ulong SteamId = 0);
 
 /// <summary>
 /// One row of the server rankings.

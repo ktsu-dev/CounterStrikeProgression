@@ -7,6 +7,7 @@ using ktsu.CounterStrikeProgression.Core.Discord;
 using ktsu.CounterStrikeProgression.Core.Floaties;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Panel;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.Storage;
@@ -172,5 +173,13 @@ public sealed class MasteryStarTests
 		Assert.Contains("Best weapon AK-47, level 5, 2 stars.", reports.Stats("Tester", player));
 		Assert.AreEqual("1. P1 level 5, 1 star (80 XP)", reports.WeaponLeader(1, new WeaponLeaderboardEntry("P1", 80, 5)));
 		Assert.AreEqual("2. P2 level 3 (25 XP)", reports.WeaponLeader(2, new WeaponLeaderboardEntry("P2", 25, 3)));
+	}
+
+	[TestMethod]
+	public void WeaponLeaderMarksABot()
+	{
+		ChatReports reports = new(TestHelpers.Engine(SmallCurve));
+
+		Assert.AreEqual("1. Muhlik [BOT] level 3 (25 XP)", reports.WeaponLeader(1, new WeaponLeaderboardEntry("Muhlik", 25, 3, BotIds.For("Muhlik"))));
 	}
 }

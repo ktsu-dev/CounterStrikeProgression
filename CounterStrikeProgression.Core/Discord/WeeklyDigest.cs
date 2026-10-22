@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Core.Discord;
 using System.Globalization;
 using System.Text;
 using ktsu.CounterStrikeProgression.Core.Contracts;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Rotation;
 using ktsu.CounterStrikeProgression.Core.Storage;
@@ -26,11 +27,11 @@ internal static class WeeklyDigest
 	/// Writes the digest for the week before a Monday.
 	/// </summary>
 	/// <param name="week">The Monday that starts the new week.</param>
-	/// <param name="gains">Every player who earned rank XP last week, most first.</param>
+	/// <param name="gains">Every player who earned rank XP last week, most first. Bots are left out.</param>
 	/// <param name="ranks">The rank ladder, which turns XP into ranks.</param>
 	/// <param name="progression">The settings that pick the weekly contract and what it pays.</param>
 	/// <param name="settings">How many climbers to list, and the lowest rank-up to name.</param>
-	/// <returns>The post, or <see langword="null"/> when nobody earned anything last week.</returns>
+	/// <returns>The post, or <see langword="null"/> when no human earned anything last week.</returns>
 	public static string? Build(DateOnly week, IReadOnlyList<PeriodGain> gains, RankLadder ranks, ProgressionSettings progression, DiscordSettings settings)
 	{
 		Ensure.NotNull(gains);
@@ -38,6 +39,8 @@ internal static class WeeklyDigest
 		Ensure.NotNull(progression);
 		Ensure.NotNull(settings);
 
+		// Bots play in the server but never reach Discord.
+		gains = [.. gains.Where(g => !BotIds.IsBot(g.SteamId))];
 		if (gains.Count == 0)
 		{
 			return null;

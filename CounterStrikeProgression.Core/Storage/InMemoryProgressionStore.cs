@@ -146,7 +146,7 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 	/// <inheritdoc/>
 	public Task<IReadOnlyList<LeaderboardEntry>> TopAsync(int count, CancellationToken cancellationToken)
 	{
-		IReadOnlyList<LeaderboardEntry> top = [.. players.Values.OrderByDescending(p => p.RankXp).Take(count).Select(p => new LeaderboardEntry(p.Name, p.RankXp, p.Rank))];
+		IReadOnlyList<LeaderboardEntry> top = [.. players.Values.OrderByDescending(p => p.RankXp).Take(count).Select(p => new LeaderboardEntry(p.Name, p.RankXp, p.Rank, p.SteamId))];
 		return Task.FromResult(top);
 	}
 
@@ -159,7 +159,7 @@ internal sealed class InMemoryProgressionStore : IProgressionStore
 			.OrderByDescending(w => w.Xp)
 			.ThenBy(w => w.SteamId)
 			.Take(count)
-			.Select(w => new WeaponLeaderboardEntry(players.TryGetValue(w.SteamId, out PlayerRow? p) ? p.Name : string.Empty, w.Xp, w.Level))];
+			.Select(w => new WeaponLeaderboardEntry(players.TryGetValue(w.SteamId, out PlayerRow? p) ? p.Name : string.Empty, w.Xp, w.Level, w.SteamId))];
 		return Task.FromResult(top);
 	}
 

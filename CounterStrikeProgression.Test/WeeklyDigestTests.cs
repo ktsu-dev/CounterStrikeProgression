@@ -5,6 +5,7 @@ namespace ktsu.CounterStrikeProgression.Test;
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Contracts;
 using ktsu.CounterStrikeProgression.Core.Discord;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Storage;
 
@@ -213,5 +214,24 @@ public sealed class WeeklyDigestTests
 		DateOnly week = Monday.AddDays(7 * Random.Shared.Next(1, 100_000));
 		Assert.IsTrue(await store.ClaimDigestAsync(week, At(week), TestContext.CancellationToken).ConfigureAwait(false));
 		Assert.IsFalse(await store.ClaimDigestAsync(week, At(week, 13), TestContext.CancellationToken).ConfigureAwait(false));
+	}
+
+	[TestMethod]
+	public void LeavesOutBots()
+	{
+		PeriodGain[] gains = [new(BotIds.For("Muhlik"), "Muhlik", 0, 9000), new(1, "Alice", 0, 1000)];
+
+		string? post = WeeklyDigest.Build(Monday, gains, Ranks, Progression, new DiscordSettings());
+
+		Assert.Contains("**Alice**: +1,000 XP", post!);
+		Assert.DoesNotContain("Muhlik", post!);
+	}
+
+	[TestMethod]
+	public void OnlyBotsPostsNothing()
+	{
+		PeriodGain[] gains = [new(BotIds.For("Muhlik"), "Muhlik", 0, 9000)];
+
+		Assert.IsNull(WeeklyDigest.Build(Monday, gains, Ranks, Progression, new DiscordSettings()));
 	}
 }
