@@ -1,6 +1,6 @@
-## v1.27.1 (patch)
+## v1.27.2 (patch)
 
-Changes since v1.27.0:
+Changes since v1.27.1:
 
-- [patch] Fade each heatmap line in from the shooter (matt-edmondson)
+- [patch] Widen each heatmap line toward the victim (matt-edmondson)
 
