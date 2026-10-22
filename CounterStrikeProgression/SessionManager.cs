@@ -45,10 +45,17 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 	private const int SaveAttempts = 5;
 	private const int InitializeAttempts = 6;
 
+	// Every tracked player saves at round end, bot personas included, so without a cap a full server opens a database
+	// connection per player at once, and under disk load the handshakes time out together. Writes past the cap queue.
+	private const int MaxConcurrentWrites = 2;
+
 	private static readonly TimeSpan LoadRetryDelay = TimeSpan.FromSeconds(15);
 	private static readonly TimeSpan FirstSaveRetryDelay = TimeSpan.FromSeconds(2);
 	private static readonly TimeSpan FirstInitializeRetryDelay = TimeSpan.FromSeconds(2);
 	private static readonly TimeSpan RecentlyLeftKeepFor = TimeSpan.FromMinutes(30);
+
+	// Static, because writes from every session share the one database, and a plugin reload keeps no write running.
+	private static readonly SemaphoreSlim WriteSlots = new(MaxConcurrentWrites, MaxConcurrentWrites);
 
 	private readonly Dictionary<int, PlayerSession> sessions = [];
 	private readonly Dictionary<ulong, Task> saveChains = [];
@@ -428,7 +435,7 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 		{
 			try
 			{
-				await write().ConfigureAwait(false);
+				await WriteAsync(write).ConfigureAwait(false);
 				return true;
 			}
 			catch (Exception exception)
@@ -450,6 +457,20 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 
 			await Task.Delay(delay).ConfigureAwait(false);
 			delay *= 2;
+		}
+	}
+
+	// Holds one of the write slots for a single attempt, so a retry's backoff never keeps a slot from another player.
+	private static async Task WriteAsync(Func<Task> write)
+	{
+		await WriteSlots.WaitAsync().ConfigureAwait(false);
+		try
+		{
+			await write().ConfigureAwait(false);
+		}
+		finally
+		{
+			WriteSlots.Release();
 		}
 	}
 
