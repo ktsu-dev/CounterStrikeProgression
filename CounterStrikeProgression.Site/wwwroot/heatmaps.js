@@ -69,6 +69,9 @@
 	};
 	// One kill's stroke alpha. Strokes add up under "lighter", so a line with Count kills is drawn at Count times this.
 	const LINE_ALPHA = 0.14;
+	// A line's width in radar pixels at the shooter and at the victim; it widens toward the death.
+	const LINE_START_WIDTH = 0.5;
+	const LINE_END_WIDTH = 4;
 	const KINDS = ["kills", "deaths", "lines"];
 
 	function readQuery() {
@@ -161,23 +164,32 @@
 		const size = view.cellPixels;
 		context.save();
 		context.globalCompositeOperation = "lighter";
-		context.lineWidth = 1.5;
-		context.lineCap = "round";
 		for (const [x1, y1, x2, y2, death, count] of view.lines) {
 			const rgb = (!view.player ? LINE_COLORS.server : death ? LINE_COLORS.death : LINE_COLORS.kill).join(",");
 			const fromX = (x1 + 0.5) * size;
 			const fromY = (y1 + 0.5) * size;
 			const toX = (x2 + 0.5) * size;
 			const toY = (y2 + 0.5) * size;
-			// Each line fades in from nothing at the shooter, so its bright end marks where the victim fell.
+			const length = Math.hypot(toX - fromX, toY - fromY);
+			if (length === 0) {
+				continue;
+			}
+
+			// Each line fades in from nothing at the shooter and widens toward the victim, so its bright, thick end marks
+			// where the victim fell. It's drawn as a filled wedge, because a canvas stroke has one width along its length.
 			const fade = context.createLinearGradient(fromX, fromY, toX, toY);
 			fade.addColorStop(0, `rgba(${rgb},0)`);
 			fade.addColorStop(1, `rgba(${rgb},${Math.min(1, LINE_ALPHA * count).toFixed(3)})`);
-			context.strokeStyle = fade;
+			const normalX = (fromY - toY) / length;
+			const normalY = (toX - fromX) / length;
+			context.fillStyle = fade;
 			context.beginPath();
-			context.moveTo(fromX, fromY);
-			context.lineTo(toX, toY);
-			context.stroke();
+			context.moveTo(fromX + normalX * LINE_START_WIDTH / 2, fromY + normalY * LINE_START_WIDTH / 2);
+			context.lineTo(toX + normalX * LINE_END_WIDTH / 2, toY + normalY * LINE_END_WIDTH / 2);
+			context.lineTo(toX - normalX * LINE_END_WIDTH / 2, toY - normalY * LINE_END_WIDTH / 2);
+			context.lineTo(fromX - normalX * LINE_START_WIDTH / 2, fromY - normalY * LINE_START_WIDTH / 2);
+			context.closePath();
+			context.fill();
 		}
 		context.restore();
 	}
