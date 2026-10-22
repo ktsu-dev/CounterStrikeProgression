@@ -250,9 +250,13 @@ internal sealed class SiteReporter : IDisposable
 
 			if (controller.IsBot)
 			{
-				players.Add(WithPosition(new LivePlayer(controller.Slot, 0, name, IsBot: true, Rank: 0, kills, deaths, MapXp: 0), controller));
+				// A bot with a persona is sent under its id with its rank, and one without as a nameless extra.
+				LivePlayer bot = sessionManager.Get(controller) is PlayerSession botSession
+					? new LivePlayer(controller.Slot, botSession.SteamId, name, IsBot: true, botSession.Progress?.Rank ?? 0, kills, deaths, botSession.MapXp)
+					: new LivePlayer(controller.Slot, 0, name, IsBot: true, Rank: 0, kills, deaths, MapXp: 0);
+				players.Add(WithPosition(bot, controller));
 			}
-			else if (GameState.IsHuman(controller))
+			else if (GameState.IsTracked(controller))
 			{
 				PlayerSession? session = sessionManager.Get(controller);
 				players.Add(WithPosition(new LivePlayer(controller.Slot, controller.SteamID, name, IsBot: false, session?.Progress?.Rank ?? 0, kills, deaths, session?.MapXp ?? 0), controller));

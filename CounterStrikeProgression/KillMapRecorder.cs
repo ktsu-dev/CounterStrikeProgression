@@ -69,11 +69,13 @@ internal sealed class KillMapRecorder(HeatmapSettings settings, IKillMapStore st
 	/// </summary>
 	/// <param name="map">The map.</param>
 	/// <param name="killer">The killer.</param>
+	/// <param name="killerId">The killer's session id, or 0 when they have no session.</param>
 	/// <param name="victim">The victim.</param>
+	/// <param name="victimId">The victim's session id, or 0 when they have no session.</param>
 	/// <param name="weapon">The weapon.</param>
 	/// <param name="headshot">Whether it was a headshot.</param>
 	/// <returns>The kill, or <see langword="null"/> when either player has no pawn.</returns>
-	public static KillPoint? PointOf(string map, CCSPlayerController killer, CCSPlayerController victim, WeaponInfo weapon, bool headshot)
+	public static KillPoint? PointOf(string map, CCSPlayerController killer, ulong killerId, CCSPlayerController victim, ulong victimId, WeaponInfo weapon, bool headshot)
 	{
 		Ensure.NotNull(killer);
 		Ensure.NotNull(victim);
@@ -86,8 +88,8 @@ internal sealed class KillMapRecorder(HeatmapSettings settings, IKillMapStore st
 
 		return new KillPoint(
 			map,
-			GameState.IsHuman(killer) ? killer.SteamID : 0,
-			GameState.IsHuman(victim) ? victim.SteamID : 0,
+			killerId,
+			victimId,
 			weapon.Key.WeakString,
 			headshot,
 			KillPoint.Round(from.X),
@@ -102,7 +104,7 @@ internal sealed class KillMapRecorder(HeatmapSettings settings, IKillMapStore st
 	}
 
 	/// <summary>
-	/// Notes a kill for the next write, if a human is on either end of it and the sampling keeps it.
+	/// Notes a kill for the next write, if a player with a session is on either end of it and the sampling keeps it.
 	/// </summary>
 	/// <param name="point">The kill, from <see cref="PointOf"/>.</param>
 	public void Record(KillPoint point) => buffer.Add(point);

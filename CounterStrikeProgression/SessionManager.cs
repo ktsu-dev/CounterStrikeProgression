@@ -8,6 +8,7 @@ using System.Net.Sockets;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using ktsu.CounterStrikeProgression.Core.Admin;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Records;
 using ktsu.CounterStrikeProgression.Core.Rivals;
@@ -15,7 +16,8 @@ using ktsu.CounterStrikeProgression.Core.Storage;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
-/// Keeps a session for every connected human, loads their progress when they join, and saves what changed.
+/// Keeps a session for every connected human, and for every bot while a human is on, loads their progress when
+/// they join, and saves what changed.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -58,6 +60,12 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 
 	/// <summary>Gets every current session.</summary>
 	public IEnumerable<PlayerSession> All => sessions.Values;
+
+	/// <summary>Gets a value indicating whether any human has a session, which bots need before they're tracked.</summary>
+	public bool HumansOnline => sessions.Values.Any(s => !s.IsBot);
+
+	/// <summary>Gets the sessions of the bot personas being tracked.</summary>
+	public IReadOnlyList<PlayerSession> BotSessions => [.. sessions.Values.Where(s => s.IsBot)];
 
 	/// <summary>Gets how many saves failed every retry since the plugin loaded.</summary>
 	public long SaveFailures => Interlocked.Read(ref saveFailures);
@@ -112,18 +120,28 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 	/// Gets a player's session.
 	/// </summary>
 	/// <param name="player">The player.</param>
-	/// <returns>The session, or <see langword="null"/> for bots and players not yet connected.</returns>
+	/// <returns>The session, or <see langword="null"/> for untracked bots and players not yet connected.</returns>
 	public PlayerSession? Get(CCSPlayerController? player) =>
-		GameState.IsHuman(player) && sessions.TryGetValue(player!.Slot, out PlayerSession? session) && (session.SteamId == player.SteamID) ? session : null;
+		GameState.IsTracked(player) && sessions.TryGetValue(player!.Slot, out PlayerSession? session) && (session.SteamId == GameState.PlayerIdOf(player)) ? session : null;
 
 	/// <summary>
-	/// Starts a session for a joining human and loads their progress.
+	/// Starts a session for a joining human, or for a bot while a human is on, and loads their progress.
 	/// </summary>
+	/// <remarks>
+	/// A bot's id comes from its name, so a second bot with a name already in use gets no session, and a bot
+	/// kicked and added again picks its progress back up from the players who recently left.
+	/// </remarks>
 	/// <param name="player">The player.</param>
 	public void Connect(CCSPlayerController player)
 	{
 		Ensure.NotNull(player);
-		if (!GameState.IsHuman(player) || (Get(player) is not null))
+		if (!GameState.IsTracked(player) || (Get(player) is not null))
+		{
+			return;
+		}
+
+		ulong id = GameState.PlayerIdOf(player);
+		if (!BotTracking.MayStart(id, HumansOnline, sessions.Values.Select(s => s.SteamId)))
 		{
 			return;
 		}
@@ -131,7 +149,7 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 		// A disconnect that never arrived leaves someone else's session in the slot, so end it properly first.
 		DisconnectSlot(player.Slot);
 
-		PlayerSession session = new(player.Slot, player.SteamID);
+		PlayerSession session = new(player.Slot, id);
 		sessions[player.Slot] = session;
 		string name = player.PlayerName;
 
@@ -163,6 +181,18 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 			progress.IsDirty = true;
 			recentlyLeft[session.SteamId] = progress;
 			Save(progress);
+		}
+	}
+
+	/// <summary>
+	/// Saves and ends every bot persona's session, for when the last human leaves. Their progress is kept with
+	/// the players who recently left, so bots that stay on pick it back up when a human returns.
+	/// </summary>
+	public void EndBotSessions()
+	{
+		foreach (PlayerSession session in BotSessions)
+		{
+			DisconnectSlot(session.Slot);
 		}
 	}
 

@@ -25,7 +25,7 @@ internal sealed class Announcer(PluginConfig config)
 	private const double SkillShotMessageSeconds = 1.5;
 
 	/// <summary>
-	/// Announces a result.
+	/// Announces a result. Nothing a bot persona earns is announced.
 	/// </summary>
 	/// <param name="player">The player who earned it.</param>
 	/// <param name="session">The player's session.</param>
@@ -35,6 +35,10 @@ internal sealed class Announcer(PluginConfig config)
 		Ensure.NotNull(player);
 		Ensure.NotNull(session);
 		Ensure.NotNull(result);
+		if (session.IsBot)
+		{
+			return;
+		}
 
 		List<string> skillShots = [];
 		long skillShotXp = 0;

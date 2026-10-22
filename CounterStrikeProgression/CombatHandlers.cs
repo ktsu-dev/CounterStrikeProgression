@@ -240,9 +240,15 @@ internal sealed class CombatHandlers(ProgressionServices services)
 			return HookResult.Continue;
 		}
 
-		// The kill is credited before the bounty, so its skill shots are announced first.
+		// The kill is credited before the bounty, so its skill shots are announced first. A bot with a persona
+		// carries and collects bounties like a human, and one without stays out of them.
+		PlayerSession? attackerSession = Sessions.Get(attacker);
 		IReadOnlyList<BountyChange> bounty = services.Bounties.Kill(
-			attacker.Slot, victim.Slot, attacker.IsBot, ProgressionServices.IsTeammate(attacker, victim), Sessions.Get(attacker)?.Progress is not null);
+			attacker.Slot,
+			victim.Slot,
+			killerUntracked: attacker.IsBot && (attackerSession is null),
+			ProgressionServices.IsTeammate(attacker, victim),
+			attackerSession?.Progress is not null);
 		CreditKill(@event, attacker, victim, teammatesAreEnemies);
 		services.ApplyBounty(bounty);
 		return HookResult.Continue;
@@ -267,7 +273,7 @@ internal sealed class CombatHandlers(ProgressionServices services)
 		CCSPlayerPawn? attackerPawn = GameState.PawnOf(attacker);
 		WeaponInfo? weapon = GameState.ResolveWeapon(@event.Weapon, attackerPawn);
 		if ((weapon is not null) && !ProgressionServices.IsTeammate(attacker, victim) && ((services.KillMaps is not null) || (services.Site is not null))
-			&& (KillMapRecorder.PointOf(Server.MapName ?? string.Empty, attacker, victim, weapon, @event.Headshot) is { } point))
+			&& (KillMapRecorder.PointOf(Server.MapName ?? string.Empty, attacker, Sessions.Get(attacker)?.SteamId ?? 0, victim, Sessions.Get(victim)?.SteamId ?? 0, weapon, @event.Headshot) is { } point))
 		{
 			services.KillMaps?.Record(point);
 			services.Site?.Record(point);
@@ -284,7 +290,8 @@ internal sealed class CombatHandlers(ProgressionServices services)
 		Vector? at = Copy(GameState.PawnOf(victim)?.AbsOrigin);
 		services.Apply(attacker, session, Engine.ApplyCombat(progress, kill), victim.Slot, at);
 
-		// Only humans have sessions, so a bot victim never counts toward a head-to-head.
+		// Humans and tracked bot personas both have sessions, so either counts toward a head-to-head, and a bot with
+		// no persona never does.
 		if (!kill.IsTeammate && (Sessions.Get(victim) is { Progress: PlayerProgress victimProgress }))
 		{
 			services.Apply(attacker, session, Engine.ApplyRivalKill(progress, victimProgress), victim.Slot, at);

@@ -25,7 +25,7 @@ internal sealed class PanelPresenter(PanelSettings settings, PanelBuilder builde
 
 	/// <summary>
 	/// Opens the panel on a page, or closes it when it's already open. Asking for another page while the panel is
-	/// open turns to that page instead.
+	/// open turns to that page instead. A bot persona never has a panel.
 	/// </summary>
 	/// <param name="player">The player.</param>
 	/// <param name="session">The player's session.</param>
@@ -34,6 +34,10 @@ internal sealed class PanelPresenter(PanelSettings settings, PanelBuilder builde
 	{
 		Ensure.NotNull(player);
 		Ensure.NotNull(session);
+		if (session.IsBot)
+		{
+			return;
+		}
 
 		if (session.Panel.IsOpen && (page != 0) && (session.Panel.Page != page))
 		{
@@ -81,7 +85,7 @@ internal sealed class PanelPresenter(PanelSettings settings, PanelBuilder builde
 	{
 		Ensure.NotNull(session);
 
-		if (!session.Panel.IsOpen)
+		if (session.IsBot || !session.Panel.IsOpen)
 		{
 			return;
 		}
@@ -115,7 +119,7 @@ internal sealed class PanelPresenter(PanelSettings settings, PanelBuilder builde
 		Ensure.NotNull(session);
 
 		PanelState panel = session.Panel;
-		if (!panel.IsOpen || (session.Progress is null))
+		if (session.IsBot || !panel.IsOpen || (session.Progress is null))
 		{
 			return;
 		}

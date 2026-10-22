@@ -8,11 +8,13 @@ using CounterStrikeSharp.API.Modules.Admin;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Utils;
 using ktsu.CounterStrikeProgression.Core.Admin;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Panel;
 
 /// <summary>
 /// The root-only corrections: <c>css_csp_grant &lt;player&gt; &lt;xp&gt;</c> adds or takes away rank XP, and
-/// <c>css_csp_reset &lt;player&gt;</c> clears everything a player has earned. Both are logged.
+/// <c>css_csp_reset &lt;player&gt;</c> clears everything a player has earned. Both are logged, and both can name a
+/// bot persona as <c>bot:&lt;name&gt;</c>.
 /// </summary>
 /// <remarks>
 /// <see cref="CorrectionTargets"/> decides who a command names. A reset can't be undone, so it runs only when
@@ -46,7 +48,7 @@ internal sealed class AdminCommands(ProgressionServices services)
 
 		if ((command.ArgCount < 3) || !AdminCorrection.TryParseGrant(command.GetArg(2), out AdminCorrection? grant) || (grant is null))
 		{
-			command.ReplyToCommand("Usage: css_csp_grant <#userid|steamid64|name> <xp>, where a negative amount takes XP away.");
+			command.ReplyToCommand("Usage: css_csp_grant <#userid|steamid64|bot:<name>|name> <xp>, where a negative amount takes XP away.");
 			return;
 		}
 
@@ -65,7 +67,7 @@ internal sealed class AdminCommands(ProgressionServices services)
 
 		if (command.ArgCount < 2)
 		{
-			command.ReplyToCommand("Usage: css_csp_reset <#userid|steamid64|name>");
+			command.ReplyToCommand("Usage: css_csp_reset <#userid|steamid64|bot:<name>|name>");
 			return;
 		}
 
@@ -110,9 +112,15 @@ internal sealed class AdminCommands(ProgressionServices services)
 			: $"{name}'s progress is still loading, so try again in a moment.");
 	}
 
+	// A bot persona is never told, because nothing is sent to a bot.
 	private void TellTarget(ulong steamId, string text)
 	{
-		foreach (CCSPlayerController player in Utilities.GetPlayers().Where(p => p.SteamID == steamId))
+		if (BotIds.IsBot(steamId))
+		{
+			return;
+		}
+
+		foreach (CCSPlayerController player in Utilities.GetPlayers().Where(p => GameState.IsHuman(p) && (p.SteamID == steamId)))
 		{
 			if (services.Sessions.Get(player) is PlayerSession session)
 			{
@@ -149,12 +157,14 @@ internal sealed class AdminCommands(ProgressionServices services)
 		return true;
 	}
 
-	private static TargetResolution? FindTarget(CommandInfo command)
+	// Every connected human is a candidate, and a bot only while it's tracked, under its persona's id.
+	private TargetResolution? FindTarget(CommandInfo command)
 	{
-		TargetCandidate[] humans = [.. Utilities.GetPlayers()
-			.Where(GameState.IsHuman)
-			.Select(p => new TargetCandidate(p.SteamID, p.UserId ?? -1, p.PlayerName ?? string.Empty))];
-		TargetResolution target = CorrectionTargets.Resolve(command.GetArg(1), humans);
+		TargetCandidate[] players = [.. Utilities.GetPlayers()
+			.Where(GameState.IsTracked)
+			.Select(p => new TargetCandidate(p.IsBot ? services.Sessions.Get(p)?.SteamId ?? 0 : p.SteamID, p.UserId ?? -1, p.PlayerName ?? string.Empty))
+			.Where(c => c.SteamId != 0)];
+		TargetResolution target = CorrectionTargets.Resolve(command.GetArg(1), players);
 		if (!target.Found)
 		{
 			command.ReplyToCommand(target.Error!);

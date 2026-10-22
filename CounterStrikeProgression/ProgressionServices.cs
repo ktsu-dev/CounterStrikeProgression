@@ -77,6 +77,10 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	/// Refreshes a player's panel, shows a floatie, announces what they earned, and adds it to this map's XP,
 	/// the site's feed, and Discord.
 	/// </summary>
+	/// <remarks>
+	/// A bot persona's gains still count toward its map XP, its recap, the records, and the site, which keeps them
+	/// for the bot's own page, but nothing is drawn for it and its moments stay out of chat and Discord.
+	/// </remarks>
 	/// <param name="player">The player.</param>
 	/// <param name="session">The player's session.</param>
 	/// <param name="result">What they earned.</param>
@@ -98,16 +102,20 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 		session.MapXp += result.XpEarned;
 		session.Recap.Add(result);
 		Site?.Record(session, player.PlayerName ?? string.Empty, result);
-		if (Discord is { } discord)
+		if (!session.IsBot)
 		{
-			foreach (string line in DiscordMessages.From(result, player.PlayerName ?? string.Empty, Config.Discord))
+			if (Discord is { } discord)
 			{
-				discord.TryEnqueue(line);
+				foreach (string line in DiscordMessages.From(result, player.PlayerName ?? string.Empty, Config.Discord))
+				{
+					discord.TryEnqueue(line);
+				}
 			}
+
+			PanelPresenter.Invalidate(session);
+			Floaties.Show(player, result, floatieKey, at);
+			announcer.Announce(player, session, result);
 		}
-		PanelPresenter.Invalidate(session);
-		Floaties.Show(player, result, floatieKey, at);
-		announcer.Announce(player, session, result);
 
 		// Records are rare and the site reads them from the database, so a broken one is written straight away.
 		Sessions.SaveRecords();
@@ -153,7 +161,7 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	/// <param name="session">The player's session.</param>
 	/// <param name="player">The player, or <see langword="null"/> when their controller is already gone.</param>
 	/// <param name="map">The map played.</param>
-	/// <param name="announce">Whether to tell the player in chat.</param>
+	/// <param name="announce">Whether to tell the player in chat, which a bot never is.</param>
 	public void FinishRecap(PlayerSession session, CCSPlayerController? player, string map, bool announce)
 	{
 		Ensure.NotNull(session);
@@ -175,7 +183,7 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 		MapStats.Add(session.Progress, recap);
 
 		Site?.Record(recap);
-		if (announce && (valid is not null))
+		if (announce && (valid is not null) && !session.IsBot)
 		{
 			announcer.AnnounceRecap(valid, recap);
 		}

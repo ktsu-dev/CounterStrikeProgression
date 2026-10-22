@@ -63,9 +63,24 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 		if (@event.Userid is CCSPlayerController player)
 		{
 			Sessions.Connect(player);
+			ConnectBots();
 		}
 
 		return HookResult.Continue;
+	}
+
+	// Bots are only tracked while a human is on, so the first human to join brings in the bots already playing.
+	private void ConnectBots()
+	{
+		if (!Sessions.HumansOnline)
+		{
+			return;
+		}
+
+		foreach (CCSPlayerController bot in Utilities.GetPlayers().Where(p => p.IsBot))
+		{
+			Sessions.Connect(bot);
+		}
 	}
 
 	// Keyed by slot, so a player whose controller is already invalid as they leave still gets saved.
@@ -82,11 +97,37 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 		services.ApplyBounty(services.Bounties.Drop(playerSlot));
 		services.Floaties.RemoveOwner(playerSlot);
 		Sessions.DisconnectSlot(playerSlot);
+
+		if (!Sessions.HumansOnline)
+		{
+			EndBotSessions();
+		}
+	}
+
+	// With the last human gone, the bots stop being tracked: their recaps go to the site quietly, their progress
+	// is saved, and the bounty board starts empty when someone comes back.
+	private void EndBotSessions()
+	{
+		foreach (PlayerSession bot in Sessions.BotSessions)
+		{
+			services.FinishRecap(bot, Utilities.GetPlayerFromSlot(bot.Slot), MapName, announce: false);
+			services.Site?.Forget(bot.SteamId);
+		}
+
+		Sessions.EndBotSessions();
+		services.Bounties.Clear();
 	}
 
 	private HookResult OnPlayerSpawn(EventPlayerSpawn @event, GameEventInfo info)
 	{
 		CCSPlayerController? player = @event.Userid;
+
+		// A bot added while a human is on, or one that was on before the first human joined, starts here.
+		if (player is { IsValid: true, IsBot: true })
+		{
+			Sessions.Connect(player);
+		}
+
 		if ((player is null) || (Sessions.Get(player) is not PlayerSession session))
 		{
 			return HookResult.Continue;
@@ -107,7 +148,7 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 	// easy to miss, and their progress may not have loaded yet. A load that finishes later waits for the next spawn.
 	private void Welcome(CCSPlayerController player, PlayerSession session)
 	{
-		if (session.Welcomed || !services.Config.WelcomeMessage || (session.Progress is not PlayerProgress progress))
+		if (session.IsBot || session.Welcomed || !services.Config.WelcomeMessage || (session.Progress is not PlayerProgress progress))
 		{
 			return;
 		}

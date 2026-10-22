@@ -4,23 +4,27 @@ namespace ktsu.CounterStrikeProgression;
 
 using CounterStrikeSharp.API;
 using ktsu.CounterStrikeProgression.Core.Events;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.Tracking;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
 /// <summary>
-/// Everything the plugin keeps for one connected human player.
+/// Everything the plugin keeps for one connected player, a human or a tracked bot.
 /// </summary>
 /// <param name="slot">The player's slot.</param>
-/// <param name="steamId">The player's 64-bit Steam ID.</param>
+/// <param name="steamId">The player's id: a 64-bit Steam ID, or a bot persona's id.</param>
 internal sealed class PlayerSession(int slot, ulong steamId)
 {
 	/// <summary>Gets the player's slot.</summary>
 	public int Slot { get; } = slot;
 
-	/// <summary>Gets the player's 64-bit Steam ID.</summary>
+	/// <summary>Gets the player's id: a 64-bit Steam ID, or a bot persona's id from <see cref="BotIds"/>.</summary>
 	public ulong SteamId { get; } = steamId;
+
+	/// <summary>Gets a value indicating whether the session is a bot persona's.</summary>
+	public bool IsBot => BotIds.IsBot(SteamId);
 
 	/// <summary>Whether the player has left, which stops load retries. Read off the game thread, so it is volatile.</summary>
 	public volatile bool IsGone;

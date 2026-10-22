@@ -37,6 +37,7 @@ internal sealed class RankTags(RankTagSettings settings, SessionManager sessions
 
 	/// <summary>
 	/// Sets a player's clan tag when their rank has changed since it was last set, or it was asked to be set again.
+	/// A bot persona never gets one.
 	/// </summary>
 	/// <param name="player">The player.</param>
 	/// <param name="session">The player's session.</param>
@@ -44,7 +45,7 @@ internal sealed class RankTags(RankTagSettings settings, SessionManager sessions
 	{
 		Ensure.NotNull(player);
 		Ensure.NotNull(session);
-		if (!settings.ClanTag || (session.Progress is not PlayerProgress progress) || (session.ClanTagRank == progress.Rank))
+		if (!settings.ClanTag || session.IsBot || (session.Progress is not PlayerProgress progress) || (session.ClanTagRank == progress.Rank))
 		{
 			return;
 		}
@@ -62,13 +63,18 @@ internal sealed class RankTags(RankTagSettings settings, SessionManager sessions
 	public static void Refresh(PlayerSession session)
 	{
 		Ensure.NotNull(session);
+		if (session.IsBot)
+		{
+			return;
+		}
+
 		session.ClanTagRank = -1;
 	}
 
 	private HookResult OnSayText2(UserMessage message)
 	{
 		CCSPlayerController? author = Utilities.GetPlayerFromIndex(message.ReadInt("entityindex"));
-		if (sessions.Get(author) is { Progress: PlayerProgress progress })
+		if (sessions.Get(author) is { IsBot: false, Progress: PlayerProgress progress })
 		{
 			message.SetString("param1", $"{RankLadder.TagFor(progress.Rank)} {message.ReadString("param1")}");
 		}

@@ -7,6 +7,7 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Cvars;
 using CounterStrikeSharp.API.Modules.Utils;
 using ktsu.CounterStrikeProgression.Core.Events;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Weapons;
 
 /// <summary>
@@ -96,6 +97,24 @@ internal static class GameState
 	/// <returns>Whether it's a human player.</returns>
 	public static bool IsHuman(CCSPlayerController? player) =>
 		(player is not null) && player.IsValid && !player.IsBot && !player.IsHLTV && (player.SteamID != 0);
+
+	/// <summary>
+	/// Gets a value indicating whether a controller is a player whose progress is kept: a human with a SteamID, or
+	/// a bot with a name to key its persona by.
+	/// </summary>
+	/// <param name="player">The controller.</param>
+	/// <returns>Whether the player can have a session.</returns>
+	public static bool IsTracked(CCSPlayerController? player) =>
+		(player is not null) && player.IsValid && !player.IsHLTV
+		&& (player.IsBot ? !string.IsNullOrWhiteSpace(player.PlayerName) : player.SteamID != 0);
+
+	/// <summary>
+	/// Gets the id a player's progress is keyed by: the SteamID64 for a human, and the name's bot id for a bot.
+	/// </summary>
+	/// <param name="player">The controller.</param>
+	/// <returns>The id, or 0 when there is no player or no usable id.</returns>
+	public static ulong PlayerIdOf(CCSPlayerController? player) =>
+		player is null ? 0 : PlayerIds.Of(player.IsBot, player.SteamID, player.PlayerName);
 
 	/// <summary>
 	/// Gets a player's live pawn.

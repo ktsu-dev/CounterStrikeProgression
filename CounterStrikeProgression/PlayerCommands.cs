@@ -248,7 +248,7 @@ internal sealed class PlayerCommands(ProgressionServices services, string module
 					ChatColors.Yellow,
 					i + 1,
 					ChatColors.Default,
-					entry.Name,
+					ChatReports.PlayerName(entry.SteamId, entry.Name),
 					ChatColors.Gold,
 					rank,
 					entry.RankXp));
