@@ -212,6 +212,45 @@ public sealed class AdminCorrectionTests
 	}
 
 	[TestMethod]
+	public void Resolve_NamesAnOfflineBotByPrefix()
+	{
+		TargetResolution target = CorrectionTargets.Resolve("bot:Muhlik", []);
+
+		Assert.IsTrue(target.Found);
+		Assert.AreEqual(10000000062568863UL, target.SteamId);
+		Assert.AreEqual("Muhlik", target.Name);
+	}
+
+	[TestMethod]
+	public void Resolve_TakesABotId()
+	{
+		TargetResolution target = CorrectionTargets.Resolve("10000000062568863", []);
+
+		Assert.IsTrue(target.Found);
+		Assert.AreEqual(10000000062568863UL, target.SteamId);
+	}
+
+	[TestMethod]
+	public void Resolve_MatchesAConnectedBotByName()
+	{
+		TargetCandidate[] players = [new(10000000062568863, 3, "Muhlik"), new(76561197960265729, 2, "Alice")];
+
+		TargetResolution target = CorrectionTargets.Resolve("muh", players);
+
+		Assert.IsTrue(target.Found);
+		Assert.AreEqual(10000000062568863UL, target.SteamId);
+	}
+
+	[TestMethod]
+	public void Resolve_RejectsAnEmptyBotName()
+	{
+		TargetResolution target = CorrectionTargets.Resolve("bot:", []);
+
+		Assert.IsFalse(target.Found);
+		StringAssert.Contains(target.Error, "bot:<name>");
+	}
+
+	[TestMethod]
 	public void TargetsExplainMissingAndAmbiguousMatches()
 	{
 		TargetCandidate[] humans = [new(76561198000000002, 7, "Bob"), new(76561198000000003, 9, "Bobby"), new(76561198000000004, 11, "Rob")];
