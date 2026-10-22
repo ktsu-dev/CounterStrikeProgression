@@ -84,11 +84,11 @@ internal sealed class Announcer(PluginConfig config)
 					break;
 
 				case NoticeKind.BountyCollected:
-					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} ended {ChatColors.Red}{notice.PlayerName}{ChatColors.Default}'s {notice.Value}-kill streak and collected the {ChatColors.Gold}{Xp(notice.Xp)} XP{ChatColors.Default} bounty!");
+					Server.PrintToChatAll($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.Green}{player.PlayerName}{ChatColors.Default} ended {ChatColors.Red}{OtherName(notice)}{ChatColors.Default}'s {notice.Value}-kill streak and collected the {ChatColors.Gold}{Xp(notice.Xp)} XP{ChatColors.Default} bounty!");
 					break;
 
 				case NoticeKind.NemesisKilled:
-					player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} You took down your nemesis {ChatColors.LightRed}{notice.PlayerName}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
+					player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} You took down your nemesis {ChatColors.LightRed}{OtherName(notice)}{ChatColors.Default} (+{Xp(notice.Xp)} XP)");
 					break;
 
 				case NoticeKind.StreakDay:
@@ -108,6 +108,13 @@ internal sealed class Announcer(PluginConfig config)
 			player.PrintToChat($" {ChatColors.Gold}{config.ChatPrefix}{ChatColors.Default} {ChatColors.LightPurple}{string.Join(", ", skillShots)}{ChatColors.Default} +{Xp(skillShotXp)} XP");
 		}
 	}
+
+	/// <summary>
+	/// Gets the chat name of the other player in a notice, which ends in " [BOT]" for a bot persona.
+	/// </summary>
+	/// <param name="notice">The notice.</param>
+	/// <returns>The name.</returns>
+	private static string OtherName(ProgressionNotice notice) => ChatReports.PlayerName(notice.PlayerId, notice.PlayerName ?? string.Empty);
 
 	/// <summary>
 	/// Tells the whole server a line, such as a bounty being placed.

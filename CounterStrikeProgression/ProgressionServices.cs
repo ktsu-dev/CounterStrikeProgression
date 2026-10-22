@@ -153,7 +153,7 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 	/// connected, so their names can be read.
 	/// </summary>
 	/// <param name="changes">What the bounty board returned.</param>
-	public void ApplyBounty(IReadOnlyList<BountyChange> changes) => BountyBoard.Settle(changes, NameOf, PayBounty, announcer.AnnounceAll);
+	public void ApplyBounty(IReadOnlyList<BountyChange> changes) => BountyBoard.Settle(changes, NameOf, IdOf, PayBounty, announcer.AnnounceAll);
 
 	/// <summary>
 	/// Ends a player's map recap, adds it to their totals for the map, sends it to the site, and tells them about it. A session that earned
@@ -215,17 +215,19 @@ internal sealed class ProgressionServices(PluginConfig config, ProgressionEngine
 		return !GameState.TeammatesAreEnemies && (attacker.TeamNum == victim.TeamNum);
 	}
 
-	private bool PayBounty(BountyChange change, string holder)
+	private BountyPayout PayBounty(BountyChange change, string holder)
 	{
 		if ((change.CollectorSlot is not int slot) || (Utilities.GetPlayerFromSlot(slot) is not { IsValid: true } collector)
 			|| (Sessions.Get(collector) is not { Progress: PlayerProgress progress } session))
 		{
-			return false;
+			return BountyPayout.Unpaid;
 		}
 
-		Apply(collector, session, Engine.ApplyBounty(progress, holder, change.Kills, change.Xp), change.HolderSlot);
-		return true;
+		Apply(collector, session, Engine.ApplyBounty(progress, holder, change.Kills, change.Xp, IdOf(change.HolderSlot)), change.HolderSlot);
+		return session.IsBot ? BountyPayout.PaidToBot : BountyPayout.Paid;
 	}
+
+	private ulong IdOf(int slot) => Sessions.All.FirstOrDefault(s => s.Slot == slot)?.SteamId ?? 0;
 
 	private string NameOf(int slot) =>
 		(Utilities.GetPlayerFromSlot(slot) is { IsValid: true } player ? player.PlayerName : null)

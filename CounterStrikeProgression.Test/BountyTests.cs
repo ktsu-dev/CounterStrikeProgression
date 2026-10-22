@@ -4,6 +4,7 @@ namespace ktsu.CounterStrikeProgression.Test;
 
 using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Floaties;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Recap;
 using ktsu.CounterStrikeProgression.Core.Tracking;
@@ -14,6 +15,7 @@ public sealed class BountyTests
 	private const int Leader = 1;
 	private const int Hunter = 2;
 	private const int Victim = 9;
+	private const ulong HumanId = 76561197960265729;
 
 	private static BountyBoard Board(int startKills = 5, int xpPerKill = 50) =>
 		new(new ProgressionSettings { BountyStartKills = startKills, BountyXpPerKill = xpPerKill });
@@ -227,13 +229,13 @@ public sealed class BountyTests
 		BountyChange placed = new(BountyChangeKind.Placed, Leader, 5, 250);
 		BountyChange collected = new(BountyChangeKind.Collected, Leader, 7, 350, Hunter);
 
-		bool Pay(BountyChange change, string holder)
+		BountyPayout Pay(BountyChange change, string holder)
 		{
 			paid.Add((change, holder));
-			return true;
+			return BountyPayout.Paid;
 		}
 
-		BountyBoard.Settle([collected, placed], slot => $"P{slot}", Pay, announced.Add);
+		BountyBoard.Settle([collected, placed], slot => $"P{slot}", _ => HumanId, Pay, announced.Add);
 
 		Assert.HasCount(1, paid);
 		Assert.AreEqual((collected, "P1"), paid[0]);
@@ -247,10 +249,48 @@ public sealed class BountyTests
 		List<string> announced = [];
 		BountyChange collected = new(BountyChangeKind.Collected, Leader, 7, 350, Hunter);
 
-		BountyBoard.Settle([collected], _ => "Ann", (_, _) => false, announced.Add);
+		BountyBoard.Settle([collected], _ => "Ann", _ => HumanId, (_, _) => BountyPayout.Unpaid, announced.Add);
 
 		Assert.HasCount(1, announced);
 		Assert.Contains("went unclaimed", announced[0]);
+	}
+
+	[TestMethod]
+	public void ABotEndingAStreakIsAnnouncedToEveryone()
+	{
+		List<string> announced = [];
+		BountyChange collected = new(BountyChangeKind.Collected, Leader, 7, 350, Hunter);
+		Dictionary<int, (ulong Id, string Name)> players = new()
+		{
+			[Leader] = (HumanId, "Ann"),
+			[Hunter] = (BotIds.For("Muhlik"), "Muhlik"),
+		};
+
+		BountyBoard.Settle([collected], slot => players[slot].Name, slot => players[slot].Id, (_, _) => BountyPayout.PaidToBot, announced.Add);
+
+		Assert.HasCount(1, announced);
+		Assert.AreEqual("Ann's 7-kill streak was ended by Muhlik [BOT], who collected the 350 XP bounty.", announced[0]);
+	}
+
+	[TestMethod]
+	public void BoardLinesMarkABotHolder()
+	{
+		List<string> announced = [];
+		BountyChange placed = new(BountyChangeKind.Placed, Leader, 5, 250);
+
+		BountyBoard.Settle([placed], _ => "Muhlik", _ => BotIds.For("Muhlik"), (_, _) => BountyPayout.Paid, announced.Add);
+
+		Assert.AreEqual("Muhlik [BOT] leads with a 5-kill streak. End it for a 250 XP bounty!", announced.Single());
+	}
+
+	[TestMethod]
+	public void ACollectedBountyKeepsTheHoldersId()
+	{
+		ulong holderId = BotIds.For("Muhlik");
+
+		ProgressionResult result = TestHelpers.Engine().ApplyBounty(TestHelpers.Player(), "Muhlik", 5, 250, holderId);
+
+		Assert.AreEqual(holderId, result.Notices.Single(n => n.Kind == NoticeKind.BountyCollected).PlayerId);
 	}
 
 	[TestMethod]

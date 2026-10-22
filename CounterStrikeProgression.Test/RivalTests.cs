@@ -99,6 +99,7 @@ public sealed class RivalTests
 		ProgressionNotice notice = Assert.ContainsSingle(result.Notices);
 		Assert.AreEqual(NoticeKind.NemesisKilled, notice.Kind);
 		Assert.AreEqual("Muhlik", notice.PlayerName);
+		Assert.AreEqual(bot.SteamId, notice.PlayerId);
 		Assert.AreEqual(engine.Settings.NemesisKillXp, notice.Xp);
 	}
 

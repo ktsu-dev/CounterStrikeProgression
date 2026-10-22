@@ -94,9 +94,15 @@
 		return cross;
 	}
 
+	// A bot's name ends in " [BOT]", as everywhere only text fits.
+	function nameOf(name, isBot) {
+		const text = String(name ?? "");
+		return text && isBot ? `${text} [BOT]` : text;
+	}
+
 	function killText(kill) {
-		const killer = String(kill.killerName ?? "") || (kill.killerIsBot ? "A bot" : "A player");
-		const victim = String(kill.victimName ?? "") || (kill.victimIsBot ? "a bot" : "a player");
+		const killer = nameOf(kill.killerName, kill.killerIsBot) || (kill.killerIsBot ? "A bot" : "A player");
+		const victim = nameOf(kill.victimName, kill.victimIsBot) || (kill.victimIsBot ? "a bot" : "a player");
 		const weapon = String(kill.weapon ?? "");
 		return `${killer} → ${victim}${weapon ? `, ${weapon}` : ""}${kill.headshot ? ", headshot" : ""}`;
 	}

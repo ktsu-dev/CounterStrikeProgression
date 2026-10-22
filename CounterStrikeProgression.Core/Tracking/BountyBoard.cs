@@ -3,6 +3,7 @@
 namespace ktsu.CounterStrikeProgression.Core.Tracking;
 
 using System.Globalization;
+using ktsu.CounterStrikeProgression.Core.Panel;
 
 /// <summary>
 /// What happened to the bounty.
@@ -20,6 +21,21 @@ internal enum BountyChangeKind
 
 	/// <summary>The holder's streak ended with no one to pay, such as a suicide, an untracked bot, or leaving.</summary>
 	Lost,
+}
+
+/// <summary>
+/// What paying a collected bounty came to.
+/// </summary>
+internal enum BountyPayout
+{
+	/// <summary>No collector was found to pay, so the bounty went unclaimed.</summary>
+	Unpaid = 0,
+
+	/// <summary>A human collected it, and their own result announces it.</summary>
+	Paid,
+
+	/// <summary>A bot persona collected it. Its own result is never announced, so the board announces it.</summary>
+	PaidToBot,
 }
 
 /// <summary>
@@ -114,32 +130,69 @@ internal sealed class BountyBoard(ProgressionSettings settings)
 	}
 
 	/// <summary>
-	/// Pays each collected bounty to its collector, and tells everyone about every other change.
+	/// Pays each collected bounty to its collector, and tells everyone about every other change, and about a bot
+	/// persona ending a streak, since a bot's own result is never announced.
 	/// </summary>
 	/// <param name="changes">What the board returned.</param>
 	/// <param name="nameOf">Gets a player's name from their slot.</param>
-	/// <param name="pay">Pays a collected bounty, given the holder's name, and returns whether it found the collector to pay.</param>
+	/// <param name="idOf">Gets a player's id from their slot, which marks a bot persona's name in chat.</param>
+	/// <param name="pay">Pays a collected bounty, given the holder's name, and says who it paid.</param>
 	/// <param name="announce">Tells the whole server a line.</param>
-	public static void Settle(IReadOnlyList<BountyChange> changes, Func<int, string> nameOf, Func<BountyChange, string, bool> pay, Action<string> announce)
+	public static void Settle(IReadOnlyList<BountyChange> changes, Func<int, string> nameOf, Func<int, ulong> idOf, Func<BountyChange, string, BountyPayout> pay, Action<string> announce)
 	{
 		Ensure.NotNull(changes);
 		Ensure.NotNull(nameOf);
+		Ensure.NotNull(idOf);
 		Ensure.NotNull(pay);
 		Ensure.NotNull(announce);
 
+		string ChatName(int slot) => ChatReports.PlayerName(idOf(slot), nameOf(slot));
+
 		foreach (BountyChange change in changes)
 		{
-			string holder = nameOf(change.HolderSlot);
-			if ((change.Kind != BountyChangeKind.Collected) || !pay(change, holder))
+			if (change.Kind != BountyChangeKind.Collected)
 			{
-				announce(Describe(change, holder));
+				announce(Describe(change, ChatName(change.HolderSlot)));
+				continue;
+			}
+
+			switch (pay(change, nameOf(change.HolderSlot)))
+			{
+				case BountyPayout.Unpaid:
+					announce(Describe(change, ChatName(change.HolderSlot)));
+					break;
+
+				case BountyPayout.PaidToBot when change.CollectorSlot is int collector:
+					announce(DescribeBotCollected(change, ChatName(change.HolderSlot), ChatName(collector)));
+					break;
+
+				default:
+					break;
 			}
 		}
 	}
 
 	/// <summary>
+	/// Gets the chat line for a bot persona ending a streak and collecting its bounty.
+	/// </summary>
+	/// <param name="change">The collected bounty.</param>
+	/// <param name="holderName">The chat name of the player whose streak ended.</param>
+	/// <param name="botName">The bot's chat name, marked as a bot.</param>
+	/// <returns>The line.</returns>
+	public static string DescribeBotCollected(BountyChange change, string holderName, string botName)
+	{
+		Ensure.NotNull(change);
+		Ensure.NotNull(holderName);
+		Ensure.NotNull(botName);
+
+		string xp = change.Xp.ToString("N0", CultureInfo.InvariantCulture);
+		return $"{holderName}'s {change.Kills}-kill streak was ended by {botName}, who collected the {xp} XP bounty.";
+	}
+
+	/// <summary>
 	/// Gets the chat line for a bounty that was placed, grew, or went unclaimed. A collected bounty is announced with
-	/// the collector's result instead, so one with no collector to pay reads as unclaimed.
+	/// the collector's result instead, or with <see cref="DescribeBotCollected"/> for a bot persona, so one with no
+	/// collector to pay reads as unclaimed.
 	/// </summary>
 	/// <param name="change">What happened.</param>
 	/// <param name="holderName">The name of the player who carries, or carried, the bounty.</param>

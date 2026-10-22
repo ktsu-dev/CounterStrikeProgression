@@ -52,6 +52,9 @@ internal sealed record ProgressionNotice
 	/// <summary>Gets the other player's name, for nemesis notices and the player whose bounty was collected.</summary>
 	public string? PlayerName { get; init; }
 
+	/// <summary>Gets the other player's id, alongside <see cref="PlayerName"/>, which tells a bot persona from a human.</summary>
+	public ulong PlayerId { get; init; }
+
 	/// <summary>Gets the challenge name, for tier notices.</summary>
 	public string? ChallengeName { get; init; }
 

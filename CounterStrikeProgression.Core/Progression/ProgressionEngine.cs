@@ -268,7 +268,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 		Rivalry.Count(killer, victim);
 		if ((nemesis?.SteamId == victim.SteamId) && (Settings.NemesisKillXp > 0))
 		{
-			result.Notices.Add(new() { Kind = NoticeKind.NemesisKilled, PlayerName = victim.Name, Value = (int)Math.Min(int.MaxValue, nemesis.Deaths), Xp = Settings.NemesisKillXp });
+			result.Notices.Add(new() { Kind = NoticeKind.NemesisKilled, PlayerName = victim.Name, PlayerId = victim.SteamId, Value = (int)Math.Min(int.MaxValue, nemesis.Deaths), Xp = Settings.NemesisKillXp });
 			CreditRankXp(killer, Settings.NemesisKillXp, result);
 		}
 
@@ -474,8 +474,9 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 	/// <param name="holderName">The name of the player whose streak ended.</param>
 	/// <param name="kills">The streak that ended.</param>
 	/// <param name="xp">What the bounty was worth.</param>
+	/// <param name="holderId">The id of the player whose streak ended.</param>
 	/// <returns>What it earned.</returns>
-	public ProgressionResult ApplyBounty(PlayerProgress player, string holderName, int kills, long xp)
+	public ProgressionResult ApplyBounty(PlayerProgress player, string holderName, int kills, long xp, ulong holderId = 0)
 	{
 		Ensure.NotNull(player);
 		Ensure.NotNull(holderName);
@@ -486,7 +487,7 @@ internal sealed class ProgressionEngine(ProgressionSettings settings, TimeProvid
 			return result;
 		}
 
-		result.Notices.Add(new() { Kind = NoticeKind.BountyCollected, PlayerName = holderName, Value = kills, Xp = xp, Broadcast = true });
+		result.Notices.Add(new() { Kind = NoticeKind.BountyCollected, PlayerName = holderName, PlayerId = holderId, Value = kills, Xp = xp, Broadcast = true });
 		CreditRankXp(player, xp, result);
 		return Settle(player, result);
 	}
