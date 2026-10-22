@@ -141,6 +141,7 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 		}
 
 		ulong id = GameState.PlayerIdOf(player);
+		EndStaleSessions(id);
 		if (!BotTracking.MayStart(id, HumansOnline, sessions.Values.Select(s => s.SteamId)))
 		{
 			return;
@@ -165,6 +166,23 @@ internal sealed class SessionManager(IProgressionStore store, ProgressionEngine 
 		Task pendingSaves = saveChains.GetValueOrDefault(session.SteamId) ?? Task.CompletedTask;
 		_ = Task.Run(() => LoadAsync(session, name, pendingSaves));
 	}
+
+	/// <summary>
+	/// Ends every session holding an id whose slot no longer holds a controller with it, which a disconnect that
+	/// never arrived leaves behind. Without this, such a session would keep a bot persona's name from being
+	/// tracked in any other slot. The progress is kept with the players who recently left.
+	/// </summary>
+	/// <param name="id">The id.</param>
+	private void EndStaleSessions(ulong id)
+	{
+		foreach (PlayerSession stale in sessions.Values.Where(s => (s.SteamId == id) && (GameState.PlayerIdOf(SlotController(s.Slot)) != id)).ToList())
+		{
+			DisconnectSlot(stale.Slot);
+		}
+	}
+
+	private static CCSPlayerController? SlotController(int slot) =>
+		Utilities.GetPlayerFromSlot(slot) is { } controller && GameState.IsTracked(controller) ? controller : null;
 
 	/// <summary>
 	/// Saves and ends the session in a slot, if there is one.

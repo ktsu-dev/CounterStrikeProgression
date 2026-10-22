@@ -121,6 +121,30 @@ public sealed class HeatmapTests
 	}
 
 	[TestMethod]
+	public void BufferDropsBotFightsBeforeKillsWithAHuman()
+	{
+		ulong muhlik = BotIds.For("Muhlik");
+		ulong rip = BotIds.For("Rip");
+		KillPointBuffer buffer = new(new HeatmapSettings { QueueLimit = 100 });
+		for (short i = 0; i < 60; i++)
+		{
+			buffer.Add(Kill(x: i));
+		}
+
+		for (short i = 0; i < 60; i++)
+		{
+			buffer.Add(Kill(killer: muhlik, victim: rip, x: (short)(1000 + i)));
+		}
+
+		IReadOnlyList<KillPoint> drained = buffer.Drain();
+		Assert.HasCount(100, drained);
+		Assert.AreEqual(60, drained.Count(p => !p.IsBotFight));
+		Assert.AreEqual(40, drained.Count(p => p.IsBotFight));
+		Assert.AreEqual((short)1020, drained.First(p => p.IsBotFight).KillerX);
+		Assert.AreEqual((short)0, drained[0].KillerX);
+	}
+
+	[TestMethod]
 	public void RoundClampsToTheStoredRange()
 	{
 		Assert.AreEqual((short)12, KillPoint.Round(11.6));

@@ -140,13 +140,15 @@ A persona appears with the humans everywhere a player shows: the ranks, ladder, 
 Personas are left out of:
 
 - server records, which stay human-only even with `RecordsCountBots` on,
-- the home page's live feed, Discord posts, the weekly digest, and chat announcements to the server, though each persona's moments still show on its own page,
+- the home page's live feed, Discord posts, the weekly digest, and chat announcements of their own moments to the server, though each persona's moments still show on its own page,
 - anything drawn or sent to a player, such as the panel, chat lines, and floaties, since a bot has no client,
 - the admin panel (CSS-BANS and SimpleAdmin).
 
+The bounty board is the exception in chat. The whole server still hears when a bounty is placed on a persona, grows, or goes unclaimed, and when a persona ends a human's streak and collects the bounty, with the persona's name ending in ` [BOT]`.
+
 `css_csp_grant` and `css_csp_reset` take `bot:<name>`, such as `css_csp_reset bot:Muhlik`, or the persona's id, to correct or reset a persona whether it's on the server or not.
 
-Kills between two personas are stored for the heatmaps under their own per-map cap, `MaxBotFightsPerMap`, so they never push out a human's kills (see [Kill heatmaps](#kill-heatmaps)).
+Kills between two personas are stored for the heatmaps under their own per-map cap, `MaxBotFightsPerMap`, so they never push out a human's kills (see [Kill heatmaps](#kill-heatmaps)). While the database is down, the plugin's queue of unwritten kills drops its oldest bot fights first, for the same reason.
 
 ### Progression site
 

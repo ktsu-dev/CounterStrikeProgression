@@ -5,7 +5,7 @@ namespace ktsu.CounterStrikeProgression.Core.Heatmaps;
 /// <summary>
 /// Holds kills on the game thread until the next write. It keeps one in every
 /// <see cref="HeatmapSettings.SampleEvery"/> kills per map, and drops the oldest past
-/// <see cref="HeatmapSettings.QueueLimit"/>, so a database outage can't grow it without end.
+/// <see cref="HeatmapSettings.QueueLimit"/>, bot fights first, so a database outage can't grow it without end.
 /// </summary>
 /// <param name="settings">The heatmap settings.</param>
 internal sealed class KillPointBuffer(HeatmapSettings settings)
@@ -71,9 +71,27 @@ internal sealed class KillPointBuffer(HeatmapSettings settings)
 		Trim();
 	}
 
+	/// <summary>
+	/// Drops the oldest bot fights past the limit first, so fights between bot personas never push out a kill
+	/// with a human on either end, and only then the oldest of the rest.
+	/// </summary>
 	private void Trim()
 	{
-		while (pending.Count > QueueLimit)
+		int excess = pending.Count - QueueLimit;
+		LinkedListNode<KillPoint>? node = pending.First;
+		while ((excess > 0) && (node is not null))
+		{
+			LinkedListNode<KillPoint>? next = node.Next;
+			if (node.Value.IsBotFight)
+			{
+				pending.Remove(node);
+				excess--;
+			}
+
+			node = next;
+		}
+
+		for (; excess > 0; excess--)
 		{
 			pending.RemoveFirst();
 		}

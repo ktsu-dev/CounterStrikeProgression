@@ -127,8 +127,8 @@ internal sealed class SiteReporter : IDisposable
 	}
 
 	/// <summary>
-	/// Adds a kill to the next batch, for the live map and the live fight maps. Kills between two bots are sent
-	/// too, for the live map, and the site keeps them out of the fight maps.
+	/// Adds a kill to the next batch, for the live map and the live fight maps. Every kill is sent, for the live
+	/// map, and the site keeps out of the fight maps only kills between two bots with no persona.
 	/// </summary>
 	/// <param name="point">The kill.</param>
 	public void Record(KillPoint point)
