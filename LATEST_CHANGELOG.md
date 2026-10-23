@@ -1,6 +1,6 @@
-## v1.27.3 (patch)
+## v1.27.4-pre.1 (prerelease)
 
-Changes since v1.27.2:
+Changes since v1.27.3:
 
-- [patch] Cap concurrent database writes at two (matt-edmondson)
+- Bump CounterStrikeSharp.API from 1.0.377 to 1.0.378 (dependabot[bot])
 
