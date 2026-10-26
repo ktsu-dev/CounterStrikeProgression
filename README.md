@@ -133,6 +133,8 @@ Bots are players too. Each bot name is a persona with its own progress, kept acr
 
 Bots are tracked only while at least one human is on the server, so an empty server can't farm XP, streaks, or season standings.
 
+`BotNames` renames bots, keyed by the name their profile gives them and matched ignoring case, such as `"BotNames": { "Muhlik": "Data", "Rock": "Vision" }`. It's empty by default. A bot is renamed as it joins, before it's tracked, so the new name is its persona and the old name's progress stays with the old name. CS2 reads its bot profiles from its own pak ahead of any loose `botprofile.db`, which makes this the way to rename bots on a server.
+
 Each persona's id comes from its name, from 10000000000000000 to 10000000099999999. That range sits below every individual-account SteamID64, so a bot id never collides with a human's, and the site can tell a bot from its id alone. A human using a bot's name is still a different player, keyed by their SteamID64. A bot with no usable name gets id 0 and isn't tracked.
 
 A persona appears with the humans everywhere a player shows: the ranks, ladder, leaderboards, seasons, compare, rivals, the live scoreboard and map, `!top`, and `!stats`. The site marks it with a BOT pill after its name, and its share card draws the same pill. Where only text fits, such as chat, a page title, or a link preview, the name ends in ` [BOT]`. A persona has its own player page, feed, fights map, and share card, but no Steam profile link.

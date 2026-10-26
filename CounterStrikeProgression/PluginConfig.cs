@@ -234,6 +234,13 @@ public sealed class PluginConfig : BasePluginConfig
 	/// <summary>Gets or sets where each player's rank is shown to everyone else.</summary>
 	public RankTagSettings RankTags { get; set; } = new();
 
+	/// <summary>
+	/// Gets or sets the names bots are given in place of their profile names, keyed by the profile name and matched
+	/// ignoring case. A bot is renamed as it joins, before it's tracked, so its persona is keyed by the new name.
+	/// </summary>
+	[SuppressMessage("Usage", "CA2227:Collection properties should be read only", Justification = "CounterStrikeSharp's config binder sets the whole dictionary.")]
+	public Dictionary<string, string> BotNames { get; set; } = [];
+
 	/// <summary>Gets or sets how often, in seconds, changed progress is saved.</summary>
 	public float SaveIntervalSeconds { get; set; } = 60;
 

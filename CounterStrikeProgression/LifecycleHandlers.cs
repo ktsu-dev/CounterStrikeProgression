@@ -6,6 +6,7 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using ktsu.CounterStrikeProgression.Core.Events;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Progression;
 
 /// <summary>
@@ -45,6 +46,7 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 		plugin.RegisterListener<Listeners.OnMapStart>(OnMapStart);
 		plugin.RegisterListener<Listeners.OnTick>(OnTick);
 		plugin.RegisterListener<Listeners.OnClientDisconnect>(OnClientDisconnect);
+		plugin.RegisterListener<Listeners.OnClientPutInServer>(OnClientPutInServer);
 		plugin.RegisterListener<Listeners.OnMapEnd>(OnMapEnd);
 		plugin.RegisterListener<Listeners.CheckTransmit>(OnCheckTransmit);
 		if (services.Site is { } site)
@@ -79,7 +81,26 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 
 		foreach (CCSPlayerController bot in Utilities.GetPlayers().Where(p => p.IsBot))
 		{
+			RenameBot(bot);
 			Sessions.Connect(bot);
+		}
+	}
+
+	private void OnClientPutInServer(int playerSlot)
+	{
+		if (Utilities.GetPlayerFromSlot(playerSlot) is { IsValid: true, IsBot: true } bot)
+		{
+			RenameBot(bot);
+		}
+	}
+
+	// Also run before a bot is tracked, in case its name wasn't set yet when it was put in the server.
+	private void RenameBot(CCSPlayerController bot)
+	{
+		if (BotNames.RenameFor(services.Config.BotNames, bot.PlayerName) is string name)
+		{
+			bot.PlayerName = name;
+			Utilities.SetStateChanged(bot, "CBasePlayerController", "m_iszPlayerName");
 		}
 	}
 
@@ -125,6 +146,7 @@ internal sealed class LifecycleHandlers(ProgressionServices services)
 		// A bot added while a human is on, or one that was on before the first human joined, starts here.
 		if (player is { IsValid: true, IsBot: true })
 		{
+			RenameBot(player);
 			Sessions.Connect(player);
 		}
 
