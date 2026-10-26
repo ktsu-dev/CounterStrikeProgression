@@ -1,6 +1,9 @@
-## v1.27.4-pre.1 (prerelease)
+## v1.28.0 (minor)
 
-Changes since v1.27.3:
+Changes since v1.27.0:
 
-- Bump CounterStrikeSharp.API from 1.0.377 to 1.0.378 (dependabot[bot])
+- [minor] Rename bots from a BotNames config map (matt-edmondson)
+- [patch] Cap concurrent database writes at two (matt-edmondson)
+- [patch] Widen each heatmap line toward the victim (matt-edmondson)
+- [patch] Fade each heatmap line in from the shooter (matt-edmondson)
 
