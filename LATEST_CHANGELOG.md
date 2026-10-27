@@ -1,9 +1,6 @@
-## v1.28.0 (minor)
+## v1.28.1-pre.1 (prerelease)
 
-Changes since v1.27.0:
+Changes since v1.28.0:
 
-- [minor] Rename bots from a BotNames config map (matt-edmondson)
-- [patch] Cap concurrent database writes at two (matt-edmondson)
-- [patch] Widen each heatmap line toward the victim (matt-edmondson)
-- [patch] Fade each heatmap line in from the shooter (matt-edmondson)
+- Bump MSTest.Sdk from 4.5.1 to 4.5.2 (dependabot[bot])
 
