@@ -1,6 +1,6 @@
-## v1.28.1-pre.1 (prerelease)
+## v1.29.0 (minor)
 
 Changes since v1.28.0:
 
-- Bump MSTest.Sdk from 4.5.1 to 4.5.2 (dependabot[bot])
+- [minor] Suggest challenges for the weapon in the player's hands (matt-edmondson)
 
