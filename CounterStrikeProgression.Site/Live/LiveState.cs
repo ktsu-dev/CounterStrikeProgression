@@ -206,6 +206,19 @@ internal sealed partial class LiveState(SiteOptions options, FeedStore feed, Tim
 		}
 	}
 
+	/// <summary>
+	/// Gets the weapon a player has in their hands, as the latest snapshot reports it.
+	/// </summary>
+	/// <param name="steamId">The player's id.</param>
+	/// <returns>The weapon key, or <see langword="null"/> when the player isn't on, the server is offline, or they hold nothing tracked.</returns>
+	public string? EquippedWeapon(ulong steamId)
+	{
+		lock (gate)
+		{
+			return (steamId != 0) && IsOnlineLocked() ? snapshot!.Players.FirstOrDefault(p => p.SteamId == steamId)?.Weapon : null;
+		}
+	}
+
 	private List<ulong> MergeProgress(IReadOnlyList<ulong> corrected, IReadOnlyList<ProgressSnapshot> progress)
 	{
 		// Live rows only ever merge upward, so a correction that lowered someone's progress has to clear them first.

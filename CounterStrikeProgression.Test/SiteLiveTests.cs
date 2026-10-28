@@ -119,6 +119,22 @@ public sealed class SiteLiveTests
 	}
 
 	[TestMethod]
+	public void EquippedWeapon_IsTheLivePlayersWeapon_WhileOnline()
+	{
+		ManualTime time = new();
+		LiveState state = NewState(time);
+		state.Apply(Batch(Server(Start, "de_dust2", Human(1) with { Weapon = "ak47" }, Human(2))));
+
+		Assert.AreEqual("ak47", state.EquippedWeapon(1));
+		Assert.IsNull(state.EquippedWeapon(2));
+		Assert.IsNull(state.EquippedWeapon(3));
+		Assert.IsNull(state.EquippedWeapon(0));
+
+		time.Advance(TimeSpan.FromSeconds(30));
+		Assert.IsNull(state.EquippedWeapon(1));
+	}
+
+	[TestMethod]
 	public void IsPlaying_CountsABotPersona()
 	{
 		LiveState state = NewState(new ManualTime());

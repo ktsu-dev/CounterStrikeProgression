@@ -207,6 +207,14 @@ internal static class GameState
 	}
 
 	/// <summary>
+	/// Gets the tracked weapon a player is holding, telling alternates such as the USP-S and P2000 apart.
+	/// </summary>
+	/// <param name="pawn">The player's pawn.</param>
+	/// <returns>The weapon, or <see langword="null"/> when they hold nothing tracked.</returns>
+	public static WeaponInfo? HeldWeapon(CCSPlayerPawn? pawn) =>
+		ActiveWeapon(pawn) is { } held ? WeaponCatalog.Resolve(held.DesignerName, held.AttributeManager.Item.ItemDefinitionIndex) : null;
+
+	/// <summary>
 	/// Works out which tracked weapon an event's weapon name means, using the attacker's held weapon to tell
 	/// alternates such as the USP-S and P2000 apart.
 	/// </summary>

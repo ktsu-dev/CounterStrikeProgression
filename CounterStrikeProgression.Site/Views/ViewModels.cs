@@ -74,6 +74,7 @@ internal sealed record WeaponView(
 /// <param name="LastSession">The player's last finished map, or <see langword="null"/> when none has been seen.</param>
 /// <param name="Contracts">The contracts running now, today's first, with the player's progress on each.</param>
 /// <param name="Streak">The player's play streak.</param>
+/// <param name="Equipped">The challenges for the weapon in the player's hands, or <see langword="null"/> while they're off the server or hold nothing tracked.</param>
 internal sealed record PlayerView(
 	string SteamId,
 	string Name,
@@ -92,7 +93,14 @@ internal sealed record PlayerView(
 	IReadOnlyList<FeedItem> Feed,
 	SessionView? LastSession,
 	IReadOnlyList<ContractView> Contracts,
-	StreakView Streak);
+	StreakView Streak,
+	EquippedView? Equipped = null);
+
+/// <summary>The challenges to try with the weapon a player is holding.</summary>
+/// <param name="WeaponKey">The weapon key.</param>
+/// <param name="WeaponName">The weapon's display name.</param>
+/// <param name="Suggestions">The weapon's challenges, closest to a tier first, then ones not started.</param>
+internal sealed record EquippedView(string WeaponKey, string WeaponName, IReadOnlyList<SuggestionView> Suggestions);
 
 /// <summary>A player's run of consecutive days with rank XP.</summary>
 /// <param name="Days">The current streak, or 0 once it has broken.</param>

@@ -194,7 +194,7 @@ internal static class Endpoints
 		}
 
 		PlayerProgress merged = ProgressMerge.Merge(stored, overlay);
-		PlayerView view = PlayerViewBuilder.Build(merged, live.Settings, live.IsPlaying(steamId), live.PlayerFeed(steamId), live.LastSession(steamId), reroll: reroll ?? 0);
+		PlayerView view = PlayerViewBuilder.Build(merged, live.Settings, live.IsPlaying(steamId), live.PlayerFeed(steamId), live.LastSession(steamId), reroll: reroll ?? 0, equippedWeapon: live.EquippedWeapon(steamId));
 		feats.Set(steamId, view.Feats.Where(f => f.Earned).Select(f => FeatCatalog.All.First(d => d.Id == f.Id)));
 		return TypedResults.Ok(view);
 	}

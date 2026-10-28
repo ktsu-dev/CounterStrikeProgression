@@ -30,8 +30,9 @@ internal static class PlayerViewBuilder
 	/// <param name="lastSession">The player's last map recap. Omitted, the page shows none.</param>
 	/// <param name="now">The moment that decides which contracts are running, in UTC, or the current time when omitted.</param>
 	/// <param name="reroll">How many times the viewer has rerolled the "try something new" suggestion.</param>
+	/// <param name="equippedWeapon">The key of the weapon in the player's hands. Omitted, or while offline, the page suggests nothing for it.</param>
 	/// <returns>The page model.</returns>
-	public static PlayerView Build(PlayerProgress merged, ProgressionSettings settings, bool online, IReadOnlyList<FeedEntry>? feed = null, MapRecap? lastSession = null, DateTime? now = null, int reroll = 0)
+	public static PlayerView Build(PlayerProgress merged, ProgressionSettings settings, bool online, IReadOnlyList<FeedEntry>? feed = null, MapRecap? lastSession = null, DateTime? now = null, int reroll = 0, string? equippedWeapon = null)
 	{
 		Ensure.NotNull(merged);
 		Ensure.NotNull(settings);
@@ -69,12 +70,37 @@ internal static class PlayerViewBuilder
 			online,
 			weapons,
 			ChallengeSuggester.Suggest(merged, settings, catalog, reroll),
-			[.. new FeatCatalog(settings).Measure(merged).Select(m => new FeatView(m.Feat.Id, m.Feat.Name, m.Feat.Description, m.Progress.IsEarned, Math.Min(m.Progress.Current, m.Progress.Target), m.Progress.Target))],
+			Feats(merged, settings),
 			FeedCaptions.For(feed ?? [], settings),
 			lastSession is null ? null : BuildSession(lastSession),
 			Contracts(merged, settings, at),
-			Streak(merged.Streak, at));
+			Streak(merged.Streak, at),
+			online ? Equipped(merged, equippedWeapon, settings, catalog) : null);
 	}
+
+	/// <summary>
+	/// Gets every feat, earned or not, with the player's progress toward it.
+	/// </summary>
+	/// <param name="merged">The player's progress.</param>
+	/// <param name="settings">The plugin's settings.</param>
+	/// <returns>The feats.</returns>
+	private static IReadOnlyList<FeatView> Feats(PlayerProgress merged, ProgressionSettings settings) =>
+	[
+		.. new FeatCatalog(settings).Measure(merged).Select(m => new FeatView(m.Feat.Id, m.Feat.Name, m.Feat.Description, m.Progress.IsEarned, Math.Min(m.Progress.Current, m.Progress.Target), m.Progress.Target)),
+	];
+
+	/// <summary>
+	/// Gets the challenges for the weapon a player is holding.
+	/// </summary>
+	/// <param name="merged">The player's progress.</param>
+	/// <param name="weaponKey">The key of the weapon in their hands.</param>
+	/// <param name="settings">The plugin's settings.</param>
+	/// <param name="catalog">The challenge ladders built from <paramref name="settings"/>.</param>
+	/// <returns>The suggestions, or <see langword="null"/> when the weapon isn't tracked.</returns>
+	private static EquippedView? Equipped(PlayerProgress merged, string? weaponKey, ProgressionSettings settings, ChallengeCatalog catalog) =>
+		WeaponCatalog.Resolve(weaponKey) is { } held
+			? new EquippedView(held.Key.WeakString, held.DisplayName, ChallengeSuggester.ForWeapon(merged, held, settings, catalog))
+			: null;
 
 	/// <summary>
 	/// Gets the contracts running at a moment, with the player's progress on each.

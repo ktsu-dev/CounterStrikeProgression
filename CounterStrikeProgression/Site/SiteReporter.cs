@@ -267,8 +267,8 @@ internal sealed class SiteReporter : IDisposable
 	}
 
 	/// <summary>
-	/// Adds where a player's pawn stands, which way it faces, and whether it's alive. A player with no pawn
-	/// keeps no position, and counts as dead.
+	/// Adds where a player's pawn stands, which way it faces, whether it's alive, and the tracked weapon it holds
+	/// while alive. A player with no pawn keeps no position, and counts as dead.
 	/// </summary>
 	private static LivePlayer WithPosition(LivePlayer player, CCSPlayerController controller)
 	{
@@ -279,6 +279,7 @@ internal sealed class SiteReporter : IDisposable
 		}
 
 		bool alive = pawn.LifeState == (byte)LifeState_t.LIFE_ALIVE;
+		player = player with { Weapon = alive ? GameState.HeldWeapon(pawn)?.Key.WeakString : null };
 		float yaw = pawn.EyeAngles.Y;
 		// The site's JSON options reject NaN and Infinity, and one such value would fail the whole batch.
 		if (!float.IsFinite(origin.X) || !float.IsFinite(origin.Y) || !float.IsFinite(yaw))

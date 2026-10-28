@@ -21,6 +21,9 @@ internal static class ChallengeSuggester
 	/// </summary>
 	public const int PerWeaponLimit = 2;
 
+	/// <summary>The most challenges to suggest for the weapon a player is holding.</summary>
+	public const int EquippedLimit = 3;
+
 	/// <summary>
 	/// Suggests the player's next challenges.
 	/// </summary>
@@ -104,6 +107,41 @@ internal static class ChallengeSuggester
 		}
 
 		return suggestions;
+	}
+
+	/// <summary>
+	/// Suggests challenges for one weapon, the one a player is holding.
+	/// </summary>
+	/// <param name="player">The player's merged progress.</param>
+	/// <param name="weapon">The weapon.</param>
+	/// <param name="settings">The plugin's settings, for the XP a tier pays.</param>
+	/// <param name="catalog">The challenge ladders built from <paramref name="settings"/>.</param>
+	/// <returns>
+	/// Up to <see cref="EquippedLimit"/> of the weapon's challenges: started ones closest to their next tier first,
+	/// then ones not started, Kills first and then skill challenges commonest first.
+	/// </returns>
+	public static IReadOnlyList<SuggestionView> ForWeapon(PlayerProgress player, WeaponInfo weapon, ProgressionSettings settings, ChallengeCatalog catalog)
+	{
+		Ensure.NotNull(player);
+		Ensure.NotNull(weapon);
+		Ensure.NotNull(settings);
+		Ensure.NotNull(catalog);
+
+		WeaponProgress progress = player.Weapons.GetValueOrDefault(weapon.Key) ?? new(weapon.Key);
+		List<ChallengeDefinition> ladders = [.. catalog.For(weapon)];
+		IEnumerable<SuggestionView> started = ladders
+			.Select(d => Build(weapon, d, progress, settings, isNew: false))
+			.OfType<SuggestionView>()
+			.Where(v => v.Count > 0)
+			.OrderByDescending(v => v.Progress)
+			.ThenBy(v => v.Target - v.Count)
+			.ThenBy(v => v.ChallengeId, StringComparer.Ordinal);
+		IEnumerable<SuggestionView> fresh = ladders.Where(d => d.Id == ChallengeDefinition.KillsId)
+			.Concat(ladders.Where(d => d.Kind == ChallengeKind.Skill).OrderBy(d => d.Rarity))
+			.Select(d => Build(weapon, d, progress, settings, isNew: true))
+			.OfType<SuggestionView>()
+			.Where(v => v.Count == 0);
+		return [.. started.Concat(fresh).Take(EquippedLimit)];
 	}
 
 	/// <summary>

@@ -1187,6 +1187,8 @@
 		const panel = el("div", "panel");
 		root.replaceChildren(panel);
 		let online = false;
+		// The weapon the page's "For your" section is for, so a switch in game refetches it.
+		let equipped = null;
 		let last = null;
 		let seasons = null;
 		// The open tab and the weapon picked on the weapons tab, kept across refetches.
@@ -1236,11 +1238,17 @@
 		function nextTab(player) {
 			const suggestions = Array.isArray(player.suggestions) ? player.suggestions : [];
 			const contracts = Array.isArray(player.contracts) ? player.contracts : [];
-			return suggestions.length > 0 || contracts.length > 0 ? "next" : "weapons";
+			return suggestions.length > 0 || contracts.length > 0 || player.equipped ? "next" : "weapons";
 		}
 
 		function renderNext(player) {
 			const box = el("div", "pad");
+			const held = player.equipped;
+			if (held && Array.isArray(held.suggestions) && held.suggestions.length > 0) {
+				const heldCards = el("div", "suggestions");
+				heldCards.append(...held.suggestions.map((suggestion) => suggestionCard(suggestion)));
+				box.append(el("h2", "section-title", `For your ${held.weaponName}`), heldCards);
+			}
 			const contracts = Array.isArray(player.contracts) ? player.contracts : [];
 			if (contracts.length > 0) {
 				const done = contracts.filter((contract) => contract.completed).length;
@@ -1620,6 +1628,7 @@
 		function render(player) {
 			last = player;
 			online = Boolean(player.online);
+			equipped = player.equipped?.weaponKey ?? null;
 			document.title = `${botLabel(id, player.name)} · ${SERVER_NAME}`;
 			tab = tab ?? tabFromHash() ?? nextTab(player);
 
@@ -1736,8 +1745,8 @@
 			}
 		});
 		on("snapshot", (snapshot) => {
-			const present = snapshot.players.some((p) => String(p.steamId) !== "0" && String(p.steamId) === id);
-			if (present !== online) {
+			const self = snapshot.players.find((p) => String(p.steamId) !== "0" && String(p.steamId) === id);
+			if ((Boolean(self) !== online) || (self && (self.weapon ?? null) !== equipped)) {
 				refetch();
 			}
 		});
