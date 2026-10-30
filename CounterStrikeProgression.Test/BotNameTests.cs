@@ -42,4 +42,12 @@ public sealed class BotNameTests
 	[TestMethod]
 	public void RenameFor_IgnoresABlankTarget() =>
 		Assert.IsNull(BotNames.RenameFor(new Dictionary<string, string> { ["Rock"] = " " }, "Rock"));
+
+	[TestMethod]
+	public void RenameFor_ANullTarget_StillRenamesTheOtherBots() =>
+		Assert.AreEqual("Muhlik", BotNames.RenameFor(new Dictionary<string, string> { ["Rock"] = null!, ["Bob"] = "Muhlik" }, "Bob"));
+
+	[TestMethod]
+	public void RenameFor_IgnoresANullTarget() =>
+		Assert.IsNull(BotNames.RenameFor(new Dictionary<string, string> { ["Rock"] = null!, ["Bob"] = "Muhlik" }, "Rock"));
 }

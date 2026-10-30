@@ -27,7 +27,10 @@ internal static class BotNames
 		}
 
 		string trimmed = current.Trim();
-		if (names.Values.Any(given => string.Equals(given.Trim(), trimmed, StringComparison.OrdinalIgnoreCase)))
+
+		// A null value is read from config as readily as a blank one ("Rock": null), and means the same:
+		// leave that bot alone. It must not stop every other bot from being renamed.
+		if (names.Values.Any(given => string.Equals(given?.Trim(), trimmed, StringComparison.OrdinalIgnoreCase)))
 		{
 			return null;
 		}
