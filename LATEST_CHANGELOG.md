@@ -1,7 +1,6 @@
-## v1.29.1-pre.1 (prerelease)
+## v1.29.1 (patch)
 
 Changes since v1.29.0:
 
-- Bump SkiaSharp.NativeAssets.Linux.NoDependencies from 4.153.1 to 4.154.0 (dependabot[bot])
-- Bump SkiaSharp from 4.153.1 to 4.154.0 (dependabot[bot])
+- [patch] Leave a bot alone when its BotNames entry is null (Claude)
 
