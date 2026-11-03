@@ -50,9 +50,20 @@ internal static class CorrectionTargets
 		if (text.StartsWith(BotPrefix, StringComparison.OrdinalIgnoreCase))
 		{
 			string botName = text[BotPrefix.Length..].Trim();
-			return botName.Length == 0
-				? new(0, text, $"Name a bot as {BotPrefix}<name>.")
-				: new(BotIds.For(botName), botName, null);
+			if (botName.Length == 0)
+			{
+				return new(0, text, $"Name a bot as {BotPrefix}<name>.");
+			}
+
+			// A persona's id hashes its name case-sensitively, but admins type names in any case. Prefer a
+			// connected bot whose name matches, so "bot:muhlik" reaches the connected "Muhlik" rather than a
+			// persona that doesn't exist. An offline persona can only be named by its exact case.
+			List<TargetCandidate> connected = [.. players.Where(p => BotIds.IsBot(p.SteamId) && string.Equals(p.Name, botName, StringComparison.OrdinalIgnoreCase))];
+			TargetCandidate? bot = connected.FirstOrDefault(p => string.Equals(p.Name, botName, StringComparison.Ordinal))
+				?? (connected.Count == 1 ? connected[0] : null);
+			return bot is null
+				? new(BotIds.For(botName), botName, null)
+				: new(bot.SteamId, bot.Name, null);
 		}
 
 		if (ulong.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out ulong steamId) && (steamId is >= MinSteamId and <= MaxSteamId || BotIds.IsBot(steamId)))
