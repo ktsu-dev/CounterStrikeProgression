@@ -50,4 +50,13 @@ public sealed class BotNameTests
 	[TestMethod]
 	public void RenameFor_IgnoresANullTarget() =>
 		Assert.IsNull(BotNames.RenameFor(new Dictionary<string, string> { ["Rock"] = null!, ["Bob"] = "Muhlik" }, "Rock"));
+
+	[TestMethod]
+	public void RenameFor_ANullMapFromConfig_RenamesNothing()
+	{
+		// "BotNames": null in the config leaves the non-nullable property null, as the binder does.
+		Dictionary<string, string> names = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>("null")!;
+
+		Assert.IsNull(BotNames.RenameFor(names, "Rock"));
+	}
 }

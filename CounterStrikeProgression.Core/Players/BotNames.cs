@@ -11,17 +11,19 @@ internal static class BotNames
 	/// <summary>
 	/// Gets the name to give a bot.
 	/// </summary>
-	/// <param name="names">Profile names to the names they're replaced with, matched ignoring case.</param>
+	/// <param name="names">
+	/// Profile names to the names they're replaced with, matched ignoring case. Null, as config reads
+	/// <c>"BotNames": null</c>, renames nothing, the same as an empty map.
+	/// </param>
 	/// <param name="current">The bot's name now.</param>
 	/// <returns>
 	/// The new name, or null to leave the bot alone: the name isn't mapped, maps to itself or to a blank, or is
 	/// already a name the map gives. The last keeps a bot from being renamed twice when one rename's result is
 	/// another's source.
 	/// </returns>
-	public static string? RenameFor(IReadOnlyDictionary<string, string> names, string current)
+	public static string? RenameFor(IReadOnlyDictionary<string, string>? names, string current)
 	{
-		Ensure.NotNull(names);
-		if (string.IsNullOrWhiteSpace(current))
+		if (names is null || string.IsNullOrWhiteSpace(current))
 		{
 			return null;
 		}
