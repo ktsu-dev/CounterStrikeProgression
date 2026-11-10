@@ -3,6 +3,7 @@
 namespace ktsu.CounterStrikeProgression.Test;
 
 using ktsu.CounterStrikeProgression.Core;
+using ktsu.CounterStrikeProgression.Core.Contracts;
 using ktsu.CounterStrikeProgression.Core.Feats;
 using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Panel;
@@ -114,6 +115,72 @@ public sealed class RecapTests
 		FeatDefinition feat = FeatCatalog.All[0];
 		tracker.Add(Result(0, new ProgressionNotice { Kind = NoticeKind.RankUp, Value = 4 }, new ProgressionNotice { Kind = NoticeKind.FeatEarned, Feat = feat }));
 		Assert.AreEqual($"the feat {feat.Name}", tracker.Finish(1, "a", "m", 0, 0, Start).Best);
+	}
+
+	[TestMethod]
+	public void Tracker_BestMoment_NamesAFinishedContractOverCommonShots()
+	{
+		ActiveContract contract = ContractCatalog.Active(new DateOnly(2026, 10, 17), new ProgressionSettings())[0];
+		RecapTracker tracker = new(Start);
+		tracker.Add(Result(0, Shot(Rarity.Common, xp: 10), Shot(Rarity.Common, xp: 10)));
+		tracker.Add(Result(0, new ProgressionNotice { Kind = NoticeKind.ContractCompleted, Contract = contract, Xp = contract.Xp }));
+
+		Assert.AreEqual(FeedBuilder.ContractTitle(contract), tracker.Finish(1, "a", "m", 0, 0, Start).Best);
+	}
+
+	[TestMethod]
+	public void Tracker_BestMoment_RanksAContractBetweenTiersAndEpicShots()
+	{
+		ActiveContract contract = ContractCatalog.Active(new DateOnly(2026, 10, 17), new ProgressionSettings())[^1];
+		ProgressionNotice finished = new() { Kind = NoticeKind.ContractCompleted, Contract = contract, Xp = contract.Xp };
+
+		RecapTracker tracker = new(Start);
+		tracker.Add(Result(0, new ProgressionNotice { Kind = NoticeKind.TierCompleted, Weapon = TestHelpers.Weapon("awp"), ChallengeName = "Kills", Value = 3, Xp = 9000 }, finished));
+		Assert.AreEqual(FeedBuilder.ContractTitle(contract), tracker.Finish(1, "a", "m", 0, 0, Start).Best);
+
+		tracker.Add(Result(0, finished, Shot(Rarity.Epic, "awp", 10)));
+		Assert.AreEqual($"{Shot(Rarity.Epic).SkillShot!.Name} with the AWP", tracker.Finish(1, "a", "m", 0, 0, Start).Best);
+	}
+
+	[TestMethod]
+	public void Tracker_BestMoment_NamesANemesisKillOverCommonShots()
+	{
+		RecapTracker tracker = new(Start);
+		tracker.Add(Result(0, Shot(Rarity.Common, xp: 10)));
+		tracker.Add(Result(0, new ProgressionNotice { Kind = NoticeKind.NemesisKilled, PlayerName = "Rival", Value = 4, Xp = 50 }));
+
+		Assert.AreEqual("revenge on your nemesis Rival", tracker.Finish(1, "a", "m", 0, 0, Start).Best);
+	}
+
+	[TestMethod]
+	public void Tracker_BestMoment_ANemesisKillAloneIsNamed()
+	{
+		RecapTracker tracker = new(Start);
+		tracker.Add(Result(50, new ProgressionNotice { Kind = NoticeKind.NemesisKilled, PlayerName = "Rival", Value = 4, Xp = 50 }));
+
+		Assert.AreEqual("revenge on your nemesis Rival", tracker.Finish(1, "a", "m", 0, 0, Start).Best);
+	}
+
+	[TestMethod]
+	public void Describe_EveryRecappedNoticeKindHasText()
+	{
+		ActiveContract contract = ContractCatalog.Active(new DateOnly(2026, 10, 17), new ProgressionSettings())[0];
+		foreach (NoticeKind kind in Enum.GetValues<NoticeKind>().Where(k => k != NoticeKind.StreakDay))
+		{
+			ProgressionNotice notice = new()
+			{
+				Kind = kind,
+				Weapon = kind is NoticeKind.SkillShot or NoticeKind.TierCompleted or NoticeKind.WeaponLevelUp or NoticeKind.MasteryStar ? TestHelpers.Weapon("awp") : null,
+				SkillShot = kind == NoticeKind.SkillShot ? SkillShotCatalog.All[0] : null,
+				Feat = FeatCatalog.All[0],
+				Contract = contract,
+				PlayerName = "Rival",
+				ChallengeName = "Kills",
+				Value = 3,
+			};
+
+			Assert.IsFalse(string.IsNullOrWhiteSpace(RecapTracker.Describe(notice)), $"{kind} has no recap text");
+		}
 	}
 
 	[TestMethod]

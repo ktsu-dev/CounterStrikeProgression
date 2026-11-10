@@ -2,6 +2,7 @@
 
 namespace ktsu.CounterStrikeProgression.Core.Recap;
 
+using ktsu.CounterStrikeProgression.Core.Live;
 using ktsu.CounterStrikeProgression.Core.Panel;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
@@ -190,25 +191,29 @@ internal sealed class RecapTracker(DateTime startedAt)
 			NoticeKind.WeaponLevelUp => $"{weapon} level {notice.Value}".TrimStart(),
 			NoticeKind.MasteryStar => WeaponLevelCurve.StarTitle(notice.Weapon, notice.Value),
 			NoticeKind.BountyCollected => $"{notice.PlayerName}'s bounty",
-			_ => weapon is null ? $"{notice.SkillShot?.Name}" : $"{notice.SkillShot?.Name} with the {weapon}",
+			NoticeKind.ContractCompleted => notice.Contract is { } contract ? FeedBuilder.ContractTitle(contract) : "a contract",
+			NoticeKind.NemesisKilled => $"revenge on your nemesis {notice.PlayerName}".TrimEnd(),
+			NoticeKind.SkillShot => weapon is null ? $"{notice.SkillShot?.Name}" : $"{notice.SkillShot?.Name} with the {weapon}",
+			_ => string.Empty,
 		};
 	}
 
 	/// <summary>
-	/// Ranks moments: server records, then feats, then mastery stars, rank-ups, then epic skill shots, finished tiers and bounties, rare skill shots, weapon
-	/// levels, and common skill shots. Within a kind, the one that paid more wins, then the higher level, tier,
+	/// Ranks moments: server records, then feats, then mastery stars, rank-ups, then epic skill shots, finished contracts,
+	/// finished tiers, bounties and nemesis kills, rare skill shots, weapon levels, and common skill shots. Within a kind, the one that paid more wins, then the higher level, tier,
 	/// or rank, and the first wins a tie.
 	/// </summary>
 	private static (int Kind, long Xp, int Value) Weight(ProgressionNotice notice)
 	{
 		int kind = notice.Kind switch
 		{
-			NoticeKind.RecordBroken => 8,
-			NoticeKind.FeatEarned => 7,
-			NoticeKind.MasteryStar => 6,
-			NoticeKind.RankUp => 5,
-			NoticeKind.SkillShot when notice.SkillShot?.Rarity == Rarity.Epic => 4,
-			NoticeKind.TierCompleted or NoticeKind.BountyCollected => 3,
+			NoticeKind.RecordBroken => 9,
+			NoticeKind.FeatEarned => 8,
+			NoticeKind.MasteryStar => 7,
+			NoticeKind.RankUp => 6,
+			NoticeKind.SkillShot when notice.SkillShot?.Rarity == Rarity.Epic => 5,
+			NoticeKind.ContractCompleted => 4,
+			NoticeKind.TierCompleted or NoticeKind.BountyCollected or NoticeKind.NemesisKilled => 3,
 			NoticeKind.SkillShot when notice.SkillShot?.Rarity == Rarity.Rare => 2,
 			NoticeKind.WeaponLevelUp => 1,
 			_ => 0,
