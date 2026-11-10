@@ -126,6 +126,52 @@ public sealed class ContractTests
 		Assert.IsFalse(notices.Any(n => n.Kind == NoticeKind.ContractCompleted && n.Contract == contract));
 	}
 
+	private static ActiveContract MultiKills(ProgressionEngine engine) =>
+		engine.ActiveContracts.Single(c => c.Definition.Id == "multi_kills");
+
+	// One chain of quick kills, each kill a step further along it, as RoundTracker reports them.
+	private static void Chain(ProgressionEngine engine, PlayerProgress player, int kills)
+	{
+		for (int chained = 1; chained <= kills; chained++)
+		{
+			_ = engine.ApplyCombat(player, TestHelpers.Kill("ak47") with { ChainedKills = chained });
+		}
+	}
+
+	[TestMethod]
+	public void AFourKillChainCountsOnceTowardMultiKills()
+	{
+		ManualTime time = new();
+		ProgressionEngine engine = Engine(time);
+		PlayerProgress player = TestHelpers.Player();
+		ActiveContract contract = MultiKills(engine);
+
+		Chain(engine, player, 4);
+
+		ContractProgress progress = player.Contracts[(contract.PeriodKey, contract.Definition.Id)];
+		Assert.AreEqual(1, progress.Count);
+		Assert.IsFalse(progress.Completed);
+	}
+
+	[TestMethod]
+	public void ThreeSeparateDoubleKillsFinishMultiKills()
+	{
+		ManualTime time = new();
+		ProgressionEngine engine = Engine(time);
+		PlayerProgress player = TestHelpers.Player();
+		ActiveContract contract = MultiKills(engine);
+
+		List<ProgressionNotice> notices = [];
+		for (int i = 0; i < 3; i++)
+		{
+			_ = engine.ApplyCombat(player, TestHelpers.Kill("ak47") with { ChainedKills = 1 });
+			notices.AddRange(engine.ApplyCombat(player, TestHelpers.Kill("ak47") with { ChainedKills = 2 }).Notices);
+		}
+
+		Assert.AreEqual(3, player.Contracts[(contract.PeriodKey, contract.Definition.Id)].Count);
+		Assert.IsTrue(notices.Any(n => n.Kind == NoticeKind.ContractCompleted && n.Contract == contract));
+	}
+
 	[TestMethod]
 	public void KillsWithOtherClassesDoNotCount()
 	{
