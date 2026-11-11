@@ -18,7 +18,7 @@ internal static class GameState
 {
 	// Finding the game rules walks every entity, so it's done once per map rather than on every shot.
 	private static CCSGameRulesProxy? gameRules;
-	private static ConVar? teammatesAreEnemies;
+	private static ConVar<bool>? teammatesAreEnemies;
 
 	/// <summary>
 	/// Gets a value indicating whether the match is in warmup, when nothing counts.
@@ -43,8 +43,8 @@ internal static class GameState
 	{
 		get
 		{
-			teammatesAreEnemies ??= ConVar.Find("mp_teammates_are_enemies");
-			return teammatesAreEnemies?.GetPrimitiveValue<bool>() ?? false;
+			teammatesAreEnemies ??= ConVar<bool>.Find("mp_teammates_are_enemies");
+			return teammatesAreEnemies?.Value ?? false;
 		}
 	}
 

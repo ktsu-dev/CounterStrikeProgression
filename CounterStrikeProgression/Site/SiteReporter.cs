@@ -36,8 +36,8 @@ internal sealed class SiteReporter : IDisposable
 	private readonly List<ulong> pendingCorrected = [];
 	private readonly List<KillPoint> pendingKills = [];
 	private DateTime? mapStartedAt;
-	private ConVar? gameType;
-	private ConVar? gameMode;
+	private ConVar<int>? gameType;
+	private ConVar<int>? gameMode;
 	private int batchesSinceReset;
 
 	/// <summary>
@@ -196,9 +196,9 @@ internal sealed class SiteReporter : IDisposable
 
 	private void CollectBatch()
 	{
-		gameType ??= ConVar.Find("game_type");
-		gameMode ??= ConVar.Find("game_mode");
-		string mode = GameModes.Name(gameType?.GetPrimitiveValue<int>() ?? 0, gameMode?.GetPrimitiveValue<int>() ?? 0);
+		gameType ??= ConVar<int>.Find("game_type");
+		gameMode ??= ConVar<int>.Find("game_mode");
+		string mode = GameModes.Name(gameType?.Value ?? 0, gameMode?.Value ?? 0);
 		ServerSnapshot snapshot = new(DateTime.UtcNow, Server.MapName ?? string.Empty, mode, Server.MaxPlayers, ReadPlayers(), mapStartedAt);
 
 		int fullResendEvery = pluginConfig.Site.FullResendEvery;
