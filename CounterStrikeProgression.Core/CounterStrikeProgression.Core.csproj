@@ -15,7 +15,6 @@
     <PackageReference Include="Dapper" />
     <PackageReference Include="ktsu.Extensions" />
     <PackageReference Include="ktsu.Semantics.Strings" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" VersionOverride="11.0.0" />
     <PackageReference Include="MySqlConnector" />
     <PackageReference Include="Polyfill" PrivateAssets="all" />
   </ItemGroup>
