@@ -10,6 +10,11 @@ updates:
     # 3.x (the last license-key-free line); still allow 3.1.x patch/minor bumps.
     - dependency-name: "SixLabors.ImageSharp"
       update-types: ["version-update:semver-major"]
+    # Microsoft.Extensions.* majors track the target framework: the Site gets them
+    # from the ASP.NET Core shared framework and the plugin from the CounterStrikeSharp
+    # host. A lone major bump replaces those copies and breaks the build (#82).
+    - dependency-name: "Microsoft.Extensions.*"
+      update-types: ["version-update:semver-major"]
   groups:
     ktsu:
       patterns:

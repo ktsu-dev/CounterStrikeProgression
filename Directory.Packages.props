@@ -7,7 +7,7 @@
     <PackageVersion Include="Dapper" Version="2.1.89" />
     <PackageVersion Include="ktsu.Extensions" Version="1.9.3" />
     <PackageVersion Include="ktsu.Semantics.Strings" Version="6.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.15" />
     <PackageVersion Include="MySqlConnector" Version="3.0.0" />
     <PackageVersion Include="Polyfill" Version="11.4.5" />
     <PackageVersion Include="SkiaSharp" Version="4.156.0" />
