@@ -3,6 +3,7 @@
 namespace ktsu.CounterStrikeProgression.Test;
 
 using ktsu.CounterStrikeProgression.Core.Admin;
+using ktsu.CounterStrikeProgression.Core.Players;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.Storage;
 
@@ -219,6 +220,27 @@ public sealed class AdminCorrectionTests
 		Assert.IsTrue(target.Found);
 		Assert.AreEqual(10000000062568863UL, target.SteamId);
 		Assert.AreEqual("Muhlik", target.Name);
+	}
+
+	[TestMethod]
+	public void Resolve_NamesAConnectedBotByPrefixIgnoringCase()
+	{
+		TargetCandidate[] players = [new(BotIds.For("Muhlik"), 3, "Muhlik"), new(76561197960265729, 2, "muhlik")];
+
+		TargetResolution target = CorrectionTargets.Resolve("bot:muhlik", players);
+
+		Assert.IsTrue(target.Found);
+		Assert.AreEqual(BotIds.For("Muhlik"), target.SteamId);
+		Assert.AreEqual("Muhlik", target.Name);
+	}
+
+	[TestMethod]
+	public void Resolve_PrefersTheExactCaseWhenTwoConnectedBotsDifferOnlyInCase()
+	{
+		TargetCandidate[] players = [new(BotIds.For("Muhlik"), 3, "Muhlik"), new(BotIds.For("MUHLIK"), 4, "MUHLIK")];
+
+		Assert.AreEqual(BotIds.For("MUHLIK"), CorrectionTargets.Resolve("bot:MUHLIK", players).SteamId);
+		Assert.AreEqual(BotIds.For("muhlik"), CorrectionTargets.Resolve("bot:muhlik", players).SteamId);
 	}
 
 	[TestMethod]
