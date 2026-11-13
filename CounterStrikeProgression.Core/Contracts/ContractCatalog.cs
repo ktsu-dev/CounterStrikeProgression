@@ -32,7 +32,9 @@ internal static class ContractCatalog
 		[Daily("rare_skill_shots", "Earn 3 rare or epic skill shots", 3, s => s.SkillShot is { Rarity: not Rarity.Common })],
 		[Daily("wallbangs", "Get 2 kills through walls", 2, SkillShots("wallbang"))],
 		[Daily("movement", "Earn 5 movement skill shots, such as Jumpshot or Moving target", 5, SkillShots("moving_target", "airborne_target", "jumpshot", "air_to_air", "run_and_gun", "landing_shot"))],
-		[Daily("multi_kills", "Earn Double kill or better 3 times", 3, SkillShots("double_kill", "triple_kill", "rampage"))],
+		// Each chain of two or more quick kills reaches Double kill exactly once, while Triple kill and Rampage fire again
+		// as the same chain grows, so counting Double kill alone counts each multi-kill once.
+		[Daily("multi_kills", "Earn Double kill or better 3 times", 3, SkillShots("double_kill"))],
 		[Daily("utility_kills", "Get 2 kills with the knife, a grenade, or the Zeus", 2, s => (s.Kind == SignalKind.Kill) && s.Weapon is { Class: WeaponClass.Knife or WeaponClass.Grenade or WeaponClass.Taser })],
 		[Daily("chickens", "Kill 5 chickens", 5, s => s.Kind == SignalKind.Chicken)],
 		[Daily("assists", "Get 5 assists", 5, s => s.Kind == SignalKind.Assist)],
