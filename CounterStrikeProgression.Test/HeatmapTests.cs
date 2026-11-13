@@ -59,11 +59,67 @@ public sealed class HeatmapTests
 	}
 
 	[TestMethod]
-	public void IsBotFight_NeedsABotPersonaOnBothEnds()
+	public void IsBotFight_MeansNoHumanOnEitherEnd()
 	{
 		Assert.IsTrue(Kill(killer: BotIds.For("Rock"), victim: BotIds.For("Muhlik")).IsBotFight);
 		Assert.IsFalse(Kill(killer: TestHelpers.SteamId, victim: BotIds.For("Muhlik")).IsBotFight);
-		Assert.IsFalse(Kill(killer: 0, victim: BotIds.For("Muhlik")).IsBotFight);
+		Assert.IsFalse(Kill(killer: BotIds.For("Muhlik"), victim: TestHelpers.SteamId).IsBotFight);
+		Assert.IsFalse(Kill(killer: TestHelpers.SteamId, victim: 0).IsBotFight);
+		Assert.IsFalse(Kill(killer: 0, victim: TestHelpers.SteamId).IsBotFight);
+	}
+
+	/// <summary>
+	/// A bot with no session is recorded with id 0. A kill between it and a persona has no human on either
+	/// end, so it is a bot fight, not a human kill (#72).
+	/// </summary>
+	[TestMethod]
+	public void IsBotFight_IncludesAPersonaAgainstAnUntrackedBot()
+	{
+		Assert.IsTrue(Kill(killer: 0, victim: BotIds.For("Muhlik")).IsBotFight);
+		Assert.IsTrue(Kill(killer: BotIds.For("Muhlik"), victim: 0).IsBotFight);
+	}
+
+	/// <summary>
+	/// With the human cap at its floor, kills between a persona and an untracked bot never push a kill with a
+	/// human on an end out of the store (#72).
+	/// </summary>
+	[TestMethod]
+	public async Task Add_UntrackedBotFightsNeverPushOutHumanKills()
+	{
+		InMemoryKillMapStore store = new();
+		CancellationToken token = TestContext.CancellationToken;
+		ulong muhlik = BotIds.For("Muhlik");
+		await store.AddAsync([.. Enumerable.Range(0, 100).Select(i => Kill(killer: TestHelpers.SteamId, victim: muhlik, x: (short)i))], 100, 100, token).ConfigureAwait(false);
+		await store.AddAsync([.. Enumerable.Range(0, 500).Select(i => Kill(killer: muhlik, victim: 0, x: (short)(1000 + i)))], 100, 100, token).ConfigureAwait(false);
+
+		IReadOnlyList<KillPoint> human = await store.FightsAsync("de_dust2", TestHelpers.SteamId, null, 1000, token).ConfigureAwait(false);
+
+		Assert.HasCount(100, human);
+		Assert.IsTrue(human.All(p => p.KillerX < 1000));
+	}
+
+	/// <summary>
+	/// A backlog drops kills between a persona and an untracked bot before kills with a human on an end (#72).
+	/// </summary>
+	[TestMethod]
+	public void BufferDropsUntrackedBotFightsBeforeKillsWithAHuman()
+	{
+		ulong muhlik = BotIds.For("Muhlik");
+		KillPointBuffer buffer = new(new HeatmapSettings { QueueLimit = 100 });
+		for (short i = 0; i < 60; i++)
+		{
+			buffer.Add(Kill(killer: muhlik, victim: 0, x: (short)(1000 + i)));
+		}
+
+		for (short i = 0; i < 60; i++)
+		{
+			buffer.Add(Kill(x: i));
+		}
+
+		IReadOnlyList<KillPoint> drained = buffer.Drain();
+		Assert.HasCount(100, drained);
+		Assert.AreEqual(60, drained.Count(p => p.KillerId == TestHelpers.SteamId), "Every kill with a human on an end is kept");
+		Assert.AreEqual(40, drained.Count(p => p.IsBotFight));
 	}
 
 	[TestMethod]

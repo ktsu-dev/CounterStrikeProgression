@@ -39,10 +39,15 @@ internal sealed record KillPoint(
 	string? VictimName = null)
 {
 	/// <summary>
-	/// Gets a value indicating whether both ends are bot personas. Kept out of the live batch's JSON, because it follows from the two IDs.
+	/// Gets a value indicating whether there is no human on either end: each end is a bot persona or a bot with
+	/// no persona (id 0). A kill between a persona and an untracked bot is a bot fight too, so it is held to the
+	/// bot-fight cap and never pushes out a kill with a human on an end. Kept out of the live batch's JSON,
+	/// because it follows from the two IDs.
 	/// </summary>
 	[JsonIgnore]
-	public bool IsBotFight => BotIds.IsBot(KillerId) && BotIds.IsBot(VictimId);
+	public bool IsBotFight => !IsHuman(KillerId) && !IsHuman(VictimId);
+
+	private static bool IsHuman(ulong id) => (id != 0) && !BotIds.IsBot(id);
 
 	/// <summary>
 	/// Rounds a world coordinate to a stored one. CS2 maps fit in ±16384 units, so anything past a short's range is clamped.
