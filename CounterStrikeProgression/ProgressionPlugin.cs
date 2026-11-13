@@ -39,6 +39,9 @@ public sealed class ProgressionPlugin : BasePlugin, IPluginConfig<PluginConfig>
 	public void OnConfigParsed(PluginConfig config)
 	{
 		Ensure.NotNull(config);
+
+		// "BotNames": null is an obvious way to switch renaming off, and must mean the same as {}.
+		config.BotNames ??= [];
 		Config = config;
 	}
 
