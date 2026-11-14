@@ -6,6 +6,7 @@ using ktsu.CounterStrikeProgression.Core;
 using ktsu.CounterStrikeProgression.Core.Challenges;
 using ktsu.CounterStrikeProgression.Core.Progression;
 using ktsu.CounterStrikeProgression.Core.SkillShots;
+using ktsu.CounterStrikeProgression.Core.Weapons;
 
 /// <summary>One player's totals on the compare page.</summary>
 /// <param name="SteamId">The 64-bit Steam ID as a decimal string.</param>
@@ -126,8 +127,12 @@ internal static class CompareViewBuilder
 	{
 		long kills = progress.Weapons.Values.Sum(w => w.Kills);
 		long headshots = progress.Weapons.Values.Sum(w => w.Headshots);
-		long hits = progress.Weapons.Values.Sum(w => w.Hits);
-		long shots = progress.Weapons.Values.Sum(w => w.Shots);
+
+		// Only guns record shots, so knife and Zeus hits would raise accuracy with nothing to divide
+		// them by. Count hits and shots over guns alone, as LifeTracker does for a life's accuracy.
+		List<WeaponProgress> guns = [.. progress.Weapons.Where(w => WeaponCatalog.Find(w.Key)?.IsGun == true).Select(w => w.Value)];
+		long hits = guns.Sum(w => w.Hits);
+		long shots = guns.Sum(w => w.Shots);
 		return new(
 			view.SteamId,
 			view.Name,

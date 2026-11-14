@@ -78,6 +78,23 @@ public sealed class CompareTests
 	}
 
 	[TestMethod]
+	public void Build_AccuracyCountsOnlyGunsBecauseKnifeAndZeusRecordNoShots()
+	{
+		PlayerProgress player = Shooter();
+		WeaponProgress knife = player.Weapon(TestHelpers.Weapon("knife").Key);
+		knife.Kills = 4;
+		knife.Hits = 30;
+		WeaponProgress taser = player.Weapon(TestHelpers.Weapon("taser").Key);
+		taser.Kills = 1;
+		taser.Hits = 1;
+
+		CompareView view = CompareViewBuilder.Build(player, true, NoSeason, Sniper(), false, NoSeason, new ProgressionSettings());
+
+		Assert.AreEqual(50, view.A.Accuracy, "Knife and Zeus hits, which never record a shot, raised the gun accuracy.");
+		Assert.AreEqual(15, view.A.Kills, "Knife and Zeus kills still count toward the kill total.");
+	}
+
+	[TestMethod]
 	public void Build_ListsEveryWeaponEitherPlayerUsed()
 	{
 		CompareView view = CompareViewBuilder.Build(Shooter(), false, NoSeason, Sniper(), false, NoSeason, new ProgressionSettings());
