@@ -9,7 +9,7 @@ using ktsu.Extensions;
 /// </summary>
 /// <param name="IsOpeningKill">Whether it's the round's first kill.</param>
 /// <param name="ChainedKills">The attacker's kills in the current chain, counting this one.</param>
-/// <param name="KillsWithThisBullet">The attacker's kills on this tick, counting this one.</param>
+/// <param name="KillsWithThisBullet">The attacker's kills with this weapon on this tick, counting this one.</param>
 /// <param name="IsTrade">Whether the victim had just killed one of the attacker's teammates.</param>
 internal readonly record struct KillContext(bool IsOpeningKill, int ChainedKills, int KillsWithThisBullet, bool IsTrade);
 
@@ -48,9 +48,13 @@ internal sealed class RoundTracker(ProgressionSettings settings)
 	/// <param name="victim">The victim's id.</param>
 	/// <param name="victimTeam">The victim's side.</param>
 	/// <param name="time">The game time in seconds.</param>
-	/// <param name="tick">The server tick, which identifies kills made with one bullet.</param>
+	/// <param name="tick">The server tick, which with the weapon identifies kills made with one bullet.</param>
+	/// <param name="weapon">
+	/// The weapon's key. Kills on one tick count as one bullet only when they're with the same weapon, so a molotov
+	/// finishing one enemy as a rifle kills another isn't a collateral.
+	/// </param>
 	/// <returns>The round context for the kill.</returns>
-	public KillContext RegisterKill(int attacker, int attackerTeam, int victim, int victimTeam, double time, int tick)
+	public KillContext RegisterKill(int attacker, int attackerTeam, int victim, int victimTeam, double time, int tick, string? weapon = null)
 	{
 		bool opening = !anyKill;
 		anyKill = true;
@@ -63,8 +67,9 @@ internal sealed class RoundTracker(ProgressionSettings settings)
 
 		chain.Count++;
 		chain.LastKillTime = time;
-		chain.KillsThisTick = chain.LastTick == tick ? chain.KillsThisTick + 1 : 1;
+		chain.KillsThisTick = (chain.LastTick == tick) && string.Equals(chain.LastWeapon, weapon, StringComparison.Ordinal) ? chain.KillsThisTick + 1 : 1;
 		chain.LastTick = tick;
+		chain.LastWeapon = weapon;
 
 		bool trade = false;
 		if (recentKillsBy.TryGetValue(victim, out List<KillRecord>? victimsKills))
@@ -115,6 +120,8 @@ internal sealed class RoundTracker(ProgressionSettings settings)
 		public int LastTick { get; set; } = -1;
 
 		public int KillsThisTick { get; set; }
+
+		public string? LastWeapon { get; set; }
 	}
 
 	private sealed record KillRecord(int Victim, int VictimTeam, double Time);

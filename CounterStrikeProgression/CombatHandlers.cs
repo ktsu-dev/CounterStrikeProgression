@@ -256,13 +256,16 @@ internal sealed class CombatHandlers(ProgressionServices services)
 
 	private void CreditKill(EventPlayerDeath @event, CCSPlayerController attacker, CCSPlayerController victim, bool teammatesAreEnemies)
 	{
+		CCSPlayerPawn? attackerPawn = GameState.PawnOf(attacker);
+		WeaponInfo? weapon = GameState.ResolveWeapon(@event.Weapon, attackerPawn);
 		KillContext context = services.Round.RegisterKill(
 			attacker.Slot,
 			GameState.SideOf(attacker, teammatesAreEnemies),
 			victim.Slot,
 			GameState.SideOf(victim, teammatesAreEnemies),
 			Server.CurrentTime,
-			Server.TickCount);
+			Server.TickCount,
+			weapon?.Key.WeakString ?? @event.Weapon);
 
 		CreditAssist(@event, victim);
 		if (!ProgressionServices.IsTeammate(attacker, victim) && (Sessions.Get(attacker) is { Progress: not null } lifeSession))
@@ -270,8 +273,6 @@ internal sealed class CombatHandlers(ProgressionServices services)
 			lifeSession.Life.Kill(victim.IsBot);
 		}
 
-		CCSPlayerPawn? attackerPawn = GameState.PawnOf(attacker);
-		WeaponInfo? weapon = GameState.ResolveWeapon(@event.Weapon, attackerPawn);
 		if ((weapon is not null) && !ProgressionServices.IsTeammate(attacker, victim) && ((services.KillMaps is not null) || (services.Site is not null))
 			&& (KillMapRecorder.PointOf(Server.MapName ?? string.Empty, attacker, Sessions.Get(attacker)?.SteamId ?? 0, victim, Sessions.Get(victim)?.SteamId ?? 0, weapon, @event.Headshot) is { } point))
 		{
