@@ -50,6 +50,17 @@ public sealed class TrackerTests
 	}
 
 	[TestMethod]
+	public void KillsOnTheSameTickWithDifferentWeaponsAreNotOneBullet()
+	{
+		RoundTracker round = new(new ProgressionSettings());
+		round.StartRound();
+
+		Assert.AreEqual(1, round.RegisterKill(1, TeamA, 10, TeamB, 1.0, 64, "molotov").KillsWithThisBullet);
+		Assert.AreEqual(1, round.RegisterKill(1, TeamA, 11, TeamB, 1.0, 64, "ak47").KillsWithThisBullet, "A molotov kill and a rifle kill on one tick counted as one bullet.");
+		Assert.AreEqual(2, round.RegisterKill(1, TeamA, 12, TeamB, 1.0, 64, "ak47").KillsWithThisBullet, "Two rifle kills on one tick are one bullet.");
+	}
+
+	[TestMethod]
 	public void KillingATeammatesKillerQuicklyIsATrade()
 	{
 		RoundTracker round = new(new ProgressionSettings { TradeSeconds = 3 });

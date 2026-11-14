@@ -149,6 +149,8 @@ public sealed class SkillShotTests
 		Assert.Contains("triple_kill", Earned(TestHelpers.Kill("ak47") with { ChainedKills = 3 }));
 		Assert.Contains("rampage", Earned(TestHelpers.Kill("ak47") with { ChainedKills = 6 }));
 		Assert.Contains("collateral", Earned(TestHelpers.Kill("awp") with { KillsWithThisBullet = 2 }));
+		Assert.Contains("collateral", Earned(TestHelpers.Kill("ak47") with { KillsWithThisBullet = 2 }));
+		Assert.DoesNotContain("collateral", Earned(TestHelpers.Kill("nova") with { KillsWithThisBullet = 2 }), "One shotgun shell is many pellets, not one bullet.");
 		Assert.Contains("opening_kill", Earned(TestHelpers.Kill("ak47") with { IsOpeningKill = true }));
 		Assert.Contains("trade", Earned(TestHelpers.Kill("ak47") with { IsTrade = true }));
 		Assert.Contains("revenge", Earned(TestHelpers.Kill("ak47") with { IsRevenge = true }));

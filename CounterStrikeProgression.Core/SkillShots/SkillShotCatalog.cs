@@ -97,7 +97,7 @@ internal static class SkillShotCatalog
 		Kill("untouchable", "Untouchable", "Three kills in one life without taking damage", Rarity.Rare, Any, (e, _) => e.KillsUnhurt == 3),
 		Kill("killstreak_10", "10-kill streak", "Ten kills in one life", Rarity.Rare, Any, (e, _) => e.LifeKills == 10),
 		Kill("killstreak_20", "20-kill streak", "Twenty kills in one life", Rarity.Epic, Any, (e, _) => e.LifeKills == 20),
-		Kill("collateral", "Collateral", "Kill two players with one bullet", Rarity.Epic, Gun, (e, _) => e.KillsWithThisBullet >= 2),
+		Kill("collateral", "Collateral", "Kill two players with one bullet", Rarity.Epic, GunNotShotgun, (e, _) => e.KillsWithThisBullet >= 2),
 		Kill("opening_kill", "Opening kill", "Get the first kill of the round", Rarity.Common, Any, (e, _) => e.IsOpeningKill),
 		Kill("trade", "Trade", "Kill a teammate's killer right away", Rarity.Common, Any, (e, _) => e.IsTrade),
 		Kill("revenge", "Revenge", "Kill a player who was dominating you", Rarity.Common, Any, (e, _) => e.IsRevenge),
